@@ -1,13 +1,13 @@
 # KiCad 10 release validation
 
-Status: incomplete. Do not deploy until all release gates pass.
+Status: local-source release. npm publication is not part of this release.
 
-## Candidate
+## Local generator
 
-- GUI: 0.19.0, `ergogen: npm:@runinit/ergogen@5.0.0`.
+- GUI: 0.19.0, `ergogen: file:vendor/runinit-ergogen-5.0.0.tgz`.
 - Node 24.20.0; pnpm 11.3.0.
-- Generator candidate is installed from a tarball in `/tmp/ergogen-gui-candidate`.
-- Candidate lockfile, generator bundle, and previews stay disposable.
+- The tested generator source tarball is checked in under `vendor/`.
+- Standard builds use the committed lockfile without `ERGOGEN_VERSION`.
 - KiCanvas source: `b031159eb74aaa7eef2b026fd85d35bc05ff2095`.
 - ceoloide footprints: `54a23cc9d025ef3a3d1c42b0452d1ceac681ea5a`.
 - infused-kim footprints: `bb80a207d8a6fa7b9245caad2c2d97e2adc2f612`.
@@ -53,11 +53,10 @@ service-worker registration. Viewer tests cover malformed input recovery and
 WebGL initialization errors. Mobile outputs hide while editing; worker builds
 include the pinned footprint sources without modifying dependency stores.
 
-npm publishing still requires authentication. After candidate acceptance,
-publish the exact generator tarball, verify registry integrity, remove the GUI
-candidate override, refresh the lockfile and assets from the registry, and
-repeat validation in a clean checkout. Pages is configured for workflow deployment with no custom domain. Deploy,
-verify the live site, and tag 0.19.0 only after those checks pass.
+The generator is built from the checked-in local source archive. No npm login
+or publication is required. Pages is configured for workflow deployment with
+no custom domain. Complete clean standalone validation, deploy the checked
+artifact, and verify the live site before tagging GUI 0.19.0.
 
 BHK KiCad 8/10 geometry, 3,556 connectivity records, and all 993 normalized
 DRC violations match; 206 unconnected items remain. All 21 Gerbers match after

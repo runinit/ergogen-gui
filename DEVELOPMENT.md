@@ -501,3 +501,10 @@ Production uses `/ergogen-gui/`. Build before running `pnpm run test:e2e`;
 Playwright serves `dist` with Vite preview and refuses an existing server.
 The Pages workflow deploys the artifact only after release, precommit, and
 production browser checks pass. See `RELEASE-KICAD10.md` for validation status.
+
+## Local KiCad 10 generator
+
+The default `ergogen` dependency is the checked-in source archive under `vendor/`.
+Run `pnpm install --frozen-lockfile` and `pnpm run build` without `ERGOGEN_VERSION`.
+The build stages and patches a disposable copy; the generator needs no npm
+publication. `vendor/README.md` records the source commit and archive hash.

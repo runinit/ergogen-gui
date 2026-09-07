@@ -1,5 +1,5 @@
 /*!
- * Ergogen v4.2.1
+ * Ergogen v5.0.0
  * https://ergogen.xyz
  */
 
@@ -7,7 +7,7 @@
 	typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('makerjs'), require('js-yaml'), require('jszip'), require('mathjs'), require('kle-serial'), require('hull')) :
 	typeof define === 'function' && define.amd ? define(['makerjs', 'js-yaml', 'jszip', 'mathjs', 'kle-serial', 'hull'], factory) :
 	(global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.ergogen = factory(global.makerjs, global.jsyaml, global.jszip, global.math, global.kle, global.hull));
-})(this, (function (require$$0, require$$2, require$$1$2, require$$3, require$$1$1, require$$8) { 'use strict';
+})(this, (function (require$$0, require$$2$1, require$$1$1, require$$3, require$$1, require$$8) { 'use strict';
 
 	function getDefaultExportFromCjs (x) {
 		return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
@@ -354,8 +354,8 @@
 		if (hasRequiredKle) return kle;
 		hasRequiredKle = 1;
 		const u = requireUtils();
-		const kle$1 = require$$1$1;
-		const yaml = require$$2;
+		const kle$1 = require$$1;
+		const yaml = require$$2$1;
 
 		kle.convert = (config, logger) => {
 		    const keyboard = kle$1.Serial.deserialize(config);
@@ -435,14 +435,14 @@
 	function requireIo () {
 		if (hasRequiredIo) return io;
 		hasRequiredIo = 1;
-		const yaml = require$$2;
+		const yaml = require$$2$1;
 		const makerjs = require$$0;
 
 		const u = requireUtils();
 		const a = requireAssert();
 		const kle = requireKle();
 
-		const package_json = {"name":"ergogen","version":"4.2.1","description":"Ergonomic keyboard layout generator","author":"Bán Dénes <mr@zealot.hu>","license":"MIT","homepage":"https://ergogen.xyz","repository":"github:ergogen/ergogen","bugs":"https://github.com/ergogen/ergogen/issues","main":"./src/ergogen.js","bin":"./src/cli.js","scripts":{"build":"rollup -c","test":"mocha -r test/helpers/register test/index.js","coverage":"nyc --reporter=html --reporter=text npm test"},"dependencies":{"fs-extra":"^11.3.2","hull":"github:andriiheonia/hull","js-yaml":"^3.14.1","jszip":"^3.10.1","kle-serial":"github:ergogen/kle-serial#ergogen","makerjs":"^0.18.1","mathjs":"^15.0.0","yargs":"^17.7.2"},"devDependencies":{"@rollup/plugin-commonjs":"^28.0.7","@rollup/plugin-json":"^6.1.0","chai":"^4.5.0","chai-as-promised":"^7.1.2","dir-compare":"^5.0.0","glob":"^11.0.3","mocha":"^11.7.4","nyc":"^17.1.0","rollup":"^4.52.4","sinon":"^21.0.0"},"nyc":{"all":true,"include":["src/**/*.js"]}};
+		const package_json = {"name":"@runinit/ergogen","version":"5.0.0","description":"Ergonomic keyboard layout generator","author":"Bán Dénes <mr@zealot.hu>","license":"MIT","homepage":"https://ergogen.xyz","repository":"github:runinit/ergogen","bugs":"https://github.com/runinit/ergogen/issues","main":"./src/ergogen.js","bin":{"ergogen":"./src/cli.js"},"scripts":{"build":"rollup -c","test":"mocha -r test/helpers/register test/index.js","coverage":"nyc --reporter=html --reporter=text npm test"},"dependencies":{"fs-extra":"^11.3.2","hull":"github:andriiheonia/hull#5847b0a4fa23f8e5aa3c37a8e6d7b8cf58f24082","js-yaml":"^3.14.1","jszip":"^3.10.1","kle-serial":"github:ergogen/kle-serial#61f29f317d87bbfed0b0b7e646e1b91d4384ac02","makerjs":"^0.18.1","mathjs":"^15.0.0","yargs":"^17.7.2"},"devDependencies":{"@rollup/plugin-commonjs":"^28.0.7","@rollup/plugin-json":"^6.1.0","chai":"^4.5.0","chai-as-promised":"^7.1.2","dir-compare":"^5.0.0","glob":"^11.0.3","mocha":"^11.7.4","nyc":"^17.1.0","rollup":"^4.52.4","sinon":"^21.0.0"},"nyc":{"all":true,"include":["src/**/*.js"]},"publishConfig":{"access":"public"}};
 
 		const fake_require = io.fake_require = injection => name => {
 		    const dependencies = {
@@ -7694,7 +7694,7 @@
 		    const hotswap_common = `
     ${'' /* Middle Hole */}
     ${p.include_plated_holes ? `
-    (pad ${p.reversible ? '""' : '"1"'} thru_hole circle (at 0 -5.95 ${p.r}) (size 3.3 3.3) (drill 3) (layers "*.Cu" "*.Mask") ${p.reversible ? '' : p.from.str})
+    (pad ${p.reversible ? '""' : 1} thru_hole circle (at 0 -5.95 ${p.r}) (size 3.3 3.3) (drill 3) (layers "*.Cu" "*.Mask") ${p.reversible ? '' : p.from.str})
     `: `
     (pad "" np_thru_hole circle (at 0 -5.95 ${p.r}) (size 3 3) (drill 3) (layers "*.Cu" "*.Mask"))
     `}
@@ -9403,16 +9403,16 @@
 		    function pins(def_neg, def_pos) {
 		      if (p.symmetric && p.reversible) {
 		        return `
-    (pad "2" thru_hole oval (at ${def_pos} 3.2 ${p.r}) (size 1.6 2.2) (drill oval 0.9 1.5) (layers "*.Cu" "*.Mask") ${p.SL.str})
-    (pad "3" thru_hole oval (at ${def_pos} 6.2 ${p.r}) (size 1.6 2.2) (drill oval 0.9 1.5) (layers "*.Cu" "*.Mask") ${p.R2.str})
-    (pad "4" thru_hole oval (at ${def_pos} 10.75 ${p.r}) (size 1.6 3.3) (drill oval 0.9 2.6) (layers "*.Cu" "*.Mask") ${p.TP.str})
+    (pad 2 thru_hole oval (at ${def_pos} 3.2 ${p.r}) (size 1.6 2.2) (drill oval 0.9 1.5) (layers "*.Cu" "*.Mask") ${p.SL.str})
+    (pad 3 thru_hole oval (at ${def_pos} 6.2 ${p.r}) (size 1.6 2.2) (drill oval 0.9 1.5) (layers "*.Cu" "*.Mask") ${p.R2.str})
+    (pad 4 thru_hole oval (at ${def_pos} 10.75 ${p.r}) (size 1.6 3.3) (drill oval 0.9 2.6) (layers "*.Cu" "*.Mask") ${p.TP.str})
         `
 		      } else {
 		        return `
-    (pad "2" thru_hole oval (at ${def_pos} 3.2 ${p.r}) (size 1.6 2.2) (drill oval 0.9 1.5) (layers "*.Cu" "*.Mask") ${p.SL.str})
-    (pad "3" thru_hole oval (at ${def_pos} 6.2 ${p.r}) (size 1.6 2.2) (drill oval 0.9 1.5) (layers "*.Cu" "*.Mask") ${p.R2.str})
-    (pad "4" thru_hole oval (at ${def_pos} 10.2 ${p.r}) (size 1.6 2.2) (drill oval 0.9 1.5) (layers "*.Cu" "*.Mask") ${p.TP.str})
-    (pad "5" thru_hole oval (at ${def_neg} 11.3 ${p.r}) (size 1.6 2.2) (drill oval 0.9 1.5) (layers "*.Cu" "*.Mask") ${p.R1.str})
+    (pad 2 thru_hole oval (at ${def_pos} 3.2 ${p.r}) (size 1.6 2.2) (drill oval 0.9 1.5) (layers "*.Cu" "*.Mask") ${p.SL.str})
+    (pad 3 thru_hole oval (at ${def_pos} 6.2 ${p.r}) (size 1.6 2.2) (drill oval 0.9 1.5) (layers "*.Cu" "*.Mask") ${p.R2.str})
+    (pad 4 thru_hole oval (at ${def_pos} 10.2 ${p.r}) (size 1.6 2.2) (drill oval 0.9 1.5) (layers "*.Cu" "*.Mask") ${p.TP.str})
+    (pad 5 thru_hole oval (at ${def_neg} 11.3 ${p.r}) (size 1.6 2.2) (drill oval 0.9 1.5) (layers "*.Cu" "*.Mask") ${p.R1.str})
         `
 		      }
 		    }
@@ -14048,8 +14048,8 @@
 		return kicad5;
 	}
 
-	var version = "4.2.1";
-	var require$$1 = {
+	var version = "5.0.0";
+	var require$$2 = {
 		version: version};
 
 	var kicad8;
@@ -14059,7 +14059,7 @@
 		if (hasRequiredKicad8) return kicad8;
 		hasRequiredKicad8 = 1;
 		const m = require$$0;
-		const version = require$$1.version;
+		const version = require$$2.version;
 
 		kicad8 = {
 
@@ -14198,6 +14198,153 @@
 		return kicad8;
 	}
 
+	var sexpr = {};
+
+	var hasRequiredSexpr;
+
+	function requireSexpr () {
+		if (hasRequiredSexpr) return sexpr;
+		hasRequiredSexpr = 1;
+		(function (exports) {
+			// Keep quoted atoms distinct so net "123" never becomes numeric net 123.
+			exports.quote = value => JSON.stringify(String(value));
+			exports.parse = (source, context) => {
+			    const roots = [];
+			    const stack = [roots];
+			    const tokens = /\s+|;[^\n]*|\(|\)|"(?:\\.|[^"\\])*"|[^\s()"]+/gy;
+			    let offset = 0;
+			    while (offset < source.length) {
+			        tokens.lastIndex = offset;
+			        const match = tokens.exec(source);
+			        if (!match) {
+			            throw new Error(`${context}: invalid S-expression at character ${offset}`)
+			        }
+			        const token = match[0];
+			        offset = tokens.lastIndex;
+			        if (/^\s|^;/.test(token)) {
+			            continue
+			        }
+			        if (token === '(') {
+			            const node = [];
+			            stack[stack.length - 1].push(node);
+			            stack.push(node);
+			        } else if (token === ')') {
+			            if (stack.length === 1) {
+			                throw new Error(`${context}: unexpected closing parenthesis at ${offset}`)
+			            }
+			            stack.pop();
+			        } else {
+			            stack[stack.length - 1].push(token);
+			        }
+			    }
+			    if (stack.length !== 1 || roots.some(node => !Array.isArray(node))) {
+			        throw new Error(`${context}: incomplete S-expression`)
+			    }
+			    return roots
+			};
+			exports.print = node => Array.isArray(node) ? `(${node.map(exports.print).join(' ')})` : node;
+			exports.value = atom => atom.startsWith('"') ? JSON.parse(atom) : atom; 
+		} (sexpr));
+		return sexpr;
+	}
+
+	var kicad10;
+	var hasRequiredKicad10;
+
+	function requireKicad10 () {
+		if (hasRequiredKicad10) return kicad10;
+		hasRequiredKicad10 = 1;
+		const legacy = requireKicad8();
+		const sexpr = requireSexpr();
+		const version = require$$2.version;
+		const FORMAT_VERSION = 20260206;
+		const HALF_TURN = 180;
+		const layers = [
+		    [0, 'F.Cu', 'signal'], [2, 'B.Cu', 'signal'],
+		    [9, 'F.Adhes'], [11, 'B.Adhes'], [13, 'F.Paste'], [15, 'B.Paste'],
+		    [5, 'F.SilkS'], [7, 'B.SilkS'], [1, 'F.Mask'], [3, 'B.Mask'],
+		    [17, 'Dwgs.User'], [19, 'Cmts.User'], [21, 'Eco1.User'], [23, 'Eco2.User'],
+		    [25, 'Edge.Cuts'], [27, 'Margin'], [31, 'F.CrtYd'], [29, 'B.CrtYd'],
+		    [35, 'F.Fab'], [33, 'B.Fab']
+		];
+		const child = (node, name) => node.find(item => Array.isArray(item) && item[0] === name);
+
+		// Normalize fragments at the backend boundary; footprint authors keep numeric nets.
+		const normalize = (node, nets, context) => {
+		    const kind = node[0];
+		    if (kind === 'net') {
+		        const atom = node[1];
+		        if (!atom) {
+		            throw new Error(`${context}: missing net reference`)
+		        }
+		        if (atom.startsWith('"')) {
+		            return node
+		        }
+		        const name = nets.get(Number(atom));
+		        if (name === undefined) {
+		            throw new Error(`${context}: unresolved net ${atom}`)
+		        }
+		        if (node[2] && sexpr.value(node[2]) !== name) {
+		            throw new Error(`${context}: net ${atom} name disagrees with board registry`)
+		        }
+		        return ['net', sexpr.quote(name)]
+		    }
+		    if (kind === 'module') {
+		        node[0] = 'footprint';
+		    }
+		    if (/^(fp|gr)_(line|arc|circle|rect|poly|curve)$/.test(kind)) {
+		        const width = child(node, 'width');
+		        if (width) {
+		            node.splice(node.indexOf(width), 1, ['stroke', width, ['type', 'default']]);
+		        }
+		        const angle = child(node, 'angle');
+		        if (kind.endsWith('_arc') && angle) {
+		            const center = child(node, 'start');
+		            const start = child(node, 'end');
+		            const radians = Number(angle[1]) * Math.PI / HALF_TURN;
+		            const rotate = fraction => {
+		                const x = Number(start[1]) - Number(center[1]);
+		                const y = Number(start[2]) - Number(center[2]);
+		                const theta = radians * fraction;
+		                return [String(Number(center[1]) + x * Math.cos(theta) - y * Math.sin(theta)),
+		                    String(Number(center[2]) + x * Math.sin(theta) + y * Math.cos(theta))]
+		            };
+		            const end = rotate(1);
+		            const mid = rotate(0.5);
+		            center.splice(0, center.length, 'start', ...start.slice(1));
+		            start.splice(0, start.length, 'end', ...end);
+		            node.splice(node.indexOf(angle), 1);
+		            node.splice(node.indexOf(start), 0, ['mid', ...mid]);
+		        }
+		    }
+		    // Legacy timestamps and zone net names are superseded by native identities.
+		    return node.filter(item => !Array.isArray(item) ||
+		        !['tstamp', 'net_name'].includes(item[0])).map(item =>
+		        Array.isArray(item) ? normalize(item, nets, context) : item)
+		};
+
+		kicad10 = {
+		    convert_outline: legacy.convert_outline,
+		    body: params => {
+		        const nets = new Map(params.nets.map(net => [net.index, net.name]));
+		        const fragments = [...params.footprints, ...Object.values(params.outlines)];
+		        const content = fragments.flatMap((text, index) => {
+		            const context = `PCB ${params.name}, footprint/outline ${index + 1}`;
+		            return sexpr.parse(text, context).map(node => sexpr.print(normalize(node, nets, context)))
+		        }).join('\n');
+		        return `(kicad_pcb (version ${FORMAT_VERSION})
+(generator "ergogen") (generator_version ${sexpr.quote(version)})
+(general (thickness 1.6)) (paper "A3")
+(title_block (title ${sexpr.quote(params.name)}) (rev ${sexpr.quote(params.version)}) (company ${sexpr.quote(params.author)}))
+(layers ${layers.map(([id, name, type = 'user']) => `(${id} ${sexpr.quote(name)} ${type})`).join('\n')})
+(setup (pad_to_mask_clearance 0.05) (allow_soldermask_bridges_in_footprints no))
+${content}
+(embedded_fonts no))\n`
+		    }
+		};
+		return kicad10;
+	}
+
 	var templates;
 	var hasRequiredTemplates;
 
@@ -14206,7 +14353,8 @@
 		hasRequiredTemplates = 1;
 		templates = {
 		    kicad5: requireKicad5(),
-		    kicad8: requireKicad8()
+		    kicad8: requireKicad8(),
+		    kicad10: requireKicad10()
 		};
 		return templates;
 	}
@@ -14216,7 +14364,7 @@
 	function requirePcbs () {
 		if (hasRequiredPcbs) return pcbs;
 		hasRequiredPcbs = 1;
-		const yaml = require$$2;
+		const yaml = require$$2$1;
 
 		const u = requireUtils();
 		const a = requireAssert();
@@ -14248,7 +14396,7 @@
 		    return {
 		        name,
 		        index,
-		        str: `(net ${index} "${name}")`,
+		        str: `(net ${index} ${JSON.stringify(name)})`,
 		        toString: function() { return this.str }
 		    }
 		};
@@ -14325,7 +14473,8 @@
 		        if (['string', 'number', 'boolean', 'array', 'object'].includes(type)) {
 		            parsed_params[param_name] = value;
 		        } else if (type == 'net') {
-		            const net = a.sane(value, `${name}.params.${param_name}`, 'string')(units);
+		            a.assert(typeof value === 'string', `Field ${name}.params.${param_name} should be a net name string!`);
+		            const net = value;
 		            const index = net_indexer(net);
 		            parsed_params[param_name] = net_obj(net, index);
 		        } else { // anchor
@@ -14385,7 +14534,7 @@
 		        // config sanitization
 		        a.unexpected(pcb_config, `pcbs.${pcb_name}`, ['outlines', 'footprints', 'references', 'template', 'params']);
 		        const references = a.sane(pcb_config.references || false, `pcbs.${pcb_name}.references`, 'boolean')();
-		        const template = template_types[a.in(pcb_config.template || 'kicad5', `pcbs.${pcb_name}.template`, Object.keys(template_types))];
+		        const template = template_types[a.in(pcb_config.template || 'kicad10', `pcbs.${pcb_name}.template`, Object.keys(template_types))];
 
 		        // outline conversion
 		        if (a.type(pcb_config.outlines)() == 'array') {
@@ -14400,7 +14549,7 @@
 		        }
 
 		        // making a global net index registry
-		        const nets = {"": 0};
+		        const nets = Object.assign(Object.create(null), {"": 0});
 		        const net_indexer = net => {
 		            if (nets[net] !== undefined) return nets[net]
 		            const index = Object.keys(nets).length;
@@ -14477,7 +14626,7 @@
 		const cases_lib = requireCases();
 		const pcbs_lib = requirePcbs();
 
-		const version = "4.2.1";
+		const version = "5.0.0";
 
 		const process = async (raw, options={}, logger=()=>{}) => {
 
