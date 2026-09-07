@@ -8,7 +8,7 @@ const ADux: ConfigExample = {
   label: 'A. Dux',
   author: 'tapioki',
   value: `meta:
-  engine: 4.1.0
+  engine: 5.0.0
 points:
   zones:
     matrix:
@@ -197,7 +197,7 @@ outlines:
       operation: subtract
 pcbs:
   architeuthis_dux:
-    template: kicad8
+    template: kicad10
     outlines:
       main:
         outline: bottom

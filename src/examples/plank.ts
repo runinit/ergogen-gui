@@ -9,7 +9,7 @@ const Plank: ConfigExample = {
   label: 'Plank',
   author: 'cache.works',
   value: `meta:
-  engine: 4.1.0
+  engine: 5.0.0
 units:
   visual_x: 17.5
   visual_y: 16.5
@@ -131,7 +131,7 @@ outlines:
       operation: subtract
 pcbs:
   plank:
-    template: kicad8
+    template: kicad10
     outlines:
       main:
         outline: panel

@@ -1,5 +1,17 @@
 # Changelog
 
+## KiCad 10 support
+
+September 7, 2026
+
+Ergogen GUI 0.19.0 generates native KiCad 10 boards with
+`@runinit/ergogen@5.0.0`. Explicit KiCad 5/8 templates remain available.
+
+The viewer resolves named nets consistently across pads, tracks, arcs, vias,
+and zones, including empty and numeric-looking names. Preview failures explain
+that the original PCB remains downloadable. Deployment under `/ergogen-gui/`
+supports workers, routing, and offline reload.
+
 ## Build Stack Modernization Benchmark Report
 
 July 16, 2026

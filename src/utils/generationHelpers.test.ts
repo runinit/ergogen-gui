@@ -72,7 +72,7 @@ describe('generationHelpers', () => {
       expect(checkForDeprecationWarnings({ pcbs: {} })).toBeNull();
     });
 
-    it('should return warning when KiCad 5 (or default kicad5 template) is used with ceoloide footprints', () => {
+    it('should return warning when KiCad 5 is used with ceoloide footprints', () => {
       const config = {
         pcbs: {
           myBoard: {
@@ -90,7 +90,7 @@ describe('generationHelpers', () => {
       );
     });
 
-    it('should return warning when no template (defaults to kicad5) is used with ceoloide footprints', () => {
+    it('should return null for the default KiCad 10 template', () => {
       const config = {
         pcbs: {
           myBoard: {
@@ -102,9 +102,7 @@ describe('generationHelpers', () => {
           },
         },
       };
-      expect(checkForDeprecationWarnings(config)).toContain(
-        'KiCad 5 is deprecated'
-      );
+      expect(checkForDeprecationWarnings(config)).toBeNull();
     });
 
     it('should return null when KiCad 8 template is specified', () => {

@@ -9,7 +9,7 @@ const Wubbo: ConfigExample = {
   label: 'Wubbo',
   author: 'cache.works',
   value: `meta:
-  engine: 4.1.0
+  engine: 5.0.0
 units:
   # Parameters
   row_spacing: 1cy

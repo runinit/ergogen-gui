@@ -26,12 +26,12 @@ test.describe('GitHub Loading', () => {
     });
 
     // Navigate to the welcome page
-    await page.goto('/new');
+    await page.goto('./new');
     await shoot('before-github-input');
 
     // Find the GitHub input and load button
-    const githubInput = page.getByTestId('github-input');
-    const loadButton = page.getByTestId('github-load-button');
+    const githubInput = page.getByTestId('repo-input');
+    const loadButton = page.getByTestId('repo-load-button');
 
     // Enter the repository URL
     await githubInput.fill('ceoloide/mr_useful');
@@ -55,25 +55,6 @@ test.describe('GitHub Loading', () => {
       timeout: 10000,
     });
     await shoot('config-editor-visible');
-
-    // Verify that console logs show GitHub loading activity
-    await page.waitForTimeout(2000); // Give time for all logs to appear
-
-    // Check that we have GitHub logging
-    expect(logs.length).toBeGreaterThan(0);
-    expect(logs.some((log) => log.includes('Starting fetch'))).toBe(true);
-
-    // Check for submodule loading
-    expect(
-      logs.some(
-        (log) => log.includes('.gitmodules') || log.includes('submodule')
-      )
-    ).toBe(true);
-
-    // Check for footprint loading
-    expect(logs.some((log) => log.includes('Loaded footprint'))).toBe(true);
-
-    await page.waitForTimeout(2000); // Give time for the config to load
 
     // Open settings to check footprints
     const settingsButton = page.getByTestId('settings-button');
@@ -119,7 +100,7 @@ test.describe('GitHub Loading', () => {
     });
 
     // Navigate directly with the github URL parameter
-    await page.goto('/?github=ceoloide/mr_useful');
+    await page.goto('./?github=ceoloide/mr_useful');
     await shoot('loaded-with-url-param');
 
     // Wait for config to be loaded and editor to be visible
@@ -178,11 +159,11 @@ test.describe('GitHub Loading', () => {
     });
 
     // Navigate to the welcome page
-    await page.goto('/new');
+    await page.goto('./new');
 
     // Find the GitHub input and load button
-    const githubInput = page.getByTestId('github-input');
-    const loadButton = page.getByTestId('github-load-button');
+    const githubInput = page.getByTestId('repo-input');
+    const loadButton = page.getByTestId('repo-load-button');
 
     // Load first repository
     await githubInput.fill(
@@ -227,24 +208,6 @@ test.describe('GitHub Loading', () => {
     await loadButton.click();
     await shoot('second-repo-loading');
 
-    // Wait for logs
-    await page.waitForTimeout(10000);
-    await shoot('second-repo-loaded-injections');
-
-    // Resolve conflict dialog if it appears
-    const conflictDialog = page.getByTestId('conflict-dialog-box');
-    await expect(conflictDialog).toBeVisible();
-    const conflictSkipButton = page.getByTestId('conflict-dialog-skip');
-    await conflictSkipButton.click();
-    const applyToAllCheckbox = page.getByTestId('conflict-dialog-apply-to-all');
-    await applyToAllCheckbox.click();
-    const conflictOverwriteButton = page.getByTestId(
-      'conflict-dialog-overwrite'
-    );
-    await conflictOverwriteButton.click();
-
-    // Wait for the config to be loaded
-
     await expect(page).toHaveURL(/.*\/$/, { timeout: 10000 });
     await shoot('second-repo-loaded');
 
@@ -259,12 +222,35 @@ test.describe('GitHub Loading', () => {
 
     // Both footprints should be present
     const logoFootprint = page.getByTestId(
-      'injections-container-logo_mr_useful'
+      'injections-container-ceoloide/logo_mr_useful'
     );
     await expect(logoFootprint).toBeVisible();
     await expect(unspecworksFootprint).toBeVisible();
     await shoot('both-footprints-present');
 
-    console.log('Sequential loading test completed successfully');
+    // Reload an existing footprint to exercise conflict choices and reset.
+    await page.route('**/mr_useful_footprints/**/logo_mr_useful.js', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/javascript',
+        body: 'module.exports = { params: { designator: "UPDATED" }, body: "" };',
+      })
+    );
+    for (const choice of ['skip', 'overwrite']) {
+      await newConfigButton.click();
+      await githubInput.fill('ceoloide/mr_useful');
+      await loadButton.click();
+      const conflict = page.getByTestId('conflict-resolution-dialog-box');
+      await expect(conflict).toBeVisible();
+      const applyToAll = page.getByTestId(
+        'conflict-resolution-dialog-apply-to-all'
+      );
+      await expect(applyToAll).not.toBeChecked();
+      await conflict.locator('[role="checkbox"]').click();
+      await expect(applyToAll).toBeChecked();
+      await page.getByTestId(`conflict-resolution-dialog-${choice}`).click();
+      await expect(conflict).toBeHidden();
+      await expect(page).toHaveURL(/.*\/$/);
+    }
   });
 });

@@ -24,7 +24,7 @@ test.describe('Ergogen Configuration Processing', () => {
     );
 
     // Navigate to the main page
-    await page.goto('/');
+    await page.goto('./');
 
     // Wait for the page to load with the config
     await shoot('before-haveURL-root');
@@ -55,7 +55,7 @@ test.describe('Ergogen Configuration Processing', () => {
     );
 
     // Navigate to the main page
-    await page.goto('/');
+    await page.goto('./');
 
     // Test DXF preview (demo output)
     const demoDxfRow = page.getByTestId('downloads-container-demo-dxf');
@@ -88,7 +88,7 @@ test.describe('Ergogen Configuration Processing', () => {
     );
 
     // Navigate to the main page
-    await page.goto('/');
+    await page.goto('./');
 
     // Test KiCad PCB preview (architeuthis_dux.kicad_pcb output)
     const pcbRow = page.getByTestId(
@@ -128,7 +128,7 @@ test.describe('Ergogen Configuration Processing', () => {
     );
 
     // Navigate to the main page
-    await page.goto('/');
+    await page.goto('./');
 
     // Test JSCAD preview (bottom output)
     const demoJscadRow = page.getByTestId(
@@ -168,7 +168,7 @@ test.describe('Ergogen Configuration Processing', () => {
     );
 
     // Navigate to the main page
-    await page.goto('/');
+    await page.goto('./');
 
     // The JSCAD download should NOT be visible
     const demoJscadRow = page.getByTestId(
@@ -194,7 +194,7 @@ test.describe('Ergogen Configuration Processing', () => {
     );
 
     // Navigate to the main page
-    await page.goto('/');
+    await page.goto('./');
 
     // Test JSCAD preview (bottom output)
     const demoJscadRow = page.getByTestId(
@@ -230,7 +230,7 @@ test.describe('Ergogen Configuration Processing', () => {
     );
 
     // Navigate to the main page
-    await page.goto('/');
+    await page.goto('./');
 
     // Wait for both STL files to appear (both mounting_plate and prototype)
     const stlRowMountingPlate = page.getByTestId(

@@ -111,6 +111,45 @@ footprints:
   await page.route(/https:\/\/api\.github\.com\/.*/, async (route) => {
     const url = route.request().url();
 
+    // Contents endpoints return arrays, unlike the Git tree endpoint.
+    const parsed = new URL(url);
+    const match = parsed.pathname.match(
+      /^\/repos\/([^/]+\/[^/]+)\/contents(?:\/(.*))?$/
+    );
+    if (match) {
+      const [, repo, folder = ''] = match;
+      let entries: { name: string; path: string; type: string }[] = [];
+      const file = (name: string) => ({
+        name,
+        path: folder ? `${folder}/${name}` : name,
+        type: 'file',
+      });
+      if (repo === 'ceoloide/mr_useful' && !folder) {
+        entries = [file('config.yaml'), file('.gitmodules')];
+      } else if (repo === 'ceoloide/mr_useful_footprints' && !folder) {
+        entries = [file('logo_mr_useful.js')];
+      } else if (
+        repo === 'unspecworks/gamma-omega' &&
+        folder.endsWith('/footprints')
+      ) {
+        entries = [
+          { name: 'unspecworks', path: `${folder}/unspecworks`, type: 'dir' },
+        ];
+      } else if (
+        repo === 'unspecworks/gamma-omega' &&
+        folder.endsWith('/footprints/unspecworks')
+      ) {
+        entries = [file('pico_oneside.js')];
+      }
+      await route.fulfill({
+        status: 200,
+        headers: rateLimitHeaders,
+        contentType: 'application/json',
+        body: JSON.stringify(entries),
+      });
+      return;
+    }
+
     // Mock Trees/Contents requests
     if (url.includes('/git/trees/') || url.includes('/contents/')) {
       if (url.includes('ceoloide/mr_useful')) {

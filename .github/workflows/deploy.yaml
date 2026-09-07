@@ -1,82 +1,64 @@
-# .github/workflows/deploy.yaml
-
-name: Build and deploy on GitHub Pages
+name: Validate and deploy GitHub Pages
 
 on:
-  # Runs on pushes targeting the default branch
   push:
-    branches: ["main"]
-
-  # Allows you to run this workflow manually from the Actions tab
+    branches: [main]
   workflow_dispatch:
 
-  repository_dispatch:
-  pull_request:
-
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: read
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
-  group: "pages"
+  group: pages
   cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+  check:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
         with:
           version: 11
-      - name: Setup Node
-        uses: actions/setup-node@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: '24.x'
           cache: pnpm
-      - name: Configure Git to use HTTPS for GitHub
-        run: |
-          git config --global --unset-all url."https://github.com/".insteadOf 2>/dev/null || true
-          git config --global --add url."https://github.com/".insteadOf "ssh://git@github.com/"
-          git config --global --add url."https://github.com/".insteadOf "git+ssh://git@github.com/"
-          git config --global --add url."https://github.com/".insteadOf "git@github.com:"
-      - name: pnpm install
-        run: |
-          if [ -n "$ERGOGEN_VERSION" ]; then
-            echo "ERGOGEN_VERSION is set, running preinstall patch"
-            node scripts/preinstall.js
-            PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --no-frozen-lockfile
-          else
-            echo "ERGOGEN_VERSION is not set, running pnpm install --frozen-lockfile"
-            PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --frozen-lockfile
-          fi
+      - run: pnpm install --frozen-lockfile
         env:
-          ERGOGEN_VERSION: ${{ vars.ERGOGEN_VERSION }}
-      - name: pnpm build
-        run: pnpm run build
+          PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS: 'false'
+      - name: Verify published generator
+        run: |
+          node <<'JS'
+          const assert = require('node:assert/strict');
+          const pkg = require('ergogen/package.json');
+          assert.equal(pkg.name, '@runinit/ergogen');
+          assert.equal(pkg.version, '5.0.0');
+          JS
+      - run: pnpm run test:release
+      - run: pnpm run precommit
+      - run: git diff --exit-code
+      - run: pnpm run build
         env:
           REACT_APP_GTAG_ID: ${{ vars.REACT_APP_GTAG_ID }}
-          PUBLIC_URL: ${{ vars.PUBLIC_URL }}
-          ERGOGEN_VERSION: ${{ vars.ERGOGEN_VERSION }}
-      - name: Create 404.html for SPA routing
-        run: cp ./dist/index.html ./dist/404.html
-      - name: Conditionally create CNAME
-        if: ${{ github.ref == 'refs/heads/main' && vars.CNAME_DOMAIN }}
-        run: echo "${{ vars.CNAME_DOMAIN }}" > ./dist/CNAME
-        env:
-          CNAME_DOMAIN: ${{ vars.CNAME_DOMAIN }}
-      - name: Deploy
-        uses: peaceiris/actions-gh-pages@v4
-        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch')
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm run test:e2e
+      - name: Prepare Pages routing
+        run: cp dist/index.html dist/404.html
+      - uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          allow_empty_commit: true
-          full_commit_message: ${{ github.event.head_commit.message }}
-          force_orphan: true
+          path: dist
+
+  deploy:
+    needs: check
+    if: github.repository == 'runinit/ergogen-gui' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment

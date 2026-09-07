@@ -131,7 +131,7 @@ describe('Analytics Utility', () => {
       expect(window.gtag).toHaveBeenCalledWith('event', eventName, {
         event_category: 'user_action',
         gui_version: guiPkg.version,
-        ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
+        ergogen_version: `github:runinit/ergogen#v${ergogenPkg.version}`,
         is_pwa: false,
         param1: 'value1',
         param2: 123,
@@ -147,7 +147,7 @@ describe('Analytics Utility', () => {
       expect(window.gtag).toHaveBeenCalledWith('event', eventName, {
         event_category: 'user_action',
         gui_version: guiPkg.version,
-        ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
+        ergogen_version: `github:runinit/ergogen#v${ergogenPkg.version}`,
         is_pwa: false,
       });
     });
@@ -162,7 +162,7 @@ describe('Analytics Utility', () => {
       expect(window.gtag).toHaveBeenCalledWith('event', eventName, {
         event_category: 'custom_category',
         gui_version: guiPkg.version,
-        ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
+        ergogen_version: `github:runinit/ergogen#v${ergogenPkg.version}`,
         is_pwa: false,
       });
     });
@@ -195,7 +195,7 @@ describe('Analytics Utility', () => {
       expect(window.gtag).toHaveBeenCalledWith('event', 'test_event', {
         event_category: 'user_action',
         gui_version: guiPkg.version,
-        ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
+        ergogen_version: `github:runinit/ergogen#v${ergogenPkg.version}`,
         is_pwa: true,
       });
 
@@ -231,7 +231,7 @@ describe('Analytics Utility', () => {
       expect(window.gtag).toHaveBeenCalledWith('event', 'exception', {
         event_category: 'user_action',
         gui_version: guiPkg.version,
-        ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
+        ergogen_version: `github:runinit/ergogen#v${ergogenPkg.version}`,
         is_pwa: false,
         description: '[test_context] test error message',
         fatal: true,
@@ -247,7 +247,7 @@ describe('Analytics Utility', () => {
       expect(window.gtag).toHaveBeenCalledWith('event', 'exception', {
         event_category: 'user_action',
         gui_version: guiPkg.version,
-        ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
+        ergogen_version: `github:runinit/ergogen#v${ergogenPkg.version}`,
         is_pwa: false,
         description: 'nested failure',
         fatal: false,

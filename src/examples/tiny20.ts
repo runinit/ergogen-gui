@@ -8,7 +8,7 @@ const Tiny20: ConfigExample = {
   label: 'Tiny20',
   author: 'enzocoralc',
   value: `meta:
-  engine: 4.1.0
+  engine: 5.0.0
 points:
   zones:
     matrix:
@@ -127,7 +127,7 @@ outlines:
 
 pcbs:
   tiny20:
-    template: kicad8
+    template: kicad10
     outlines:
       main:
         outline: pcb_perimeter

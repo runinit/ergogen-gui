@@ -50,7 +50,7 @@ export const getErgogenVersionInfo = (version?: string): VersionInfo => {
     return {
       label: version,
       url: version.startsWith('ergogen@')
-        ? `${defaultUrl}/releases/tag/v${verPart}`
+        ? `https://github.com/ergogen/ergogen/releases/tag/v${verPart}`
         : `https://www.npmjs.com/package/${parts[0]}`,
       displayText: verPart,
       isCustom: true,
@@ -134,7 +134,7 @@ export const getErgogenVersionInfo = (version?: string): VersionInfo => {
  */
 export const getFullErgogenVersion = (version?: string): string => {
   if (!version || version === 'undefined' || version === 'null') {
-    return `github:ergogen/ergogen#v${ergogenPkg.version}`;
+    return `${getErgogenVersionInfo().url.replace('https://github.com/', 'github:')}#v${ergogenPkg.version}`;
   }
 
   // Handle NPM version (e.g., ergogen@4.2.0)

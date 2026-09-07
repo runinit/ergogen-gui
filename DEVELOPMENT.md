@@ -489,3 +489,15 @@ To ensure accuracy and prevent cluttering Google Analytics / BigQuery:
 - **`src/atoms/UpdateChip.tsx`**: Pulsing chip rendered in Header when an update is waiting
 - **`public/manifest.json`**: Full PWA web app manifest
 - **`public/icons/`**: PWA icon set (192×192 and 512×512)
+
+## KiCad 10 release preparation
+
+Version 0.19.0 targets `@runinit/ergogen@5.0.0` through the `ergogen` npm alias. Generator patching runs on a disposable copy
+of the installed package. Public dependency caches are scoped to the GUI version.
+See [release validation](RELEASE-KICAD10.md) for the packed-candidate workflow and
+current validation limitations; this preparation is not release-ready.
+
+Production uses `/ergogen-gui/`. Build before running `pnpm run test:e2e`;
+Playwright serves `dist` with Vite preview and refuses an existing server.
+The Pages workflow deploys the artifact only after release, precommit, and
+production browser checks pass. See `RELEASE-KICAD10.md` for validation status.

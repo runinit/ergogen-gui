@@ -17,6 +17,7 @@ e2e/screenshots/
 
 # production
 /build
+/dist
 
 # misc
 .DS_Store
@@ -32,3 +33,5 @@ yarn_start.log
 
 # temporary worker test files
 src/workers/*.tmp.ts
+# Disposable pinned footprint sources for the worker.
+.generated/

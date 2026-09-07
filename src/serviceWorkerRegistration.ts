@@ -121,7 +121,7 @@ export function register(config?: Config): void {
     return;
   }
 
-  window.addEventListener('load', () => {
+  const start = () => {
     const swUrl = `${process.env.PUBLIC_URL}/service-worker.js`;
 
     if (isLocalhost()) {
@@ -138,5 +138,12 @@ export function register(config?: Config): void {
       // In production, just register normally.
       void registerValidSW(swUrl, config);
     }
-  });
+  };
+
+  // React can mount after load; register immediately in that case.
+  if (document.readyState === 'complete') {
+    start();
+    return;
+  }
+  window.addEventListener('load', start, { once: true });
 }

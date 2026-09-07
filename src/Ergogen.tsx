@@ -239,7 +239,7 @@ const MobileCloseButton = styled.button`
 /**
  * A container for the right pane that takes remaining space.
  */
-const RightPane = styled.div<{ $fullWidth?: boolean }>`
+const RightPane = styled.div<{ $fullWidth?: boolean; $hideOnMobile?: boolean }>`
   position: relative;
   flex: 1;
   min-width: 0;
@@ -249,6 +249,7 @@ const RightPane = styled.div<{ $fullWidth?: boolean }>`
 
   @media (max-width: 639px) {
     width: ${(props) => (props.$fullWidth ? '100%' : 'auto')};
+    display: ${(props) => (props.$hideOnMobile ? 'none' : 'flex')};
   }
 `;
 
@@ -695,7 +696,7 @@ const Ergogen = () => {
                   </EditorContainer>
                 </ResizablePanel>
               )}
-              <RightPane>
+              <RightPane $hideOnMobile={configContext.showConfig}>
                 {configContext.showDownloads ? (
                   <>
                     <NestedRightPane>

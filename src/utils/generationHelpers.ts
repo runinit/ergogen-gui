@@ -57,11 +57,7 @@ export const checkForDeprecationWarnings = (
     { template?: string; footprints?: Record<string, { what?: string }> }
   >;
   for (const pcb of Object.values(pcbs)) {
-    if (
-      pcb &&
-      typeof pcb === 'object' &&
-      (!pcb.template || pcb.template === 'kicad5')
-    ) {
+    if (pcb && typeof pcb === 'object' && pcb.template === 'kicad5') {
       const footprints = pcb.footprints;
       if (footprints && typeof footprints === 'object') {
         for (const footprint of Object.values(footprints)) {
@@ -71,7 +67,7 @@ export const checkForDeprecationWarnings = (
             typeof footprint.what === 'string' &&
             footprint.what.startsWith('ceoloide')
           ) {
-            return 'KiCad 5 is deprecated. Please add "template: kicad8" to your PCB definitions to avoid errors when opening PCB files with KiCad 8 or newer.';
+            return 'KiCad 5 is deprecated. Use "template: kicad10" (the default), or select "template: kicad8" for KiCad 8 compatibility.';
           }
         }
       }

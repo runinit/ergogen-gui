@@ -1,3 +1,5 @@
+import { useLayoutEffect, useRef, useState } from 'react';
+
 /**
  * Props for the PcbPreview component.
  * @typedef {object} Props
@@ -25,17 +27,52 @@ const PcbPreview = ({
   previewKey,
   'aria-label': ariaLabel,
   'data-testid': dataTestId,
-}: Props): JSX.Element => (
-  <kicanvas-embed
-    key={previewKey}
-    controls="full"
-    controlslist="nodownload nooverlay"
-    theme="kicad"
-    aria-label={ariaLabel}
-    data-testid={dataTestId}
-  >
-    <kicanvas-source type="board">{pcb}</kicanvas-source>
-  </kicanvas-embed>
-);
+}: Props): JSX.Element => {
+  const ref = useRef<HTMLElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Listen before the custom element loads; regeneration clears stale failures.
+  useLayoutEffect(() => {
+    const viewer = ref.current;
+    if (!viewer) {
+      return;
+    }
+    setError(null);
+    const loaded = () => setError(null);
+    const failed = (event: Event) => {
+      setError(
+        (event as CustomEvent<{ message?: string }>).detail?.message ||
+          'Unable to load board'
+      );
+    };
+    viewer.addEventListener('kicanvas:load', loaded);
+    viewer.addEventListener('kicanvas:error', failed);
+    return () => {
+      viewer.removeEventListener('kicanvas:load', loaded);
+      viewer.removeEventListener('kicanvas:error', failed);
+    };
+  }, [pcb, previewKey]);
+
+  return (
+    <>
+      {error && (
+        <p role="alert">
+          PCB preview unavailable: {error}. Download remains available.
+        </p>
+      )}
+      <kicanvas-embed
+        ref={ref}
+        key={previewKey}
+        controls="full"
+        controlslist="nodownload nooverlay"
+        theme="kicad"
+        aria-label={ariaLabel}
+        data-testid={dataTestId}
+      >
+        <kicanvas-source type="board">{pcb}</kicanvas-source>
+      </kicanvas-embed>
+    </>
+  );
+};
 
 export default PcbPreview;

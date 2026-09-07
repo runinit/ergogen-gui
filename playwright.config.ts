@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const baseURL = 'http://127.0.0.1:3000/ergogen-gui/';
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -7,7 +9,7 @@ export default defineConfig({
   retries: 0,
   reporter: process.env.CI ? 'list' : 'html',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL,
     trace: 'on-first-retry',
   },
   projects: [
@@ -17,9 +19,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'yarn start',
-    url: 'http://localhost:3000',
-    reuseExistingServer: true,
+    command: 'pnpm exec vite preview --host 127.0.0.1 --port 3000 --strictPort',
+    url: baseURL,
+    reuseExistingServer: false,
     timeout: 120 * 1000,
   },
 });

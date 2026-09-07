@@ -1,0 +1,24 @@
+name: Validate standalone GUI
+on:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        env:
+          PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS: 'false'
+      - run: pnpm run test:release
+      - run: pnpm run precommit
+      - run: pnpm run build
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm run test:e2e

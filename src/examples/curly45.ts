@@ -8,7 +8,7 @@ const Curly45: ConfigExample = {
   label: 'Curly-45',
   author: 'peterjc',
   value: `meta:
-  engine: 4.2.1
+  engine: 5.0.0
   version: 1.0.0
   author: peterjc
 points:

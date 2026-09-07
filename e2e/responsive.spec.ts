@@ -6,11 +6,11 @@ test.describe('Responsive Layout', () => {
     const shoot = makeShooter(page, test.info());
     // Set viewport to a mobile size
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto('/');
+    await page.goto('./');
     await page.getByTestId('empty-config-button').click();
 
     const configEditor = page.getByTestId('config-editor');
-    const outputPanel = page.getByTestId('demo.svg-file-preview');
+    const outputPanel = page.getByTestId('downloads-container');
 
     // 1. On mobile, "Config" is active, editor is visible, output is hidden
     await shoot('before-mobile-config-visible-output-hidden');

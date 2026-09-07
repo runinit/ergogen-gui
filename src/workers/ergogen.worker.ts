@@ -1,6 +1,12 @@
 import * as ergogen from 'ergogen';
 import { WorkerRequest } from './ergogen.worker.types';
 import { createInjectionModule } from '../utils/injectionEvaluator';
+import footprints from '../../.generated/footprints.json';
+
+// Register the pinned libraries before processing user configurations.
+for (const [name, source] of Object.entries(footprints)) {
+  ergogen.inject('footprint', name, createInjectionModule(source));
+}
 
 console.log('<-> Ergogen worker module starting...');
 

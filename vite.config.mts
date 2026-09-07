@@ -2,12 +2,14 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
+const deploymentPath = '/ergogen-gui/';
+
 // We will use standard React plugin and PWA plugin in injectManifest mode
 export default defineConfig(({ mode }) => {
   // Collect all REACT_APP_* environment variables to inject them into the client bundle
   const envDefines: Record<string, any> = {
     'process.env.NODE_ENV': JSON.stringify(mode),
-    'process.env.PUBLIC_URL': JSON.stringify(''),
+    'process.env.PUBLIC_URL': JSON.stringify(deploymentPath.slice(0, -1)),
   };
 
   for (const key in process.env) {
@@ -41,7 +43,7 @@ export default defineConfig(({ mode }) => {
         },
       }),
     ],
-    base: './',
+    base: deploymentPath,
     define: envDefines,
     server: {
       port: 3000,

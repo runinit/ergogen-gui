@@ -8,7 +8,7 @@ const Sweeplike: ConfigExample = {
   label: 'Sweep-like',
   author: 'jcmkk3',
   value: `meta:
-  engine: 4.1.0
+  engine: 5.0.0
 # U is a predefined unit of measure that means 19.05mm, which is MX spacing (u is 19.00mm)
 points:
   zones:
@@ -39,7 +39,7 @@ points:
           key.name: thumb_reachy
 pcbs:
   simple_split:
-    template: kicad8
+    template: kicad10
     footprints:
       keys:
         what: ceoloide/switch_mx

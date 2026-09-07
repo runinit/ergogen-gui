@@ -9,7 +9,7 @@ const Absolem: ConfigExample = {
   label: 'Absolem',
   author: 'MrZealot',
   value: `meta:
-  engine: 4.1.0
+  engine: 5.0.0
 points:
   zones:
     matrix:

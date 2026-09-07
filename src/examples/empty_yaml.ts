@@ -9,7 +9,7 @@ const EmptyYAML: ConfigExample = {
   label: 'Empty YAML configuration',
   author: 'ceoloide',
   value: `meta:
-  engine: 4.1.0
+  engine: 5.0.0
 units:
 points:
   zones:

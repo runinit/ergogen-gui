@@ -230,7 +230,7 @@ outlines:
       operation: stack
 pcbs:
   corne_pcb:
-    template: kicad8
+    template: kicad10
     outlines:
       board:
         outline: corne

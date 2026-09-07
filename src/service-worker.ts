@@ -27,6 +27,8 @@
  *   activates, and all clients are refreshed.
  */
 
+import packageJson from '../package.json';
+
 import { clientsClaim } from 'workbox-core';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { precacheAndRoute, createHandlerBoundToURL } from 'workbox-precaching';
@@ -97,7 +99,7 @@ registerRoute(
   ({ url }: { url: URL }) =>
     url.pathname.startsWith(`${publicUrl}/dependencies/`),
   new CacheFirst({
-    cacheName: 'public-dependencies-v1',
+    cacheName: `public-dependencies-${packageJson.version}`,
     plugins: [
       new CacheableResponsePlugin({ statuses: [0, 200] }),
       new ExpirationPlugin({

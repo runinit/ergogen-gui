@@ -3,7 +3,7 @@ import { makeShooter } from './utils/screenshots';
 
 test('renders editor and preview', async ({ page }) => {
   const shoot = makeShooter(page, test.info());
-  await page.goto('/new');
+  await page.goto('./new');
   await page.getByRole('button', { name: 'Empty Configuration' }).click();
 
   const editor = page.getByTestId('config-editor');

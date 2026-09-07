@@ -6,7 +6,7 @@ import { CONFIG_LOCAL_STORAGE_KEY } from '../src/context/constants';
 test.describe('Routing and Welcome Page', () => {
   test('new user is redirected to /new', async ({ page }) => {
     const shoot = makeShooter(page, test.info());
-    await page.goto('/');
+    await page.goto('./');
     await shoot('before-redirect-to-new');
     await expect(page).toHaveURL(/.*\/new/);
     await expect(page.getByText('Ergogen Web UI')).toBeVisible();
@@ -22,7 +22,7 @@ test.describe('Routing and Welcome Page', () => {
         JSON.stringify('some config')
       );
     }, CONFIG_LOCAL_STORAGE_KEY);
-    await page.goto('/');
+    await page.goto('./');
     await shoot('before-existing-user-routed-home');
     await expect(page).toHaveURL(/.*\/$/);
     await expect(page.getByTestId('config-editor')).toBeVisible();
@@ -33,7 +33,7 @@ test.describe('Routing and Welcome Page', () => {
     page,
   }) => {
     const shoot = makeShooter(page, test.info());
-    await page.goto('/');
+    await page.goto('./');
     // With no config, the "New Design" button should not be visible on the main page
     const btn = page.getByTestId('new-config-button');
     await shoot('before-new-config-btn-not-visible');
@@ -53,7 +53,7 @@ test.describe('Routing and Welcome Page', () => {
       },
       { config: Absolem.value, key: CONFIG_LOCAL_STORAGE_KEY }
     );
-    await page.goto('/');
+    await page.goto('./');
 
     // 2. Now the button should be visible, click it
     await shoot('before-new-config-button-visible');
@@ -72,7 +72,7 @@ test.describe('Routing and Welcome Page', () => {
     page,
   }) => {
     const shoot = makeShooter(page, test.info());
-    await page.goto('/new');
+    await page.goto('./new');
     await page.getByRole('button', { name: 'Empty Configuration' }).click();
     await shoot('before-empty-config-url-and-editor');
     await expect(page).toHaveURL(/.*\/$/);
@@ -89,7 +89,7 @@ test.describe('Routing and Welcome Page', () => {
     page,
   }) => {
     const shoot = makeShooter(page, test.info());
-    await page.goto('/new');
+    await page.goto('./new');
     await page.getByText(Absolem.label).click();
     await shoot('before-example-url-and-editor');
     await expect(page).toHaveURL(/.*\/$/);
@@ -98,16 +98,8 @@ test.describe('Routing and Welcome Page', () => {
 
     // Verify the config was stored by checking localStorage rather than Monaco's DOM text,
     // which renders whitespace differently and is flaky to assert on.
-    await expect(async () => {
-      const stored = await page.evaluate(
-        (key) => localStorage.getItem(key),
-        CONFIG_LOCAL_STORAGE_KEY
-      );
-      expect(stored).not.toBeNull();
-      // react-use stores raw strings JSON-encoded in localStorage
-      const parsed = JSON.parse(stored as string) as string;
-      expect(parsed).toContain('meta:');
-      expect(parsed).toContain('points:');
-    }).toPass();
+    await page.reload();
+    await expect(page.getByTestId('config-editor')).toContainText('meta:');
+    await expect(page.getByTestId('config-editor')).toContainText('points:');
   });
 });

@@ -11,7 +11,7 @@ import ergogenPkg from 'ergogen/package.json';
 describe('getErgogenVersionInfo', () => {
   const defaultVersion = ergogenPkg.version;
   const defaultVersionLabel = `v${defaultVersion}`;
-  const defaultUrl = 'https://github.com/ergogen/ergogen';
+  const defaultUrl = 'https://github.com/runinit/ergogen';
 
   it('returns default version when no version is provided', () => {
     expect(getErgogenVersionInfo()).toEqual({
@@ -110,13 +110,13 @@ describe('getFullErgogenVersion', () => {
 
   it('returns default version when no version is provided', () => {
     expect(getFullErgogenVersion()).toBe(
-      `github:ergogen/ergogen#v${defaultVersion}`
+      `github:runinit/ergogen#v${defaultVersion}`
     );
     expect(getFullErgogenVersion('undefined')).toBe(
-      `github:ergogen/ergogen#v${defaultVersion}`
+      `github:runinit/ergogen#v${defaultVersion}`
     );
     expect(getFullErgogenVersion('null')).toBe(
-      `github:ergogen/ergogen#v${defaultVersion}`
+      `github:runinit/ergogen#v${defaultVersion}`
     );
   });
 

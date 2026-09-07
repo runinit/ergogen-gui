@@ -8,6 +8,6 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/setupTests.tsx',
     css: true,
-    exclude: ['node_modules', 'dist', '.git', '.cache', 'e2e'],
+    exclude: ['node_modules', 'dist', '.git', '.cache', 'e2e', 'scripts/tests'],
   },
 });

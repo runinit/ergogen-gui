@@ -1,0 +1,453 @@
+diff --git a/src/kicad/board.ts b/src/kicad/board.ts
+index 2d2d2c6..1143bb6 100644
+--- a/src/kicad/board.ts
++++ b/src/kicad/board.ts
+@@ -21,6 +21,7 @@ import {
+     type HasStrokeParams,
+ } from "./common";
+ import { P, T, parse_expr, type Parseable } from "./parser";
++import { normalize_nets } from "./net-registry";
+ import type { List } from "./tokenizer";
+ 
+ export type Drawing =
+@@ -63,7 +64,7 @@ export class KicadPCB {
+         Object.assign(
+             this,
+             parse_expr(
+-                expr,
++                normalize_nets(expr),
+                 P.start("kicad_pcb"),
+                 P.pair("version", T.number),
+                 P.pair("generator", T.string),
+@@ -152,7 +153,7 @@ export class KicadPCB {
+     }
+ 
+     get_netname_by_number(net_number: number): string | undefined {
+-        return this.nets[net_number]?.name;
++        return this.nets.find((net) => net.number === net_number)?.name;
+     }
+ }
+ 
+@@ -322,7 +323,7 @@ export class Via implements HasUniqueID, HasNetInfo {
+     }
+ }
+ 
+-export class Zone implements HasUniqueID {
++export class Zone implements HasUniqueID, HasNetInfo {
+     locked = false;
+     net: number;
+     net_name: string;
+@@ -392,6 +393,10 @@ export class Zone implements HasUniqueID {
+     get unique_id(): string | undefined {
+         return this.uuid ?? this.tstamp;
+     }
++    get netname(): string | undefined {
++        return this.net_name;
++    }
++
+ }
+ 
+ export class ZoneKeepout {
+diff --git a/src/kicad/net-registry.ts b/src/kicad/net-registry.ts
+new file mode 100644
+index 0000000..4c065fa
+--- /dev/null
++++ b/src/kicad/net-registry.ts
+@@ -0,0 +1,83 @@
++/* KiCad 10 uses names where older boards use numeric net references. */
++import { listify, type List } from "./tokenizer";
++import type { Parseable } from "./parser";
++
++export function normalize_nets(input: Parseable): List {
++    const parsed = typeof input === "string" ? listify(input) : structuredClone(input);
++    const board = Array.isArray(parsed[0]) && parsed.length === 1 ? parsed[0] : parsed;
++    if (board[0] !== "kicad_pcb") {
++        throw new Error("Expected a KiCad board");
++    }
++    const names = new Map<string, number>([["", 0]]);
++    const numbers = new Map<number, string>([[0, ""]]);
++    const references: { expression: List; parent: List }[] = [];
++    const define = (id: number, name: string) => {
++        if (!Number.isInteger(id) || id < 0 ||
++            (numbers.has(id) && numbers.get(id) !== name) ||
++            (names.has(name) && names.get(name) !== id)) {
++            throw new Error(`Conflicting net ${id}: ${name}`);
++        }
++        numbers.set(id, name);
++        names.set(name, id);
++    };
++    const collect = (parent: List) => {
++        for (const child of parent) {
++            if (!Array.isArray(child)) {
++                continue;
++            }
++            if (child[0] !== "net") {
++                collect(child);
++                continue;
++            }
++            if (child.length < 2 || child.length > 3 ||
++                (typeof child[1] !== "number" && typeof child[1] !== "string")) {
++                throw new Error("Malformed net reference");
++            }
++            if (child.length === 3) {
++                if (typeof child[1] !== "number" || typeof child[2] !== "string") {
++                    throw new Error("Malformed net declaration");
++                }
++                define(child[1], child[2]);
++            }
++            references.push({ expression: child, parent });
++        }
++    };
++    collect(board);
++    let next = Math.max(...numbers.keys()) + 1;
++    for (const { expression, parent } of references) {
++        const reference = expression[1]!;
++        let id: number;
++        let name: string;
++        if (typeof reference === "number") {
++            if (!numbers.has(reference)) {
++                throw new Error(`Unknown net number ${reference}`);
++            }
++            id = reference;
++            name = numbers.get(id)!;
++        } else if (typeof reference === "string") {
++            name = reference;
++            id = names.get(name) ?? next++;
++            define(id, name);
++        } else {
++            throw new Error("Malformed net reference");
++        }
++        // Every copper item receives the same resolved board identity.
++        expression.splice(1, expression.length - 1, id);
++        if (parent === board || parent[0] === "pad") {
++            expression.push(name);
++        }
++        if (parent[0] === "zone") {
++            const label = parent.find((part) => Array.isArray(part) && part[0] === "net_name") as List | undefined;
++            if (label) {
++                label[1] = name;
++            } else {
++                parent.push(["net_name", name]);
++            }
++        }
++    }
++    const result = board.filter((part) => !Array.isArray(part) || part[0] !== "net");
++    for (const [id, name] of numbers) {
++        result.push(["net", id, name]);
++    }
++    return result;
++}
+diff --git a/src/kicad/tokenizer.ts b/src/kicad/tokenizer.ts
+index 7b4498b..7cddaa0 100644
+--- a/src/kicad/tokenizer.ts
++++ b/src/kicad/tokenizer.ts
+@@ -208,13 +208,15 @@ export function* tokenize(input: string) {
+                 );
+             }
+         } else if (state == State.string) {
++            if (c === EOF) {
++                throw new Error("Unterminated string");
++            }
+             if (!escaping && c === '"') {
+                 yield new Token(
+                     Token.STRING,
+                     input
+                         .substring((start_idx ?? 0) + 1, i)
+-                        .replaceAll("\\n", "\n")
+-                        .replaceAll("\\\\", "\\"),
++                        .replace(/\\([n"\\])/g, (_, char: string) => char === "n" ? "\n" : char),
+                 );
+                 state = State.none;
+                 escaping = false;
+@@ -239,31 +241,25 @@ export function* tokenize(input: string) {
+ 
+ export type List = (string | number | List)[];
+ 
+-function* listify_tokens(tokens: Generator<Token>): Generator<List> {
+-    let token;
+-    let it;
+-
+-    while (true) {
+-        it = tokens.next();
+-        token = it.value;
+-
+-        switch (token?.type) {
+-            case Token.ATOM:
+-            case Token.STRING:
+-            case Token.NUMBER:
+-                yield token.value;
+-                break;
+-            case Token.OPEN:
+-                yield Array.from(listify_tokens(tokens)) as any;
+-                break;
+-            case Token.CLOSE:
+-            case undefined:
+-                return;
++export function listify(src: string): List {
++    const root: List = [];
++    const stack: List[] = [root];
++    for (const token of tokenize(src)) {
++        if (token.type === Token.OPEN) {
++            const child: List = [];
++            stack[stack.length - 1]!.push(child);
++            stack.push(child);
++        } else if (token.type === Token.CLOSE) {
++            if (stack.length === 1) {
++                throw new Error("Unexpected closing parenthesis");
++            }
++            stack.pop();
++        } else {
++            stack[stack.length - 1]!.push(token.value);
+         }
+     }
+-}
+-
+-export function listify(src: string): List {
+-    const tokens = tokenize(src);
+-    return Array.from(listify_tokens(tokens));
++    if (stack.length !== 1) {
++        throw new Error("Unclosed S-expression");
++    }
++    return root;
+ }
+diff --git a/src/kicanvas/elements/common/viewer.ts b/src/kicanvas/elements/common/viewer.ts
+index a46dd06..d37f23a 100644
+--- a/src/kicanvas/elements/common/viewer.ts
++++ b/src/kicanvas/elements/common/viewer.ts
+@@ -40,10 +40,22 @@ export abstract class KCViewerElement<
+             this.addDisposable(
+                 this.viewer.addEventListener(KiCanvasLoadEvent.type, () => {
+                     this.loaded = true;
+-                    this.dispatchEvent(new KiCanvasLoadEvent());
++                    this.dispatchEvent(new CustomEvent("kicanvas:load", {
++                        bubbles: true,
++                        composed: true,
++                    }));
+                 }),
+             );
+-        })();
++        })().catch((error: unknown) => this.#report_error(error));
++    }
++
++    #report_error(error: unknown) {
++        this.loaded = false;
++        this.dispatchEvent(new CustomEvent("kicanvas:error", {
++            bubbles: true,
++            composed: true,
++            detail: { message: error instanceof Error ? error.message : "Unable to render preview" },
++        }));
+     }
+ 
+     override async preferenceChangeCallback(preferences: Preferences) {
+@@ -76,7 +88,11 @@ export abstract class KCViewerElement<
+ 
+     async load(src: ProjectPage) {
+         this.loaded = false;
+-        await this.viewer.load(src.document);
++        try {
++            await this.viewer.load(src.document);
++        } catch (error) {
++            this.#report_error(error);
++        }
+     }
+ 
+     override render() {
+diff --git a/src/kicanvas/elements/kc-board/nets-panel.ts b/src/kicanvas/elements/kc-board/nets-panel.ts
+index 32f7256..af227be 100644
+--- a/src/kicanvas/elements/kc-board/nets-panel.ts
++++ b/src/kicanvas/elements/kc-board/nets-panel.ts
+@@ -30,7 +30,7 @@ export class KCBoardNetsPanelElement extends KCUIElement {
+ 
+             const number = parseInt(item?.name, 10);
+ 
+-            if (!number) {
++            if (!Number.isFinite(number)) {
+                 return;
+             }
+ 
+diff --git a/src/kicanvas/elements/kicanvas-embed.ts b/src/kicanvas/elements/kicanvas-embed.ts
+index c21bc7c..134935f 100644
+--- a/src/kicanvas/elements/kicanvas-embed.ts
++++ b/src/kicanvas/elements/kicanvas-embed.ts
+@@ -100,7 +100,15 @@ class KiCanvasEmbedElement extends KCUIElement {
+     override initialContentCallback() {
+         this.#setup_events();
+         later(() => {
+-            this.#load_src();
++            void this.#load_src().catch((error: unknown) => {
++                this.loaded = false;
++                this.loading = false;
++                this.dispatchEvent(new CustomEvent("kicanvas:error", {
++                    bubbles: true,
++                    composed: true,
++                    detail: { message: error instanceof Error ? error.message : "Unable to load board" },
++                }));
++            });
+         });
+     }
+ 
+@@ -151,8 +159,7 @@ class KiCanvasEmbedElement extends KCUIElement {
+             inline_file.length === 0 ? null : new LocalFileSystem(inline_file);
+ 
+         if (url_vfs === null && inline_vfs === null) {
+-            log.warn("No valid sources specified");
+-            return;
++            throw new Error("No valid sources specified");
+         }
+ 
+         const vfs = new MergedFileSystem([url_vfs, inline_vfs]);
+@@ -167,10 +174,17 @@ class KiCanvasEmbedElement extends KCUIElement {
+             await vfs.setup();
+             await this.#project.load(vfs);
+ 
++            const oldest_preview_version = 20210101;
++            for (const board of this.#project.boards()) {
++                if (board.version < oldest_preview_version) {
++                    throw new Error("Legacy KiCad preview is unsupported; download remains available");
++                }
++            }
+             this.loaded = true;
+             await this.update();
+ 
+             this.#project.set_active_page(this.#project.root_schematic_page!);
++
+         } finally {
+             this.loading = false;
+         }
+diff --git a/src/viewers/board/painter.ts b/src/viewers/board/painter.ts
+index 2323302..dc46207 100644
+--- a/src/viewers/board/painter.ts
++++ b/src/viewers/board/painter.ts
+@@ -113,7 +113,9 @@ class LinePainter extends GraphicItemPainter {
+     }
+ 
+     paint(layer: ViewLayer, s: board_items.GrLine | board_items.FpLine) {
+-        if (this.filter_net) return;
++        if (this.filter_net !== null) {
++            return;
++        }
+ 
+         const points = [s.start, s.end];
+         this.styled_line(points, s.width, layer.color, s.stroke_params);
+@@ -128,7 +130,9 @@ class RectPainter extends GraphicItemPainter {
+     }
+ 
+     paint(layer: ViewLayer, r: board_items.GrRect | board_items.FpRect) {
+-        if (this.filter_net) return;
++        if (this.filter_net !== null) {
++            return;
++        }
+ 
+         const color = layer.color;
+ 
+@@ -163,7 +167,9 @@ class PolyPainter extends GraphicItemPainter {
+         layer: ViewLayer,
+         p: board_items.Poly | board_items.GrPoly | board_items.FpPoly,
+     ) {
+-        if (this.filter_net) return;
++        if (this.filter_net !== null) {
++            return;
++        }
+ 
+         const color = layer.color;
+ 
+@@ -190,7 +196,9 @@ class ArcPainter extends GraphicItemPainter {
+     }
+ 
+     paint(layer: ViewLayer, a: board_items.GrArc | board_items.FpArc) {
+-        if (this.filter_net) return;
++        if (this.filter_net !== null) {
++            return;
++        }
+ 
+         const arc = a.arc;
+         const points = arc.to_polyline();
+@@ -207,7 +215,9 @@ class CirclePainter extends GraphicItemPainter {
+     }
+ 
+     paint(layer: ViewLayer, c: board_items.GrCircle | board_items.FpCircle) {
+-        if (this.filter_net) return;
++        if (this.filter_net !== null) {
++            return;
++        }
+ 
+         const color = layer.color;
+ 
+@@ -240,7 +250,7 @@ class TraceSegmentPainter extends NetNameItemPainter {
+     }
+ 
+     paint(layer: ViewLayer, s: board_items.LineSegment) {
+-        if (this.filter_net && s.net != this.filter_net) {
++        if (this.filter_net !== null && s.net != this.filter_net) {
+             return;
+         }
+ 
+@@ -257,7 +267,7 @@ class TraceArcPainter extends NetNameItemPainter {
+     }
+ 
+     paint(layer: ViewLayer, a: board_items.ArcSegment) {
+-        if (this.filter_net && a.net != this.filter_net) {
++        if (this.filter_net !== null && a.net != this.filter_net) {
+             return;
+         }
+ 
+@@ -300,7 +310,7 @@ class ViaPainter extends NetNameItemPainter {
+     }
+ 
+     paint(layer: ViewLayer, v: board_items.Via) {
+-        if (this.filter_net && v.net != this.filter_net) {
++        if (this.filter_net !== null && v.net != this.filter_net) {
+             return;
+         }
+ 
+@@ -363,7 +373,7 @@ class ZonePainter extends BoardItemPainter {
+             return;
+         }
+ 
+-        if (this.filter_net && z.net != this.filter_net) {
++        if (this.filter_net !== null && z.net != this.filter_net) {
+             return;
+         }
+ 
+@@ -435,7 +445,7 @@ class PadPainter extends NetNameItemPainter {
+     }
+ 
+     paint(layer: ViewLayer, pad: board_items.Pad) {
+-        if (this.filter_net && pad.net?.number != this.filter_net) {
++        if (this.filter_net !== null && pad.net?.number != this.filter_net) {
+             return;
+         }
+ 
+@@ -734,7 +744,9 @@ class GrTextPainter extends BoardItemPainter {
+     }
+ 
+     paint(layer: ViewLayer, t: board_items.GrText) {
+-        if (this.filter_net) return;
++        if (this.filter_net !== null) {
++            return;
++        }
+ 
+         if (t.hide || !t.shown_text) {
+             return;
+@@ -781,7 +793,9 @@ class FpTextPainter extends BoardItemPainter {
+     }
+ 
+     paint(layer: ViewLayer, t: board_items.FpText) {
+-        if (this.filter_net) return;
++        if (this.filter_net !== null) {
++            return;
++        }
+ 
+         if (t.hide || !t.shown_text) {
+             return;
+@@ -843,7 +857,9 @@ class PropertyTextPainter extends BoardItemPainter {
+     }
+ 
+     paint(layer: ViewLayer, t: board_items.SymbolProperty) {
+-        if (this.filter_net) return;
++        if (this.filter_net !== null) {
++            return;
++        }
+ 
+         if (t.hide || !t.shown_text || !t.has_symbol_prop) {
+             return;
