@@ -3,3 +3,6 @@ allowBuilds:
   core-js-pure: true
   esbuild: true
 
+# This pinned source archive is local and has no npm publication date.
+minimumReleaseAgeExclude:
+  - '@runinit/ergogen@5.0.0'
