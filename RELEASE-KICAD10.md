@@ -1,6 +1,6 @@
 # KiCad 10 release validation
 
-Status: local-source release. npm publication is not part of this release.
+Status: deployed and verified. The generator is built locally; no npm package was published.
 
 ## Local generator
 
@@ -55,8 +55,20 @@ include the pinned footprint sources without modifying dependency stores.
 
 The generator is built from the checked-in local source archive. No npm login
 or publication is required. Pages is configured for workflow deployment with
-no custom domain. Complete clean standalone validation, deploy the checked
-artifact, and verify the live site before tagging GUI 0.19.0.
+no custom domain. Clean standalone validation passes with the local archive and frozen lockfile.
+Deployment of `6871b5e31cf39fed0a1a9e72f604db47e06f04ab` passed every CI gate:
+<https://github.com/runinit/ergogen-gui/actions/runs/34170128233>
+
+Live site: <https://runinit.github.io/ergogen-gui/>
+
+All six live browser checks pass, including malformed-input recovery, WebGL
+errors, BHK rendering, stale-cache isolation, and offline BHK regeneration with
+identical downloads. Seven delivered assets match the tested Pages artifact
+byte for byte. The GUI reports 0.19.0 and generator 5.0.0. Layer visibility,
+GND selection, and keyboard navigation pass with no runtime errors. The actual
+675,245-byte live download matches generator output and loads, saves, and
+reloads in KiCad 10.0.6. Local standalone tests: 386 unit, six release, and
+24 production Playwright checks pass; one existing test remains skipped.
 
 BHK KiCad 8/10 geometry, 3,556 connectivity records, and all 993 normalized
 DRC violations match; 206 unconnected items remain. All 21 Gerbers match after
