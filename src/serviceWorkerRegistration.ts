@@ -68,6 +68,11 @@ async function registerValidSW(swUrl: string, config?: Config): Promise<void> {
       if (installingWorker === null) return;
       waitForActivation(installingWorker, registration, config);
     });
+
+    // A reload can attach after updatefound; retain the pending update prompt.
+    if (registration.waiting) {
+      config?.onUpdate?.(registration);
+    }
   } catch (error) {
     console.error('[SW] Error during service worker registration:', error);
   }
