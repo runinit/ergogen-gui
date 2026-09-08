@@ -13,8 +13,7 @@
  *   `<script>` tags in index.html (`dependencies/*.js`, `kicanvas.js`, etc.)
  *   are cached on first use with a CacheFirst strategy so they load instantly
  *   on subsequent visits, even offline.
- * - **Runtime – Google Fonts**: Cached with StaleWhileRevalidate (CSS) and
- *   CacheFirst (font files) for fast, offline-capable typography.
+ * - **Fonts**: Locally bundled Fontsource assets are precached with the app.
  * - **Runtime – Google Analytics**: Uses workbox-google-analytics to queue
  *   analytics events in IndexedDB when offline and replay them when
  *   connectivity is restored. The gtag.js script itself is cached too.
@@ -33,11 +32,7 @@ import { clientsClaim } from 'workbox-core';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { precacheAndRoute, createHandlerBoundToURL } from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
-import {
-  CacheFirst,
-  StaleWhileRevalidate,
-  NetworkFirst,
-} from 'workbox-strategies';
+import { CacheFirst, NetworkFirst } from 'workbox-strategies';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 import { initialize as initializeGoogleAnalytics } from 'workbox-google-analytics';
 
@@ -127,42 +122,6 @@ registerRoute(
         maxEntries: 50,
         // 30-day cache — static assets that rarely change.
         maxAgeSeconds: 60 * 60 * 24 * 30,
-      }),
-    ],
-  })
-);
-
-// --------------------------------------------------------------------------
-// Runtime – Google Fonts
-//
-// Font CSS is served from fonts.googleapis.com and font binaries from
-// fonts.gstatic.com. We use StaleWhileRevalidate for the CSS (so the font
-// list stays up to date) and CacheFirst for the binary font files (which are
-// content-hashed and essentially immutable).
-// --------------------------------------------------------------------------
-
-registerRoute(
-  ({ url }: { url: URL }) => url.origin === 'https://fonts.googleapis.com',
-  new StaleWhileRevalidate({
-    cacheName: 'google-fonts-stylesheets',
-    plugins: [
-      new ExpirationPlugin({
-        maxEntries: 10,
-        maxAgeSeconds: 60 * 60 * 24 * 365,
-      }),
-    ],
-  })
-);
-
-registerRoute(
-  ({ url }: { url: URL }) => url.origin === 'https://fonts.gstatic.com',
-  new CacheFirst({
-    cacheName: 'google-fonts-webfonts',
-    plugins: [
-      new CacheableResponsePlugin({ statuses: [0, 200] }),
-      new ExpirationPlugin({
-        maxEntries: 30,
-        maxAgeSeconds: 60 * 60 * 24 * 365,
       }),
     ],
   })

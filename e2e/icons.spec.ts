@@ -1,5 +1,19 @@
 import { expect, test } from '@playwright/test';
 
+test('hosts fonts locally, including the PCB viewer', async ({ page }) => {
+  const externalFonts: string[] = [];
+  page.on('request', (request) => {
+    if (/fonts\.(googleapis|gstatic)\.com/.test(request.url())) {
+      externalFonts.push(request.url());
+    }
+  });
+
+  await page.goto('./new');
+  await page.evaluate(() => customElements.whenDefined('kicanvas-embed'));
+  await page.evaluate(() => document.fonts.ready);
+  expect(externalFonts).toEqual([]);
+});
+
 test('renders icons when the browser cannot use web fonts', async ({
   page,
 }) => {
