@@ -1,7 +1,10 @@
 # Case designer
 
-Open a layout, then choose **Create / edit case** beside Generate. For a complete
-example, choose **BHK gasket enclosure** on the welcome page.
+Open a layout, then choose **Create / edit case** beside Generate.
+The **BHK** welcome-page example retains its original outlines and PCB.
+The migrated BHK enclosure example has been removed; case generation works
+with the original configuration. Reload **New → BHK** to replace a previously
+loaded migrated example.
 
 1. **Layout:** choose a board profile and included points. Give split halves
    separate case names, or add a bridge between connected anchor regions.

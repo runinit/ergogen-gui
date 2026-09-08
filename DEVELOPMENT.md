@@ -539,3 +539,7 @@ native STEP/STL pipeline, process reports and isolated preview deployment.
 Scalar-to-selection edits use inline YAML collections to retain surrounding
 source. Form edits are parsed before replacing the draft; declared profile
 choices remain available when native generation fails.
+
+The shipped BHK example retains its original source, outlines and PCB.
+Offline CAD tests use a synthetic gasket fixture; BHK browser tests cover
+the original preview and case generation from its existing board outline.

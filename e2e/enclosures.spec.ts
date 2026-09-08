@@ -1,7 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import JSZip from 'jszip';
-import BHK from '../src/examples/enclosure-bhk';
+import gasketCase from './fixtures/gasket-case';
 import BHKLayout from '../src/examples/bhk';
 
 const source =
@@ -125,22 +125,22 @@ test('creates a full gasket case through forms, exports and applies one undo ste
   await expect.poll(() => saved(page)).toBe(original);
 });
 
-test('reopens the BHK enclosure offline without touching production storage', async ({
+test('reopens a gasket enclosure offline without touching production storage', async ({
   page,
   context,
 }) => {
-  await load(page, BHK.value);
+  await load(page, gasketCase);
   let dialog = await open(page);
   await ready(page);
   await dialog.getByRole('button', { name: 'section', exact: true }).click();
   await page.screenshot({
-    path: 'test-results/bhk-enclosure-section.png',
+    path: 'test-results/gasket-enclosure-section.png',
     fullPage: true,
   });
   await dialog.getByRole('button', { name: 'part', exact: true }).click();
   await dialog.getByRole('button', { name: 'bottom', exact: true }).click();
   await page.screenshot({
-    path: 'test-results/bhk-enclosure-bottom.png',
+    path: 'test-results/gasket-enclosure-bottom.png',
     fullPage: true,
   });
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
