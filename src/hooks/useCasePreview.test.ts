@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useCasePreview } from './useCasePreview';
 
 const mocks = vi.hoisted(() => ({
+  available: true,
   worker: {
     postMessage: vi.fn(),
     terminate: vi.fn(),
@@ -11,9 +12,10 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 vi.mock('../workers/workerFactory', () => ({
-  createErgogenWorker: () => mocks.worker,
+  createErgogenWorker: () => (mocks.available ? mocks.worker : null),
 }));
 beforeEach(() => {
+  mocks.available = true;
   vi.useFakeTimers();
   vi.clearAllMocks();
 });
@@ -89,5 +91,18 @@ it('keeps only the latest queued draft while a generation is running', () => {
     })
   );
   expect(mocks.worker.postMessage.mock.calls[1][0].inputConfig).toBe('three');
+  hook.unmount();
+});
+
+it('retains worker-start failures when draft effects run', () => {
+  mocks.available = false;
+  const injections: string[][] = [];
+  const hook = renderHook(({ source }) => useCasePreview(source, injections), {
+    initialProps: { source: 'one' },
+  });
+  expect(hook.result.current.error).toContain('could not start');
+  hook.rerender({ source: 'two' });
+  expect(hook.result.current.error).toContain('could not start');
+  expect(hook.result.current.pending).toBe(true);
   hook.unmount();
 });
