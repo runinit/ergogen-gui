@@ -27,7 +27,11 @@ export function editDesign(
   if (isScalar(node) && node.range) {
     return (
       source.slice(0, node.range[0]) +
-      stringify(value, { flowCollectionPadding: false }).trimEnd() +
+      stringify(value, {
+        collectionStyle: 'flow',
+        flowCollectionPadding: false,
+        lineWidth: 0,
+      }).trimEnd() +
       source.slice(node.range[1])
     );
   }

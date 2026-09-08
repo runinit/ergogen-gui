@@ -2,6 +2,7 @@ import { test, expect, Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import JSZip from 'jszip';
 import BHK from '../src/examples/enclosure-bhk';
+import BHKLayout from '../src/examples/bhk';
 
 const source =
   '# Keep the original layout\nunits: {pitch: 19}\npoints:\n  zones:\n    keys:\n      columns: {left: {}, right: {}}\n      rows: {home: {}, top: {}}\n';
@@ -201,4 +202,73 @@ test('configures machinable shells and rounded plate cutouts through forms', asy
   await dialog.getByRole('button', { name: 'Apply design' }).click();
   expect(await saved(page)).toContain('corner_radius: 1');
   expect(await saved(page)).toContain('process: cnc');
+});
+
+test('repairs a disconnected BHK boundary without losing point selections', async ({
+  page,
+}) => {
+  await load(page, BHKLayout.value);
+  await expect(
+    page.getByTestId('downloads-container-bhk_pcb-kicad_pcb-download')
+  ).toBeVisible({ timeout: 30000 });
+  const original = await saved(page);
+  const dialog = await open(page);
+  await expect(dialog.getByRole('alert')).toContainText(
+    'Expected one connected region; found 2',
+    { timeout: 90000 }
+  );
+  await expect(
+    dialog.getByText('Showing the last valid geometry.')
+  ).not.toBeVisible();
+  await expect(dialog.getByLabel('Board profile', { exact: true })).toHaveValue(
+    'profiles.case_board'
+  );
+  const points = dialog.getByRole('group', { name: 'Included layout points' });
+  const first = points.getByLabel('matrix_c1_r4', { exact: true });
+  const second = points.getByLabel('matrix_c1_r3', { exact: true });
+  const total = await points.getByRole('checkbox', { checked: true }).count();
+  await first.uncheck();
+  await expect(first).not.toBeChecked();
+  await expect(second).toBeChecked();
+  await expect(points.getByRole('checkbox', { checked: true })).toHaveCount(
+    total - 1
+  );
+  await first.check();
+  await expect(points.getByRole('checkbox', { checked: true })).toHaveCount(
+    total
+  );
+  const cutouts = dialog.getByRole('group', {
+    name: 'Points with switch cutouts',
+  });
+  await cutouts.getByLabel('matrix_c1_r4', { exact: true }).uncheck();
+  await expect(
+    cutouts.getByLabel('matrix_c1_r3', { exact: true })
+  ).toBeChecked();
+  await expect(first).toBeChecked();
+  // The PCB outline includes keys; helper points are not switch cutouts.
+  for (const box of await cutouts.getByRole('checkbox').all()) {
+    const label = await box.locator('..').innerText();
+    if (!/^(matrix|thumbfan)_/.test(label.trim())) {
+      await box.uncheck();
+    }
+  }
+  await dialog.getByLabel('Existing board outline').selectOption('bhk');
+  await ready(page);
+  await page.screenshot({
+    path: 'test-results/bhk-boundary-recovered.png',
+    fullPage: true,
+  });
+  await dialog.getByLabel('New case name').fill('test');
+  await dialog.getByRole('button', { name: 'Add case', exact: true }).click();
+  await expect(dialog.getByLabel('Case', { exact: true })).toHaveValue('test');
+  for (const box of await cutouts.getByRole('checkbox').all()) {
+    const label = await box.locator('..').innerText();
+    if (!/^(matrix|thumbfan)_/.test(label.trim())) {
+      await box.uncheck();
+    }
+  }
+  await dialog.getByLabel('Existing board outline').selectOption('bhk');
+  await ready(page);
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  expect(await saved(page)).toBe(original);
 });

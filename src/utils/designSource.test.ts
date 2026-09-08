@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { parse } from 'yaml';
 import { editDesign, movePoint } from './designSource';
 
 describe('Design source edits', () => {
@@ -54,4 +55,18 @@ it('drags an anchored point in its local frame without losing its formula', () =
       handedness: 1,
     })
   ).toBe(source.replace('at: [pitch, 0]', 'at: [pitch, -2]'));
+});
+
+it.each([
+  'regions:\n  keys:\n    where: true # keep selection note\n    close: 2\n',
+  'regions: {keys: {where: true, close: 2}} # keep selection note\n',
+])('replaces an all-points scalar with a valid inline selection', (source) => {
+  const selected = Array.from(
+    { length: 30 },
+    (_, index) => `matrix_c1_r${index}`
+  );
+  const changed = editDesign(source, ['regions', 'keys', 'where'], selected);
+  expect(parse(changed).regions.keys.where).toEqual(selected);
+  expect(changed).toContain('# keep selection note');
+  expect(changed.replace(/\[[^\]]*\]/, 'true')).toBe(source);
 });

@@ -536,3 +536,6 @@ source patch removes the upstream Google Fonts stylesheet request.
 
 See [ENCLOSURES.md](ENCLOSURES.md) for the guided flow, source transactions,
 native STEP/STL pipeline, process reports and isolated preview deployment.
+Scalar-to-selection edits use inline YAML collections to retain surrounding
+source. Form edits are parsed before replacing the draft; declared profile
+choices remain available when native generation fails.

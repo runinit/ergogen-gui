@@ -14,6 +14,10 @@ Choose FDM or CNC per part, review declared manufacturing limits, and export
 STEP/STL from the same solids. Draft previews stay separate until Apply; Cancel
 discards edits. The BHK gasket enclosure example demonstrates the complete flow.
 
+Point checkboxes now preserve the remaining selections and valid YAML. Failed
+previews retain profile choices, and existing board outlines can resolve a
+disconnected boundary.
+
 ## KiCad 10 support
 
 September 7, 2026

@@ -313,9 +313,24 @@ function CaseDraft({ onClose }: Props) {
     (preview.result?.points || context?.results?.points || {}) as object
   );
   const features = preview.result?.designs?.features || {};
-  const refs = Object.keys(features).filter(
-    (ref) => !ref.startsWith('assemblies.')
+  // Keep declared references available when native generation cannot complete.
+  const refs = Array.from(
+    new Set([
+      ...Object.keys(features).filter((ref) => !ref.startsWith('assemblies.')),
+      ...[
+        'regions',
+        'boundaries',
+        'sketches',
+        'profiles',
+        'components',
+      ].flatMap((section) =>
+        Object.keys(data?.designs?.[section] || {}).map(
+          (id) => `${section}.${id}`
+        )
+      ),
+    ])
   );
+  const disconnected = /Expected one connected region/.test(preview.error);
   const staleSource =
     base.current !== (context?.getRealtimeConfigInput() || '');
   const processes = ['bottom', 'top', 'plate'].every(
@@ -353,7 +368,12 @@ function CaseDraft({ onClose }: Props) {
   };
   const change = (transform: (source: string) => string) => {
     try {
-      setDraft(transform(draft));
+      const next = transform(draft);
+      const parsed = parseDocument(next);
+      if (parsed.errors.length) {
+        throw new Error(parsed.errors[0].message);
+      }
+      setDraft(next);
       setError('');
       setConfirmed(false);
     } catch (caught) {
@@ -649,15 +669,29 @@ function CaseDraft({ onClose }: Props) {
               )}
               {data.designs.regions?.[`${name}_keys`] && (
                 <>
-                  {selection(
-                    ['designs', 'regions', `${name}_keys`, 'where'],
-                    'Included layout points',
-                    points
-                  )}
                   {globalField(
-                    ['designs', 'regions', `${name}_keys`, 'close'],
-                    'Gap closing radius (mm)',
-                    2
+                    ['designs', 'regions', `${name}_keys`, 'outline'],
+                    'Existing board outline',
+                    '',
+                    ['', ...Object.keys(data.outlines || {})]
+                  )}
+                  <p>
+                    Choose an existing outline for the case boundary, or leave
+                    it empty to build from selected layout points.
+                  </p>
+                  {!data.designs.regions[`${name}_keys`].outline && (
+                    <>
+                      {selection(
+                        ['designs', 'regions', `${name}_keys`, 'where'],
+                        'Included layout points',
+                        points
+                      )}
+                      {globalField(
+                        ['designs', 'regions', `${name}_keys`, 'close'],
+                        'Gap closing radius (mm)',
+                        2
+                      )}
+                    </>
                   )}
                   {globalField(
                     ['designs', 'regions', `${name}_switches`, 'size'],
@@ -1365,12 +1399,18 @@ function CaseDraft({ onClose }: Props) {
           {(error || preview.error) && (
             <Status role="alert">{error || preview.error}</Status>
           )}
-          {preview.pending && (
-            <Status role="status">
-              {preview.error
-                ? 'Showing the last valid geometry.'
-                : 'Updating geometry…'}
+          {disconnected && (
+            <Status>
+              The boundary contains separate regions. Exclude helper points,
+              choose an existing board outline, or add a bridge. Use separate
+              cases for separate keyboard halves.
             </Status>
+          )}
+          {(error || preview.error) && assembly && (
+            <Status role="status">Showing the last valid geometry.</Status>
+          )}
+          {preview.pending && !error && !preview.error && (
+            <Status role="status">Updating geometry…</Status>
           )}
           <View>
             {assembly ? (

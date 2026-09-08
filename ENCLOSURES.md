@@ -5,6 +5,10 @@ example, choose **BHK gasket enclosure** on the welcome page.
 
 1. **Layout:** choose a board profile and included points. Give split halves
    separate case names, or add a bridge between connected anchor regions.
+   For a layout with an existing PCB boundary, choose **Existing board outline**
+   (for the BHK layout, `bhk`). Otherwise exclude detached helper points or add
+   bridges. Switch-cutout points remain a separate selection; for BHK, keep
+   `matrix_` and `thumbfan_` points and exclude the helper points.
 2. **Manufacturing:** choose FDM or CNC for each shell and the plate. Enter
    measured machine, stock, material and tooling dimensions. The Layout step
    includes switch-cutout corner radii for machined plates.
