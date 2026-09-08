@@ -6,6 +6,13 @@ import { loader } from '@monaco-editor/react';
 import App from './App';
 import { defineErgogenTheme } from './utils/monaco';
 import { theme } from './theme/theme';
+import '@fontsource/material-symbols-outlined/400.css';
+import '@fontsource/roboto/latin-400.css';
+import '@fontsource/roboto/latin-500.css';
+import '@fontsource/roboto/latin-700.css';
+import '@fontsource/nunito/latin-400.css';
+import '@fontsource/nunito/latin-600.css';
+import '@fontsource/nunito/latin-700.css';
 
 /**
  * The main container for the entire application.
@@ -21,6 +28,22 @@ const AppContainer = styled.div`
 `;
 
 const GlobalStyle = createGlobalStyle`
+  /* Keep icon ligatures and their sizing available when external fonts fail. */
+  .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    font-weight: normal;
+    font-style: normal;
+    font-size: ${theme.fontSizes.iconLarge};
+    display: inline-block;
+    line-height: 1;
+    text-transform: none;
+    letter-spacing: normal;
+    white-space: nowrap;
+    direction: ltr;
+    font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+  }
+
   *,
   *::before,
   *::after {

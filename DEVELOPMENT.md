@@ -508,3 +508,10 @@ The default `ergogen` dependency is the checked-in source archive under `vendor/
 Run `pnpm install --frozen-lockfile` and `pnpm run build` without `ERGOGEN_VERSION`.
 The build stages and patches a disposable copy; the generator needs no npm
 publication. `vendor/README.md` records the source commit and archive hash.
+
+## Bundled UI fonts
+
+Roboto, Nunito, and Material Symbols are installed through pinned Fontsource
+packages and bundled by Vite. The icon class is defined locally in the global
+styles. Font assets are precached so menus render with external fonts blocked
+and after offline reload. `e2e/icons.spec.ts` checks both cases.
