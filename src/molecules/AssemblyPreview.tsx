@@ -21,6 +21,7 @@ type Props = {
   exploded: boolean;
   selected: string;
   onSelect: (name: string) => void;
+  onPick?: (point: number[]) => void;
   mode?: 'assembly' | 'section' | 'part';
   lateral?: number;
   travel?: number;
@@ -62,6 +63,7 @@ function AssemblyScene({
   exploded,
   selected,
   onSelect,
+  onPick,
   mode = 'assembly',
   travel = 0,
   lateral = 0,
@@ -152,6 +154,9 @@ function AssemblyScene({
                   onClick={(event) => {
                     event.stopPropagation();
                     onSelect(mesh.name);
+                    onPick?.(
+                      event.object.worldToLocal(event.point.clone()).toArray()
+                    );
                   }}
                 >
                   <meshStandardMaterial

@@ -43,6 +43,12 @@ jobs:
           REACT_APP_GTAG_ID: ${{ vars.REACT_APP_GTAG_ID }}
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-failure
+          path: test-results
+          retention-days: 7
       - name: Prepare Pages routing
         run: cp dist/index.html dist/404.html
       - uses: actions/upload-pages-artifact@v3

@@ -17,6 +17,7 @@ import { applyDesignEdit, editDesign, SourcePath } from '../utils/designSource';
 import { createZip } from '../utils/zip';
 import { theme } from '../theme/theme';
 import AssemblyPreview from './AssemblyPreview';
+import { pickCaseFeature } from '../utils/caseSelection';
 
 const Shell = styled.section`
   position: fixed;
@@ -288,6 +289,7 @@ function CaseDraft({ onClose }: Props) {
   const [error, setError] = useState('');
   const [view, setView] = useState('assembled');
   const [selected, setSelected] = useState('');
+  const [feature, setFeature] = useState('');
   const [travel, setTravel] = useState(0);
   const [lateral, setLateral] = useState(0);
   const [confirmed, setConfirmed] = useState(false);
@@ -303,6 +305,10 @@ function CaseDraft({ onClose }: Props) {
     [preview.result]
   );
   const findings = assembly?.manufacturing || [];
+  const movement = (assembly?.parameters?.gasket || {}) as Record<
+    string,
+    number
+  >;
   const points = Object.keys(
     (preview.result?.points || context?.results?.points || {}) as object
   );
@@ -327,6 +333,24 @@ function CaseDraft({ onClose }: Props) {
   useEffect(() => {
     dialog.current?.focus();
   }, []);
+  useEffect(() => {
+    if (feature) {
+      document
+        .getElementById(`case-feature-${feature}`)
+        ?.scrollIntoView?.({ block: 'center' });
+    }
+  }, [feature, step]);
+  const pick = (point: number[]) => {
+    if (!assembly) {
+      return;
+    }
+    const id = pickCaseFeature(assembly, point);
+    if (!id) {
+      return;
+    }
+    setFeature(id);
+    setStep(id.startsWith('mounts.') ? 5 : id.startsWith('gaskets.') ? 2 : 4);
+  };
   const change = (transform: (source: string) => string) => {
     try {
       setDraft(transform(draft));
@@ -640,6 +664,11 @@ function CaseDraft({ onClose }: Props) {
                     'Switch cutout size (mm)',
                     14
                   )}
+                  {globalField(
+                    ['designs', 'regions', `${name}_switches`, 'corner_radius'],
+                    'Switch cutout corner radius (mm)',
+                    0
+                  )}
                   {selection(
                     ['designs', 'regions', `${name}_switches`, 'where'],
                     'Points with switch cutouts',
@@ -931,7 +960,7 @@ function CaseDraft({ onClose }: Props) {
                       </button>
                     ))}
                   {Object.keys(spec.gaskets || {}).map((id) => (
-                    <Card key={id}>
+                    <Card key={id} id={`case-feature-gaskets.${id}`}>
                       <legend>{id}</legend>
                       {spec.gaskets[id].anchor?.feature ? (
                         <p>Anchored to {spec.gaskets[id].anchor.feature}</p>
@@ -1056,7 +1085,7 @@ function CaseDraft({ onClose }: Props) {
                   const id = ref.split('.')[1],
                     path = ['designs', 'components', id];
                   return (
-                    <Card key={ref}>
+                    <Card key={ref} id={`case-feature-${ref}`}>
                       <legend>{id}</legend>
                       {globalField(
                         [...path, 'anchor', 'ref'],
@@ -1088,6 +1117,11 @@ function CaseDraft({ onClose }: Props) {
                         [...path, 'size', 1],
                         `${id} length (mm)`,
                         10
+                      )}
+                      {globalField(
+                        [...path, 'corner_radius'],
+                        `${id} corner radius (mm)`,
+                        0
                       )}
                       {globalField(
                         [...path, 'radius'],
@@ -1169,7 +1203,7 @@ function CaseDraft({ onClose }: Props) {
                   </button>
                 ))}
               {Object.keys(spec.mounts || {}).map((id) => (
-                <Card key={id}>
+                <Card key={id} id={`case-feature-mounts.${id}`}>
                   <legend>{id}</legend>
                   {field(['mounts', id, 'role'], 'Mount target', 'case', [
                     'case',
@@ -1353,9 +1387,10 @@ function CaseDraft({ onClose }: Props) {
                 }
                 selected={selected}
                 onSelect={setSelected}
+                onPick={pick}
                 travel={travel}
                 lateral={lateral}
-                angle={Number(spec.typing_angle || 0)}
+                angle={Number(assembly.parameters?.typing_angle || 0)}
               />
             ) : (
               <Status>
@@ -1395,8 +1430,8 @@ function CaseDraft({ onClose }: Props) {
                 <input
                   type="range"
                   aria-label="Suspension travel"
-                  min={-Number(spec.gasket?.travel_down ?? 0.2)}
-                  max={Number(spec.gasket?.travel_up ?? 0.2)}
+                  min={-Number(movement.travel_down ?? 0.2)}
+                  max={Number(movement.travel_up ?? 0.2)}
                   step="0.01"
                   value={travel}
                   onChange={(event) => setTravel(Number(event.target.value))}
@@ -1410,8 +1445,8 @@ function CaseDraft({ onClose }: Props) {
                 <input
                   type="range"
                   aria-label="Lateral travel"
-                  min={-Number(spec.gasket?.travel_side ?? 0.1)}
-                  max={Number(spec.gasket?.travel_side ?? 0.1)}
+                  min={-Number(movement.travel_side ?? 0.1)}
+                  max={Number(movement.travel_side ?? 0.1)}
                   step="0.01"
                   value={lateral}
                   onChange={(event) => setLateral(Number(event.target.value))}
@@ -1420,6 +1455,7 @@ function CaseDraft({ onClose }: Props) {
               </label>
             )}
           </Motion>
+          {feature && <p>Selected feature: {feature}</p>}
           {selected && preview.result?.solids?.[selected] && (
             <p>
               {selected} · {preview.result.solids[selected].volume.toFixed(1)}{' '}

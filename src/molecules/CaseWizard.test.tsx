@@ -4,6 +4,8 @@ import CaseWizard from './CaseWizard';
 
 const mocks = vi.hoisted(() => ({
   generate: vi.fn(),
+  preview: vi.fn(),
+  result: null as Record<string, unknown> | null,
   close: vi.fn(),
   source: 'points:\n  zones:\n    keys: {}\n',
 }));
@@ -16,14 +18,18 @@ vi.mock('../context/ConfigContext', () => ({
   }),
 }));
 vi.mock('../hooks/useCasePreview', () => ({
-  useCasePreview: () => ({ result: null, error: '', pending: true }),
+  useCasePreview: () => ({ result: mocks.result, error: '', pending: true }),
 }));
 vi.mock('./AssemblyPreview', () => ({
-  default: () => <div>Assembly preview</div>,
+  default: (props: unknown) => {
+    mocks.preview(props);
+    return <div>Assembly preview</div>;
+  },
 }));
 
 beforeEach(() => {
   mocks.source = 'points:\n  zones:\n    keys: {}\n';
+  mocks.result = null;
   vi.clearAllMocks();
 });
 
@@ -51,4 +57,21 @@ it('shows a recoverable error for invalid source instead of crashing', () => {
   render(<CaseWizard onClose={mocks.close} />);
   expect(screen.getByRole('alert')).toHaveTextContent(/source|YAML/i);
   expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
+});
+
+it('uses resolved dimensions for the preview when a field contains a formula', () => {
+  mocks.result = {
+    designs: {
+      features: {},
+      assemblies: {
+        case: { parts: {}, suggestions: [], parameters: { typing_angle: 6 } },
+      },
+    },
+  };
+  render(<CaseWizard onClose={mocks.close} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Enclosure' }));
+  const angle = screen.getByLabelText('Typing angle (degrees)');
+  fireEvent.change(angle, { target: { value: 'pitch / 3' } });
+  fireEvent.blur(angle);
+  expect(mocks.preview.mock.lastCall?.[0].angle).toBe(6);
 });

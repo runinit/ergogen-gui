@@ -1,10 +1,10 @@
 # Local Ergogen source
 
-`ergogen-dcc4db6.tgz` contains generator source from
-[`runinit/ergogen@dcc4db6`](https://github.com/runinit/ergogen/commit/dcc4db6eefcf04fc161db545a89421628d24d283).
+`ergogen-415fd3a.tgz` contains generator source from
+[`runinit/ergogen@415fd3a`](https://github.com/runinit/ergogen/commit/415fd3ae1895a7ccc5ed5a3a28e90b2dd6846b41).
 It retains the upstream MIT license and attribution.
 
-SHA-256: `c922cfb00776094f3802671e3af401f231f21aa5c160ff74f5a70b38cc8f26da`
+SHA-256: `fdc593ebf31d0c51ae92d260fc51ace88498e9d4ae12aa9826f70bd8de79e30b`
 
 The archive supplies the full enclosure and parametric design pipeline. pnpm
 installs it locally; the patch recipe builds it in a temporary directory.

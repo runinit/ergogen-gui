@@ -6,7 +6,8 @@ example, choose **BHK gasket enclosure** on the welcome page.
 1. **Layout:** choose a board profile and included points. Give split halves
    separate case names, or add a bridge between connected anchor regions.
 2. **Manufacturing:** choose FDM or CNC for each shell and the plate. Enter
-   measured machine, stock, material and tooling dimensions.
+   measured machine, stock, material and tooling dimensions. The Layout step
+   includes switch-cutout corner radii for machined plates.
 3. **Mounting:** select tray, top, bottom or gasket. Gasket contacts generate
    plate tabs, wall pockets and support shelves; pads and sleeves are supported.
 4. **Enclosure:** set continuous walls, floor, bezel, seam, typing angle and
@@ -16,7 +17,8 @@ example, choose **BHK gasket enclosure** on the welcome page.
 6. **Hardware:** accept suggested positions or add anchored mounts. Case screws
    close the shells; plate and PCB supports follow the mounting system.
 7. **Review:** inspect assembled, exploded, section and individual-part views.
-   Gasket travel controls show the declared movement envelope. Review findings,
+   Gasket travel controls show the declared movement envelope. Click a support
+   or opening to focus its form. Review findings,
    confirm dimensions, then **Apply design** or **Download ZIP**.
 
 Apply makes one undoable editor change. Cancel discards the draft. Preview

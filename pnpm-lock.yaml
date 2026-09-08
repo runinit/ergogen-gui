@@ -36,8 +36,8 @@ importers:
         specifier: 1.2.0
         version: 1.2.0
       ergogen:
-        specifier: file:vendor/ergogen-dcc4db6.tgz
-        version: '@runinit/ergogen@file:vendor/ergogen-dcc4db6.tgz'
+        specifier: file:vendor/ergogen-415fd3a.tgz
+        version: '@runinit/ergogen@file:vendor/ergogen-415fd3a.tgz'
       file-saver:
         specifier: ^2.0.5
         version: 2.0.5
@@ -1499,8 +1499,8 @@ packages:
   '@rtsao/scc@1.1.0':
     resolution: {integrity: sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g==}
 
-  '@runinit/ergogen@file:vendor/ergogen-dcc4db6.tgz':
-    resolution: {integrity: sha512-LaUVoYPAuCOzAXn76NGC1lUePUeBdMMKhTzoZowIQnAwVrRo7VkENYCwici81CvGjJeCkAP49qkzGnKjOU4LdQ==, tarball: file:vendor/ergogen-dcc4db6.tgz}
+  '@runinit/ergogen@file:vendor/ergogen-415fd3a.tgz':
+    resolution: {integrity: sha512-SwM4jYSpb4zxmTV4ih6LuaHyJ58ROK9Lh9zVI9It68zKtn471TGieRcp+2IipVNM7HUvBMN90/Mtt4vsliOWEA==, tarball: file:vendor/ergogen-415fd3a.tgz}
     version: 5.1.0-develop
     hasBin: true
 
@@ -5706,7 +5706,7 @@ snapshots:
 
   '@rtsao/scc@1.1.0': {}
 
-  '@runinit/ergogen@file:vendor/ergogen-dcc4db6.tgz':
+  '@runinit/ergogen@file:vendor/ergogen-415fd3a.tgz':
     dependencies:
       '@salusoft89/planegcs': 1.2.0
       fs-extra: 11.3.6

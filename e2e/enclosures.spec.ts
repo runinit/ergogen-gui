@@ -168,3 +168,37 @@ test('reopens the BHK enclosure offline without touching production storage', as
     await context.setOffline(false);
   }
 });
+
+test('configures machinable shells and rounded plate cutouts through forms', async ({
+  page,
+}) => {
+  await load(page, source);
+  const dialog = await open(page);
+  await ready(page);
+  await dialog.getByLabel('Switch cutout corner radius (mm)').fill('1');
+  await dialog.getByLabel('Switch cutout corner radius (mm)').press('Tab');
+  await dialog.getByRole('button', { name: 'Enclosure', exact: true }).click();
+  await dialog.getByLabel('Internal corner radius (mm)').fill('2');
+  await dialog.getByLabel('Internal corner radius (mm)').press('Tab');
+  await dialog
+    .getByRole('button', { name: 'Manufacturing', exact: true })
+    .click();
+  for (const part of ['bottom', 'top', 'plate']) {
+    await dialog
+      .getByLabel(`${part} process`, { exact: true })
+      .selectOption('cnc');
+  }
+  await dialog.getByLabel('plate cutter diameter (mm)').fill('2');
+  await dialog.getByLabel('plate cutter diameter (mm)').press('Tab');
+  await dialog.getByLabel('plate minimum wall (mm)').fill('1');
+  await dialog.getByLabel('plate minimum wall (mm)').press('Tab');
+  await ready(page);
+  await dialog.getByRole('button', { name: 'Review', exact: true }).click();
+  await dialog.getByRole('checkbox').check();
+  await expect(
+    dialog.getByRole('button', { name: 'Apply design' })
+  ).toBeEnabled({ timeout: 90000 });
+  await dialog.getByRole('button', { name: 'Apply design' }).click();
+  expect(await saved(page)).toContain('corner_radius: 1');
+  expect(await saved(page)).toContain('process: cnc');
+});

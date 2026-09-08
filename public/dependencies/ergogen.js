@@ -2992,9 +2992,14 @@
 		tooling.radius = model => {
 		    let radius = Infinity;
 		    for (const chain of g.chains(model)) {
+		        const clockwise = m.measure.isChainClockwise(chain);
+		        const winding = clockwise ? -1 : 1;
 		        const edges = chain.links.map(link => {
 		            const path = m.path.moveRelative(m.path.clone(link.walkedPath.pathContext), link.walkedPath.offset);
-		            if (path.radius) { radius = Math.min(radius, path.radius); }
+		            // Reentrant pocket turns leave convex material; they do not limit the tool.
+		            if (path.radius && (path.type === 'circle' || Boolean(link.reversed) === clockwise)) {
+		                radius = Math.min(radius, path.radius);
+		            }
 		            if (path.type === 'circle') { return null }
 		            const sample = t => m.point.middle(path, link.reversed ? 1 - t : t);
 		            const unit = (a, b) => {
@@ -3006,7 +3011,8 @@
 		        for (let index = 0; index < edges.length; index++) {
 		            const edge = edges[index], next = edges[(index + 1) % edges.length];
 		            if (!edge || !next) { continue }
-		            if (edge.end.some((v, axis) => Math.abs(v - next.start[axis]) > TANGENT_TOLERANCE)) { return 0 }
+		            const turn = edge.end[0] * next.start[1] - edge.end[1] * next.start[0];
+		            if (turn * winding > TANGENT_TOLERANCE) { return 0 }
 		        }
 		    }
 		    return radius
@@ -3173,7 +3179,8 @@
 		            const extents = m.measure.modelExtents(exterior);
 		            const seam = g.number(s.seam?.z ?? s.plate_z, `${name}.seam.z`, context.units);
 		            if (seam <= s.floor || seam >= s.height - s.wall) { g.fail(`${name}.seam`, 'Seam must lie between floor and upper bezel'); }
-		            const wedge = extents.height * Math.tan(s.typing_angle * RAD);
+		            const lift = s.front_height - s.height * Math.cos(s.typing_angle * RAD);
+		            const wedge = extents.height * Math.tan(s.typing_angle * RAD) + lift / Math.cos(s.typing_angle * RAD);
 		            let bottom = kernel.extrude(exterior, s.floor + wedge, -wedge);
 		            bottom = kernel.add(bottom, kernel.extrude(ring, seam - s.floor, s.floor));
 		            let top = kernel.extrude(ring, s.height - seam, seam);
@@ -3185,6 +3192,10 @@
 		                g.requireContains(opening, cutout, `${name}.opening`);
 		                plateModel = subtract(plateModel, cutout);
 		            }
+		            const plateVoids = g.union(g.chains(plateModel).flatMap(chain => chain.contains || []).map(chain => m.chain.toNewModel(chain)));
+		            const clearPlate = (model, path) => {
+		                if (intersects(model, plateVoids)) { g.fail(path, 'Support overlaps a plate cutout', 'clearance'); }
+		            };
 		            const contacts = [];
 		            const extras = {}, extraMotion = {};
 		            const hardwarePockets = {bottom: [], top: []};
@@ -3196,6 +3207,7 @@
 		                for (const [tabId, definition] of Object.entries(s.gaskets)) {
 		                    const path = `${name}.gaskets.${tabId}`;
 		                    const tab = shape(definition, path);
+		                    clearPlate(tab, path);
 		                    if (!intersects(tab, base)) { g.fail(path, 'Gasket tab must overlap the plate'); }
 		                    const sleeveMargin = s.gasket.kind === 'sleeves' ? s.gasket.thickness : 0;
 		                    const pocketClearance = Math.max(sleeveMargin + s.gasket.fit + s.gasket.travel_side, internalRadius);
@@ -3267,6 +3279,7 @@
 		                if (targetZ <= s.floor) { g.fail(path, 'Support height must be above the floor'); }
 		                const topMount = role === 'plate' && s.mounting === 'top';
 		                if (role === 'plate') {
+		                    clearPlate(envelope, path);
 		                    if (!intersects(base, envelope)) { g.fail(path, 'Plate mounting tab must overlap the plate'); }
 		                    plateModel = g.combine(plateModel, envelope);
 		                }
@@ -3279,7 +3292,8 @@
 		                const depth = g.positive(mount.depth ?? s.height, `${path}.depth`, context.units);
 		                const access = mount.access || 'top';
 		                if (!['top', 'bottom'].includes(access)) { g.fail(path, 'Hardware insertion must be top or bottom'); }
-		                const start = topMount ? s.plate_z : access === 'bottom' ? 0 : Math.max(0, targetZ - depth);
+		                const start = topMount ? (access === 'bottom' ? s.plate_z : Math.max(s.plate_z, s.height - depth))
+		                    : access === 'bottom' ? 0 : Math.max(0, targetZ - depth);
 		                const drill = kernel.extrude(circle(p, hole), depth + (role === 'case' ? s.height - seam : s.plate), start);
 		                bottom = kernel.cut(bottom, drill);
 		                top = kernel.cut(top, drill);
@@ -3290,32 +3304,39 @@
 		                        const pocketRadius = g.positive(mount.pocket, `${path}.pocket`, context.units);
 		                        const pocketDepth = g.positive(mount.pocket_depth, `${path}.pocket_depth`, context.units);
 		                        const circumradius = mount.hardware === 'nut' ? pocketRadius / Math.cos(Math.PI / 6) : pocketRadius;
-		                        if (circumradius + material > radius || pocketDepth + material > targetZ) {
+		                        const available = topMount ? s.height - s.plate_z - s.plate : targetZ;
+		                        if (circumradius + material > radius || pocketDepth + material > available) {
 		                            g.fail(path, 'Hardware pocket leaves insufficient surrounding material');
 		                        }
 		                        const pocketModel = mount.hardware === 'nut'
 		                            ? m.model.moveRelative(new m.models.Polygon(6, circumradius), p) : circle(p, pocketRadius);
 		                        hardwarePockets[topMount ? 'top' : 'bottom'].push(pocketModel);
-		                        const pocketZ = topMount ? s.plate_z + s.plate : access === 'top' ? targetZ - pocketDepth : 0;
+		                        const pocketZ = topMount ? (access === 'top' ? s.height - pocketDepth : s.plate_z + s.plate)
+		                            : access === 'top' ? targetZ - pocketDepth : 0;
 		                        const pocket = kernel.extrude(pocketModel, pocketDepth, pocketZ);
 		                        if (topMount) { top = kernel.cut(top, pocket); }
 		                        else { bottom = kernel.cut(bottom, pocket); }
 		                    }
 		                }
 		                holes.push({diameter: hole * 2, access});
-		                features.push({id: `mounts.${mountId}`, model: envelope, z: s.floor, height: targetZ - s.floor});
+		                features.push({id: `mounts.${mountId}`, model: envelope, z: topMount ? s.plate_z + s.plate : s.floor,
+		                    height: topMount ? s.height - s.plate_z - s.plate : (role === 'case' ? s.height : targetZ) - s.floor});
 		                mountTable[mountId] = {...mount, position: p, role};
 		            }
 
 		            for (const ref of s.openings || []) {
 		                const definition = config.components[ref.split('.')[1]];
 		                const [low, high] = definition.height.map(v => g.number(v, `${name}.${ref}.height`, context.units));
-		                const tool = kernel.extrude(resolve(ref).model, high - low, low);
+		                const model = resolve(ref).model;
+		                features.push({id: ref, model, z: low, height: high - low});
+		                const tool = kernel.extrude(model, high - low, low);
 		                bottom = kernel.cut(bottom, tool);
 		                top = kernel.cut(top, tool);
 		            }
 		            if (!floating) {
-		                const clearanceModel = g.offset(plateModel, s.fit);
+		                // Clear the entire plate footprint so holes cannot leave shell pins.
+		                const footprint = g.union(g.chains(plateModel).map(chain => m.chain.toNewModel(chain)));
+		                const clearanceModel = g.offset(footprint, s.fit);
 		                g.requireContains(g.offset(exterior, -s.wall), clearanceModel, `${name}.plate`);
 		                const relief = kernel.extrude(clearanceModel, s.plate, s.plate_z);
 		                bottom = kernel.cut(bottom, relief);
@@ -3349,13 +3370,13 @@
 		                const [low, high] = definition.height.map(v => g.number(v, `${name}.${ref}.height`, context.units));
 		                const model = resolve(ref).model;
 		                collision(definition.motion === 'floating' ? movement(model, low, high - low) : kernel.extrude(model, high - low, low), ref);
+		                features.push({id: ref, model, z: low, height: high - low});
 		                extras[ref.replace('.', '_')] = kernel.extrude(model, high - low, low);
 		                extraMotion[ref.replace('.', '_')] = definition.motion;
 		            }
 
 		            // Rotate the complete mechanical stack, then trim the bottom to a flat datum.
 		            const origin = [0, extents.low[1], 0];
-		            const lift = s.front_height - s.height * Math.cos(s.typing_angle * RAD);
 		            const placed = {};
 		            for (const [part, solid] of Object.entries({...parts, ...extras})) {
 		                placed[part] = kernel.move(kernel.rotate(solid, s.typing_angle, origin), [0, 0, lift]);
@@ -3398,7 +3419,7 @@
 		            const assembly = Object.fromEntries(Object.entries(placed).map(([part, shape]) => [`${id}_${part}`, shape]));
 		            const suggest = requireMounts().suggest;
 		            const suggestionContext = {base, exterior, units: context.units, name, shape,
-		                mounts: mountTable, exclusions: [], components: [], gasketModels: contacts.map(contact => contact.model), height: s.height};
+		                mounts: mountTable, exclusions: [plateVoids], components: [], gasketModels: contacts.map(contact => contact.model), height: s.height};
 		            const suggestions = suggest({...s, suggest: {gaskets: {spacing: 40, size: [10, 6]}}}, suggestionContext);
 		            suggestions.push(...suggest({...s, suggest: {spacing: 40, inset: 1, post: 2.5, hole: 1, height: seam - s.floor}},
 		                {...suggestionContext, base: g.offset(base, s.bezel / 2 + 1),
@@ -3406,7 +3427,11 @@
 		                        ...contacts.map(contact => contact.pocket)]}).map(item => ({...item, definition: {...item.definition, role: 'case'}})));
 		            publish(`${id}_plate`, models.plate, name);
 		            report.assemblies[id] = {preset: 'enclosure', mounting: s.mounting, parts: partReport,
-		                suggestions, mounts: mountTable, features, manufacturing: findings,
+		                suggestions, mounts: mountTable, placement: {origin, angle: s.typing_angle, lift},
+		                features: features.map(feature => {
+		                    const box = m.measure.modelExtents(feature.model);
+		                    return {...feature, bounds: [[...box.low, feature.z], [...box.high, feature.z + feature.height]]}
+		                }), manufacturing: findings,
 		                gasket: floating ? s.gasket : undefined, parameters: s,
 		                step: await kernel.assembly(assembly)};
 		        }
@@ -3455,7 +3480,9 @@
 		            const scope = {...units, ...point.meta};
 		            const size = a.wh(spec.size || [point.meta.width, point.meta.height], `${name}.size`)(scope);
 		            size.forEach(value => g.positive(value, `${name}.size`));
-		            model = m.model.center(new m.models.Rectangle(...size));
+		            const corner = g.number(spec.corner_radius || 0, `${name}.corner_radius`, scope);
+		            if (corner < 0 || corner > Math.min(...size) / 2) { g.fail(name, 'Corner radius must fit the declared width and length'); }
+		            model = m.model.center(corner ? new m.models.RoundRectangle(...size, corner) : new m.models.Rectangle(...size));
 		        }
 		        return point.position(model)
 		    };
@@ -3504,7 +3531,7 @@
 		        try {
 		            let model, occupied = {paths: {}}, groups = [];
 		            if (section === 'regions') {
-		                a.unexpected(spec, name, ['where', 'asym', 'size', 'outline', 'close', 'clearance', 'round', 'connected', 'modifications']);
+		                a.unexpected(spec, name, ['where', 'asym', 'size', 'corner_radius', 'outline', 'close', 'clearance', 'round', 'connected', 'modifications']);
 		                if (spec.outline) {
 		                    if (!own(outlines, spec.outline)) { g.fail(name, `Missing outline ${spec.outline}`, 'reference'); }
 		                    groups = [g.clone(outlines[spec.outline])];
@@ -3560,7 +3587,7 @@
 		                groups = g.partition(model);
 		                if (section === 'profiles') { publish(id, model, name); }
 		            } else if (section === 'components') {
-		                a.unexpected(spec, name, ['anchor', 'size', 'radius', 'height', 'clearance', 'motion']);
+		                a.unexpected(spec, name, ['anchor', 'size', 'radius', 'corner_radius', 'height', 'clearance', 'motion']);
 		                model = shape(spec, name);
 		                const height = a.numarr(spec.height, `${name}.height`, 2)(units);
 		                if (height[0] >= height[1]) { g.fail(name, 'Height range must increase'); }

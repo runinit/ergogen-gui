@@ -46,6 +46,8 @@ export interface DesignReport {
     string,
     {
       preset?: string;
+      placement?: { origin: number[]; angle: number; lift: number };
+      features?: { id: string; bounds: [number[], number[]] }[];
       mounting?: string;
       step?: string;
       parameters?: Record<string, unknown>;

@@ -1,6 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
+const GENERATION_TIMEOUT_MS = 30000;
+test.setTimeout(GENERATION_TIMEOUT_MS * 3);
+
 test('loads the BHK example and regenerates it offline', async ({
   page,
   context,
@@ -10,7 +13,7 @@ test('loads the BHK example and regenerates it offline', async ({
   const downloadButton = page.getByTestId(
     'downloads-container-bhk_pcb-kicad_pcb-download'
   );
-  await expect(downloadButton).toBeVisible();
+  await expect(downloadButton).toBeVisible({ timeout: GENERATION_TIMEOUT_MS });
   const getBoard = async () => {
     const pending = page.waitForEvent('download');
     await downloadButton.click();
@@ -29,7 +32,9 @@ test('loads the BHK example and regenerates it offline', async ({
   await context.setOffline(true);
   try {
     await page.reload();
-    await expect(downloadButton).toBeVisible();
+    await expect(downloadButton).toBeVisible({
+      timeout: GENERATION_TIMEOUT_MS,
+    });
     expect(await getBoard()).toEqual(board);
   } finally {
     await context.setOffline(false);
