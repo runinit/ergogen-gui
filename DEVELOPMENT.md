@@ -515,3 +515,7 @@ Roboto, Nunito, and Material Symbols are installed through pinned Fontsource
 packages and bundled by Vite. The icon class is defined locally in the global
 styles. Font assets are precached so menus render with external fonts blocked
 and after offline reload. `e2e/icons.spec.ts` checks both cases.
+
+Application controls use inline SVG icons through `atoms/Icon.tsx`, preserving
+existing icon names and sizing. They work even when the browser rejects all
+web fonts. Material Symbols remains available for the embedded PCB viewer.

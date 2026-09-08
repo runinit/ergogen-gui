@@ -1,3 +1,4 @@
+import Icon from '../atoms/Icon';
 import InjectionRow from '../atoms/InjectionRow';
 import { Injection } from '../atoms/InjectionRow';
 import styled from 'styled-components';
@@ -359,7 +360,7 @@ const Injections = ({
               aria-label="Add new custom footprint"
               title="Add footprint"
             >
-              <span className="material-symbols-outlined">add</span>
+              <Icon className="material-symbols-outlined">add</Icon>
             </GrowButton>
             <IconButton
               onClick={() => {
@@ -370,7 +371,7 @@ const Injections = ({
               aria-label="Load custom footprint files"
               title="Load footprint files"
             >
-              <span className="material-symbols-outlined">upload_file</span>
+              <Icon className="material-symbols-outlined">upload_file</Icon>
             </IconButton>
             <IconButton
               onClick={() => {
@@ -381,9 +382,9 @@ const Injections = ({
               aria-label="Load custom footprint folder"
               title="Load footprint folder"
             >
-              <span className="material-symbols-outlined">
+              <Icon className="material-symbols-outlined">
                 drive_folder_upload
-              </span>
+              </Icon>
             </IconButton>
           </ActionsContainer>
         </>
@@ -420,7 +421,7 @@ const Injections = ({
               aria-label="Add new custom outline"
               title="Add outline"
             >
-              <span className="material-symbols-outlined">add</span>
+              <Icon className="material-symbols-outlined">add</Icon>
             </GrowButton>
             <IconButton
               onClick={() => {
@@ -431,7 +432,7 @@ const Injections = ({
               aria-label="Load custom outline files"
               title="Load outline files"
             >
-              <span className="material-symbols-outlined">upload_file</span>
+              <Icon className="material-symbols-outlined">upload_file</Icon>
             </IconButton>
             <IconButton
               onClick={() => {
@@ -442,9 +443,9 @@ const Injections = ({
               aria-label="Load custom outline folder"
               title="Load outline folder"
             >
-              <span className="material-symbols-outlined">
+              <Icon className="material-symbols-outlined">
                 drive_folder_upload
-              </span>
+              </Icon>
             </IconButton>
           </ActionsContainer>
         </>
@@ -481,7 +482,7 @@ const Injections = ({
               aria-label="Add new custom template"
               title="Add template"
             >
-              <span className="material-symbols-outlined">add</span>
+              <Icon className="material-symbols-outlined">add</Icon>
             </GrowButton>
             <IconButton
               onClick={() => {
@@ -492,7 +493,7 @@ const Injections = ({
               aria-label="Load custom template files"
               title="Load template files"
             >
-              <span className="material-symbols-outlined">upload_file</span>
+              <Icon className="material-symbols-outlined">upload_file</Icon>
             </IconButton>
             <IconButton
               onClick={() => {
@@ -503,9 +504,9 @@ const Injections = ({
               aria-label="Load custom template folder"
               title="Load template folder"
             >
-              <span className="material-symbols-outlined">
+              <Icon className="material-symbols-outlined">
                 drive_folder_upload
-              </span>
+              </Icon>
             </IconButton>
           </ActionsContainer>
         </>

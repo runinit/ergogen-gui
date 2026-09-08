@@ -1,3 +1,4 @@
+import Icon from './Icon';
 import styled, { keyframes } from 'styled-components';
 import { theme } from '../theme/theme';
 import { trackEvent } from '../utils/analytics';
@@ -198,7 +199,7 @@ const DownloadRow = ({
             aria-label={`Generating ${fileName}.${extension}`}
             data-testid={testId && `${testId}-loading`}
           >
-            <span className="material-symbols-outlined">progress_activity</span>
+            <Icon className="material-symbols-outlined">progress_activity</Icon>
           </LoadingButton>
         ) : (
           <StyledLinkButton
@@ -206,7 +207,7 @@ const DownloadRow = ({
             aria-label={`Download ${fileName}.${extension}`}
             data-testid={testId && `${testId}-download`}
           >
-            <span className="material-symbols-outlined">download</span>
+            <Icon className="material-symbols-outlined">download</Icon>
           </StyledLinkButton>
         )}
       </Buttons>

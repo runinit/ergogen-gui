@@ -1,3 +1,4 @@
+import Icon from '../atoms/Icon';
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
@@ -163,7 +164,7 @@ const BulkDownloadDialog: React.FC<BulkDownloadDialogProps> = ({
 
             {!onlyConfigs && (
               <WarningBox>
-                <span className="material-symbols-outlined">warning</span>
+                <Icon className="material-symbols-outlined">warning</Icon>
                 <span>
                   Warning: Exporting generated outputs for multiple
                   configurations may take a long time depending on the number of

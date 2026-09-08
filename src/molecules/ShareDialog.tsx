@@ -1,3 +1,4 @@
+import Icon from '../atoms/Icon';
 import React, { useEffect, useState, useRef } from 'react';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
@@ -271,7 +272,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({
           data-testid={dataTestId && `${dataTestId}-close`}
           aria-label="Close dialog"
         >
-          <span className="material-symbols-outlined">close</span>
+          <Icon className="material-symbols-outlined">close</Icon>
         </CloseButton>
 
         {step === 1 ? (
@@ -378,9 +379,9 @@ const ShareDialog: React.FC<ShareDialogProps> = ({
                   data-testid={dataTestId && `${dataTestId}-copy`}
                   aria-label={copied ? 'Link copied' : 'Copy link'}
                 >
-                  <span className="material-symbols-outlined">
+                  <Icon className="material-symbols-outlined">
                     {copied ? 'check' : 'content_copy'}
-                  </span>
+                  </Icon>
                   {copied ? 'Link copied' : 'Copy link'}
                 </CopyButton>
               </ButtonWrapper>

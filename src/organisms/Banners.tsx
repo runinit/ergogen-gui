@@ -2,6 +2,7 @@ import React from 'react';
 import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';
 import { theme } from '../theme/theme';
+import Icon from '../atoms/Icon';
 
 const bannerColors = {
   info: {
@@ -22,7 +23,7 @@ const bannerColors = {
   },
 };
 
-const BannerIcon = styled.span.attrs({
+const BannerIcon = styled(Icon).attrs({
   className: 'material-symbols-outlined',
 })`
   font-size: ${theme.fontSizes.iconLarge};

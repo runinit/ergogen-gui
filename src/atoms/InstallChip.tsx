@@ -1,3 +1,4 @@
+import Icon from './Icon';
 import styled, { keyframes } from 'styled-components';
 import { theme } from '../theme/theme';
 
@@ -55,9 +56,9 @@ const InstallChip = ({ onClick, 'data-testid': dataTestId }: Props) => (
     aria-label="Install app"
     data-testid={dataTestId ?? 'install-chip'}
   >
-    <span className="material-symbols-outlined" aria-hidden="true">
+    <Icon className="material-symbols-outlined" aria-hidden="true">
       system_update_alt
-    </span>
+    </Icon>
     Install App
   </Chip>
 );

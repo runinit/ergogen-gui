@@ -1,3 +1,4 @@
+import Icon from '../atoms/Icon';
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
@@ -321,7 +322,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
             data-testid={dataTestId && `${dataTestId}-close`}
             aria-label="Close navigation panel"
           >
-            <span className="material-symbols-outlined">close</span>
+            <Icon className="material-symbols-outlined">close</Icon>
           </CloseButton>
         </Header>
         <Content>
@@ -331,7 +332,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
               aria-label="New"
               data-testid="side-nav-new-config-button"
             >
-              <span className="material-symbols-outlined">add</span>
+              <Icon className="material-symbols-outlined">add</Icon>
               <span>New</span>
             </NewConfigButton>
             {configs && configs.length > 0 && (
@@ -340,16 +341,16 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
                 aria-label="Download All"
                 data-testid="side-nav-download-all-button"
               >
-                <span className="material-symbols-outlined">download</span>
+                <Icon className="material-symbols-outlined">download</Icon>
                 <span>Download All</span>
               </DownloadAllButton>
             )}
           </ActionBar>
 
           <SearchWrapper>
-            <span className="material-symbols-outlined search-icon">
+            <Icon className="material-symbols-outlined search-icon">
               search
-            </span>
+            </Icon>
             <SearchInput
               type="text"
               placeholder="Search configurations..."
@@ -359,7 +360,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
             />
             {searchQuery && (
               <ClearSearchButton onClick={() => setSearchQuery('')}>
-                <span className="material-symbols-outlined">close</span>
+                <Icon className="material-symbols-outlined">close</Icon>
               </ClearSearchButton>
             )}
           </SearchWrapper>
@@ -396,14 +397,14 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
                         aria-label="Rename input"
                       />
                       <RenameActionBtn type="submit" aria-label="Save name">
-                        <span className="material-symbols-outlined">check</span>
+                        <Icon className="material-symbols-outlined">check</Icon>
                       </RenameActionBtn>
                       <RenameActionBtn
                         type="button"
                         onClick={() => setRenamingId(null)}
                         aria-label="Cancel rename"
                       >
-                        <span className="material-symbols-outlined">close</span>
+                        <Icon className="material-symbols-outlined">close</Icon>
                       </RenameActionBtn>
                     </RenameForm>
                   ) : (
@@ -413,9 +414,9 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
                         $isActive={isActive}
                         title={cfg.name}
                       >
-                        <span className="material-symbols-outlined">
+                        <Icon className="material-symbols-outlined">
                           description
-                        </span>
+                        </Icon>
                         <span className="config-title-text">{cfg.name}</span>
                       </ConfigNameButton>
                       <ItemActions $isActive={isActive}>
@@ -423,25 +424,25 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
                           onClick={() => handleStartRename(cfg.id, cfg.name)}
                           aria-label={`Rename configuration ${cfg.name}`}
                         >
-                          <span className="material-symbols-outlined">
+                          <Icon className="material-symbols-outlined">
                             edit
-                          </span>
+                          </Icon>
                         </ActionIconBtn>
                         <ActionIconBtn
                           onClick={() => handleDuplicateConfig(cfg.id)}
                           aria-label={`Duplicate configuration ${cfg.name}`}
                         >
-                          <span className="material-symbols-outlined">
+                          <Icon className="material-symbols-outlined">
                             content_copy
-                          </span>
+                          </Icon>
                         </ActionIconBtn>
                         <ActionIconBtn
                           onClick={() => handleDeleteConfig(cfg.id, cfg.name)}
                           aria-label={`Delete configuration ${cfg.name}`}
                         >
-                          <span className="material-symbols-outlined">
+                          <Icon className="material-symbols-outlined">
                             delete
-                          </span>
+                          </Icon>
                         </ActionIconBtn>
                       </ItemActions>
                     </>
@@ -467,7 +468,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
               aria-label="Open documentation"
               data-testid="side-nav-docs-button"
             >
-              <span className="material-symbols-outlined">description</span>
+              <Icon className="material-symbols-outlined">description</Icon>
               <span>Docs</span>
             </OutlineButton>
             <OutlineButton

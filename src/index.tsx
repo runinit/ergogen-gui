@@ -28,20 +28,11 @@ const AppContainer = styled.div`
 `;
 
 const GlobalStyle = createGlobalStyle`
-  /* Keep icon ligatures and their sizing available when external fonts fail. */
+  /* Preserve control sizing while icons render as SVG paths. */
   .material-symbols-outlined {
-    font-family: 'Material Symbols Outlined';
-    font-weight: normal;
-    font-style: normal;
     font-size: ${theme.fontSizes.iconLarge};
     display: inline-block;
-    line-height: 1;
-    text-transform: none;
-    letter-spacing: normal;
-    white-space: nowrap;
-    direction: ltr;
-    font-feature-settings: 'liga';
-    -webkit-font-smoothing: antialiased;
+    flex-shrink: 0;
   }
 
   *,

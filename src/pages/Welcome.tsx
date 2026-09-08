@@ -1,3 +1,4 @@
+import Icon from '../atoms/Icon';
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
@@ -894,9 +895,9 @@ const Welcome = () => {
                     ) : (
                       <ForgejoIcon />
                     )}
-                    <span className="material-symbols-outlined">
+                    <Icon className="material-symbols-outlined">
                       arrow_drop_down
-                    </span>
+                    </Icon>
                   </DropdownTrigger>
                   {isDropdownOpen && (
                     <DropdownMenu>
@@ -963,12 +964,12 @@ const Welcome = () => {
                   {isRepoLoading ? (
                     <Spinner />
                   ) : (
-                    <span
+                    <Icon
                       className="material-symbols-outlined"
                       style={{ display: 'block' }}
                     >
                       cloud_download
-                    </span>
+                    </Icon>
                   )}
                 </LoadButton>
               </UnifiedInputGroup>
@@ -1001,9 +1002,9 @@ const Welcome = () => {
                     />
                   ) : (
                     <FallbackIconContainer>
-                      <span className="material-symbols-outlined">
+                      <Icon className="material-symbols-outlined">
                         keyboard_off
-                      </span>
+                      </Icon>
                     </FallbackIconContainer>
                   )}
                   <ExampleName>{cfg.name}</ExampleName>

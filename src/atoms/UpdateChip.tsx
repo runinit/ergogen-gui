@@ -1,3 +1,4 @@
+import Icon from './Icon';
 import { useState } from 'react';
 import styled, { keyframes, css } from 'styled-components';
 import { theme } from '../theme/theme';
@@ -87,9 +88,9 @@ const UpdateChip = ({ onClick, 'data-testid': dataTestId }: Props) => {
       }
       data-testid={dataTestId ?? 'update-chip'}
     >
-      <span className="material-symbols-outlined" aria-hidden="true">
+      <Icon className="material-symbols-outlined" aria-hidden="true">
         {isUpdating ? 'sync' : 'update'}
-      </span>
+      </Icon>
       {isUpdating ? 'Updating version...' : 'Update Available'}
     </Chip>
   );

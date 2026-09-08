@@ -1,3 +1,4 @@
+import Icon from './Icon';
 import React, { useState, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
@@ -79,7 +80,7 @@ export const DevChip: React.FC<DevChipProps> = ({
         data-testid={dataTestId && `${dataTestId}-badge`}
         aria-label="Custom Ergogen version indicator"
       >
-        <span className="material-symbols-outlined">science</span>
+        <Icon className="material-symbols-outlined">science</Icon>
       </ChipElement>
 
       {isOpen && (
@@ -101,9 +102,9 @@ export const DevChip: React.FC<DevChipProps> = ({
             data-testid={dataTestId && `${dataTestId}-link`}
           >
             <span>{versionInfo.label}</span>
-            <span className="material-symbols-outlined open-icon">
+            <Icon className="material-symbols-outlined open-icon">
               open_in_new
-            </span>
+            </Icon>
           </VersionLink>
         </PopoverCard>
       )}

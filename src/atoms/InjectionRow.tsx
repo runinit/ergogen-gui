@@ -1,3 +1,4 @@
+import Icon from './Icon';
 import styled, { css } from 'styled-components';
 import { theme } from '../theme/theme';
 
@@ -140,7 +141,7 @@ const InjectionRow = ({
           aria-label={`edit injection ${injection.name}`}
           data-testid={dataTestId && `${dataTestId}-edit`}
         >
-          <span className="material-symbols-outlined">edit</span>
+          <Icon className="material-symbols-outlined">edit</Icon>
         </MobileEditButton>
         <StyledLinkButton
           href="#"
@@ -151,7 +152,7 @@ const InjectionRow = ({
           aria-label={`delete injection ${injection.name}`}
           data-testid={dataTestId && `${dataTestId}-delete`}
         >
-          <span className="material-symbols-outlined">delete</span>
+          <Icon className="material-symbols-outlined">delete</Icon>
         </StyledLinkButton>
         <StyledLinkButton
           target={'_blank'}
@@ -163,7 +164,7 @@ const InjectionRow = ({
           aria-label={`download injection ${injection.name}`}
           data-testid={dataTestId && `${dataTestId}-download`}
         >
-          <span className="material-symbols-outlined">download</span>
+          <Icon className="material-symbols-outlined">download</Icon>
         </StyledLinkButton>
       </Buttons>
     </Row>

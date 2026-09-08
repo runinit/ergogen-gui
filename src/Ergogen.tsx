@@ -1,3 +1,4 @@
+import Icon from './atoms/Icon';
 import {
   useEffect,
   useState,
@@ -593,7 +594,7 @@ const Ergogen = () => {
                   aria-label="Generate configuration"
                   data-testid="mobile-generate-button"
                 >
-                  <span className="material-symbols-outlined">refresh</span>
+                  <Icon className="material-symbols-outlined">refresh</Icon>
                 </GenerateIconButton>
                 <SubHeaderResponsiveIconButton
                   onClick={handleShare}
@@ -601,14 +602,14 @@ const Ergogen = () => {
                   aria-label="Share configuration"
                   data-testid="mobile-share-button"
                 >
-                  <span className="material-symbols-outlined">share</span>
+                  <Icon className="material-symbols-outlined">share</Icon>
                 </SubHeaderResponsiveIconButton>
                 <OutlineIconButton
                   onClick={handleDownload}
                   aria-label="Download configuration"
                   data-testid="mobile-download-button"
                 >
-                  <span className="material-symbols-outlined">download</span>
+                  <Icon className="material-symbols-outlined">download</Icon>
                 </OutlineIconButton>
               </>
             )}
@@ -623,7 +624,7 @@ const Ergogen = () => {
                   aria-label="Download archive of all generated files"
                   data-testid="mobile-download-outputs-button"
                 >
-                  <span className="material-symbols-outlined">archive</span>
+                  <Icon className="material-symbols-outlined">archive</Icon>
                 </SubHeaderResponsiveIconButton>
                 <OutlineIconButton
                   onClick={() =>
@@ -636,11 +637,11 @@ const Ergogen = () => {
                   }
                   data-testid="mobile-downloads-toggle-button"
                 >
-                  <span className="material-symbols-outlined">
+                  <Icon className="material-symbols-outlined">
                     {configContext.showDownloads
                       ? 'expand_content'
                       : 'collapse_content'}
-                  </span>
+                  </Icon>
                 </OutlineIconButton>
               </>
             )}
@@ -688,9 +689,9 @@ const Ergogen = () => {
                         aria-label="Download configuration"
                         data-testid="download-config-button"
                       >
-                        <span className="material-symbols-outlined">
+                        <Icon className="material-symbols-outlined">
                           download
-                        </span>
+                        </Icon>
                       </OutlineIconButton>
                     </ButtonContainer>
                   </EditorContainer>
@@ -852,7 +853,7 @@ const Ergogen = () => {
                         aria-label="Close editor"
                         data-testid="mobile-editor-close"
                       >
-                        <span className="material-symbols-outlined">close</span>
+                        <Icon className="material-symbols-outlined">close</Icon>
                       </MobileCloseButton>
                     </MobileEditorHeader>
                   )}

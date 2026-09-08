@@ -1,5 +1,28 @@
 import { expect, test } from '@playwright/test';
 
+test('renders icons when the browser cannot use web fonts', async ({
+  page,
+}) => {
+  await page.route(
+    /fonts\.(googleapis|gstatic)\.com|\.(woff2?|ttf)(\?|$)/,
+    (route) => route.abort()
+  );
+  await page.goto('./new');
+  const navigation = page.getByRole('button', {
+    name: 'Show navigation panel',
+  });
+  await expect(navigation).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  const icon = navigation.locator('.material-symbols-outlined');
+  const bounds = await icon.boundingBox();
+  expect(bounds!.width).toBeLessThanOrEqual(bounds!.height * 1.5);
+  await navigation.click();
+  await page.screenshot({
+    path: test.info().outputPath('no-fonts.png'),
+    animations: 'disabled',
+  });
+});
+
 test('renders menu icons with external fonts blocked', async ({ page }) => {
   await page.route(/https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) =>
     route.abort()
@@ -20,10 +43,6 @@ test('renders menu icons with external fonts blocked', async ({ page }) => {
   });
   await provider.click();
   await page.getByText('Codeberg', { exact: true }).click();
-  await expect(provider.locator('.material-symbols-outlined')).toHaveCSS(
-    'font-family',
-    '"Material Symbols Outlined"'
-  );
   await page.screenshot({
     path: test.info().outputPath('welcome.png'),
     animations: 'disabled',
@@ -34,7 +53,7 @@ test('renders menu icons with external fonts blocked', async ({ page }) => {
   const icons = page.locator('.material-symbols-outlined:visible');
   for (const item of await icons.all()) {
     const bounds = await item.boundingBox();
-    expect(bounds!.width, await item.innerText()).toBeLessThanOrEqual(
+    expect(bounds!.width, await item.textContent()).toBeLessThanOrEqual(
       bounds!.height * 1.5
     );
   }

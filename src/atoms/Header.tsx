@@ -1,3 +1,4 @@
+import Icon from './Icon';
 import { useState, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
@@ -337,7 +338,7 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
             }
             data-testid="side-nav-toggle-button"
           >
-            <span className="material-symbols-outlined">side_navigation</span>
+            <Icon className="material-symbols-outlined">side_navigation</Icon>
           </SideNavButton>
           <ErgogenLogo>
             <LogoButton
@@ -370,7 +371,7 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
               >
                 {isPreview && (
                   <SharedLinkIcon data-testid="header-shared-icon">
-                    <span className="material-symbols-outlined">link</span>
+                    <Icon className="material-symbols-outlined">link</Icon>
                   </SharedLinkIcon>
                 )}
                 {isEditing ? (
@@ -395,7 +396,7 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
                         aria-label="Confirm rename"
                         data-testid="header-confirm-rename-btn"
                       >
-                        <span className="material-symbols-outlined">check</span>
+                        <Icon className="material-symbols-outlined">check</Icon>
                       </HeaderActionIconBtn>
                       <HeaderActionIconBtn
                         onMouseDown={(e) => {
@@ -405,7 +406,7 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
                         aria-label="Cancel rename"
                         data-testid="header-cancel-rename-btn"
                       >
-                        <span className="material-symbols-outlined">close</span>
+                        <Icon className="material-symbols-outlined">close</Icon>
                       </HeaderActionIconBtn>
                     </HeaderItemActions>
                   </>
@@ -423,7 +424,7 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
                         aria-label="Save preview configuration"
                         data-testid="header-save-preview-btn"
                       >
-                        <span className="material-symbols-outlined">save</span>
+                        <Icon className="material-symbols-outlined">save</Icon>
                       </HeaderActionIconBtn>
                     </HeaderItemActions>
                   </>
@@ -441,25 +442,25 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
                         aria-label="Rename configuration"
                         data-testid="header-rename-btn"
                       >
-                        <span className="material-symbols-outlined">edit</span>
+                        <Icon className="material-symbols-outlined">edit</Icon>
                       </HeaderActionIconBtn>
                       <HeaderActionSecondaryBtn
                         onClick={handleDuplicate}
                         aria-label="Duplicate configuration"
                         data-testid="header-duplicate-btn"
                       >
-                        <span className="material-symbols-outlined">
+                        <Icon className="material-symbols-outlined">
                           content_copy
-                        </span>
+                        </Icon>
                       </HeaderActionSecondaryBtn>
                       <HeaderActionSecondaryBtn
                         onClick={handleDelete}
                         aria-label="Delete configuration"
                         data-testid="header-delete-btn"
                       >
-                        <span className="material-symbols-outlined">
+                        <Icon className="material-symbols-outlined">
                           delete
-                        </span>
+                        </Icon>
                       </HeaderActionSecondaryBtn>
                     </HeaderItemActions>
                   </>
@@ -485,7 +486,7 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
                 aria-label="Start new configuration"
                 data-testid="new-config-button"
               >
-                <span className="material-symbols-outlined">add_2</span>
+                <Icon className="material-symbols-outlined">add_2</Icon>
                 <NewButtonText>New</NewButtonText>
               </AccentIconButton>
               <ArchiveIconButton
@@ -497,7 +498,7 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
                 aria-label="Download archive of all generated files"
                 data-testid="header-download-outputs-button"
               >
-                <span className="material-symbols-outlined">archive</span>
+                <Icon className="material-symbols-outlined">archive</Icon>
               </ArchiveIconButton>
               <ArchiveIconButton
                 onClick={handleShare}
@@ -505,7 +506,7 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
                 aria-label="Share configuration"
                 data-testid="header-share-button"
               >
-                <span className="material-symbols-outlined">share</span>
+                <Icon className="material-symbols-outlined">share</Icon>
               </ArchiveIconButton>
             </>
           )}
@@ -519,9 +520,9 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
               }
               data-testid="settings-button"
             >
-              <span className="material-symbols-outlined">
+              <Icon className="material-symbols-outlined">
                 {configContext?.showSettings ? 'keyboard_alt' : 'settings'}
-              </span>
+              </Icon>
             </OutlineIconButton>
           )}
         </RightContainer>
