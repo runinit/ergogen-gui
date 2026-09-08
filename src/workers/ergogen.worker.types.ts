@@ -3,7 +3,8 @@
  */
 
 export type WorkerRequest = {
-  type: 'generate';
+  type: 'generate' | 'analyze';
+  assets?: Record<string, string>;
   inputConfig: string | object;
   injectionInput?: string[][];
   /** Unique id to correlate requests and responses */

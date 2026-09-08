@@ -1,5 +1,25 @@
 # Changelog
 
+## Guided mounting and explicit case generation
+
+September 8, 2026
+
+![Interactive case mounting plan.](./public/images/changelog/guided-case.png)
+
+Choose mounting and manufacturing up front. The case designer now creates
+mounting drafts from a 2D analysis, with direct placement editing, keyboard
+movement, undo and preserved manual positions. Settings include accessible help.
+
+Generate builds an explicit revision. Changes retain the last successful 3D
+result and disable Apply/export until regenerated. Imported KiCad boards supply
+component placements and thickness; guided model association packages STEP,
+STL and VRML assets with exported projects. A separate middle frame can conceal
+gaskets while retaining the switch plate.
+
+The JLCCNC aluminium preset records supplier sources, depth-dependent tooling
+and explicit switch corner relief. Missing dimensions and invalid combinations
+produce repair guidance before or during generation.
+
 ## Full enclosure designer
 
 September 8, 2026

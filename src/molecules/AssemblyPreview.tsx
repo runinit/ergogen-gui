@@ -1,5 +1,5 @@
 /* eslint-disable react/no-unknown-property -- React Three Fiber declares these scene properties. */
-import { Component, ReactNode, useEffect, useMemo } from 'react';
+import { Component, ReactNode, useEffect, useMemo, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Bounds, OrbitControls, useBounds } from '@react-three/drei';
 import { STLLoader } from 'three-stdlib';
@@ -69,6 +69,7 @@ function AssemblyScene({
   lateral = 0,
   angle = 0,
 }: Props) {
+  const viewport = useRef<HTMLDivElement>(null);
   const meshes = useMemo(() => {
     const loader = new STLLoader();
     return Object.entries(parts).flatMap(([name, part]) => {
@@ -109,7 +110,7 @@ function AssemblyScene({
     return <p role="status">Generate STL parts to preview the assembly.</p>;
   }
   return (
-    <Viewport aria-label="3D assembly preview">
+    <Viewport ref={viewport} aria-label="3D assembly preview">
       <Canvas
         gl={{ localClippingEnabled: true }}
         camera={{ position: [100, -100, 120], up: [0, 0, 1] }}
@@ -128,6 +129,9 @@ function AssemblyScene({
                 <mesh
                   key={mesh.name}
                   geometry={mesh.geometry}
+                  onAfterRender={() =>
+                    viewport.current?.setAttribute('data-rendered', 'true')
+                  }
                   visible={
                     mode !== 'part' ||
                     mesh.name === (selected || meshes[0].name)

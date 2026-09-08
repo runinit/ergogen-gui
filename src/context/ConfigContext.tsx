@@ -152,6 +152,11 @@ type ContextProps = {
       options?: ProcessOptions
     ) => Promise<void>
   >;
+  adoptGenerated: (
+    source: string,
+    result: Results,
+    assets: Record<string, string>
+  ) => void;
   generateNow: (
     textInput: string | undefined,
     injectionInput: string[][] | undefined,
@@ -512,6 +517,10 @@ const ConfigContextProvider = ({
     configInputRef.current = configInputState;
   }, [configInputState]);
 
+  const adoptedResult = useRef<{ source: string; injections: string } | null>(
+    null
+  );
+  const caseAssets = useRef<Record<string, string> | undefined>(undefined);
   const realtimeConfigInputRef = useRef<string | undefined>(configInputState);
 
   useEffect(() => {
@@ -1065,6 +1074,14 @@ const ConfigContextProvider = ({
       if (!targetInput) {
         return;
       }
+      if (
+        adoptedResult.current?.source === targetInput &&
+        adoptedResult.current.injections ===
+          JSON.stringify(injectionInput || [])
+      ) {
+        return;
+      }
+      adoptedResult.current = null;
       const inputInjection = filterInjectionsByFeatureFlags(injectionInput);
       const [, parsedConfig] = parseConfig(targetInput);
 
@@ -1093,6 +1110,7 @@ const ConfigContextProvider = ({
           ergogenWorkerRef.current.postMessage({
             type: 'generate',
             inputConfig,
+            assets: caseAssets.current,
             injectionInput: inputInjection,
             requestId: activeRequestRef.current,
             options: {
@@ -1138,6 +1156,25 @@ const ConfigContextProvider = ({
       await runGeneration(textInput, injectionInput, options);
     },
     [processInput, runGeneration]
+  );
+
+  const adoptGenerated = useCallback(
+    (source: string, result: Results, assets: Record<string, string>) => {
+      processInput.cancel();
+      activeRequestRef.current = null;
+      currentConfigVersion.current += 1;
+      adoptedResult.current = {
+        source,
+        injections: JSON.stringify(injectionInput || []),
+      };
+      caseAssets.current = assets;
+      setResults(result);
+      setResultsStale(false);
+      setResultsVersion((v) => v + 1);
+      setIsGenerating(false);
+      setError(null);
+    },
+    [processInput, injectionInput]
   );
 
   const setConfigInput = useCallback(
@@ -1568,7 +1605,7 @@ const ConfigContextProvider = ({
   useEffect(() => {
     localStorage.setItem(
       storageKey('ergogen:injection'),
-      JSON.stringify(injectionInput)
+      JSON.stringify(injectionInput || [])
     );
     if (autoGen && !showSettings) {
       processInput(configInputState, injectionInput, {
@@ -1644,6 +1681,7 @@ const ConfigContextProvider = ({
       setInjectionInput,
       processInput,
       generateNow,
+      adoptGenerated,
       error,
       setError,
       clearError,
@@ -1706,6 +1744,7 @@ const ConfigContextProvider = ({
       setInjectionInput,
       processInput,
       generateNow,
+      adoptGenerated,
       error,
       setError,
       clearError,

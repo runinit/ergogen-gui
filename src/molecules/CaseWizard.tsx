@@ -2,13 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { parseDocument } from 'yaml';
 import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';
-import { useCasePreview } from '../hooks/useCasePreview';
+import { useCasePreview, useCaseAnalysis } from '../hooks/useCasePreview';
 import {
   appendDesignRef,
   CASE_STEPS,
   caseNames,
   createCase,
   editCase,
+  editCaseChanges,
   MOUNT_STYLES,
   removeCaseField,
   toggleDesignRef,
@@ -18,6 +19,16 @@ import { createZip } from '../utils/zip';
 import { theme } from '../theme/theme';
 import AssemblyPreview from './AssemblyPreview';
 import { pickCaseFeature } from '../utils/caseSelection';
+import Field, { CaseHelp } from './CaseField';
+import CasePlanPreview, {
+  ProfilePreview,
+  StackDiagram,
+} from './CasePlanPreview';
+import { loadAssets, saveAssets } from '../utils/caseAssets';
+import CaseComponents from './CaseComponents';
+import CaseControlHelp from './CaseControlHelp';
+import { CaseConfig, CasePlacement } from '../types/case';
+import { applyPreset, JLC_GUIDE, JLC_PRESET } from '../utils/casePresets';
 
 const Shell = styled.section`
   position: fixed;
@@ -135,7 +146,7 @@ const Preview = styled.div`
 `;
 const View = styled.div`
   flex: 1;
-  min-height: ${theme.caseWizard.previewHeight};
+  min-height: ${theme.caseWizard.solidHeight};
 `;
 const Controls = styled.div`
   display: flex;
@@ -188,66 +199,6 @@ const PROCESS_DEFAULTS = {
 };
 
 type Props = { onClose: () => void };
-type FieldProps = {
-  label: string;
-  value: unknown;
-  onChange: (value: unknown) => void;
-  choices?: string[];
-};
-
-function Field({ label, value, onChange, choices }: FieldProps) {
-  if (choices) {
-    return (
-      <label>
-        {label}
-        <select
-          aria-label={label}
-          value={String(value ?? '')}
-          onChange={(event) => onChange(event.target.value)}
-        >
-          {choices.map((choice) => (
-            <option key={choice} value={choice}>
-              {choice || 'Choose…'}
-            </option>
-          ))}
-        </select>
-      </label>
-    );
-  }
-  const unsupported =
-    value !== undefined && value !== null && typeof value === 'object';
-  return (
-    <label>
-      {label}
-      <input
-        aria-label={label}
-        key={String(value)}
-        defaultValue={
-          unsupported
-            ? 'Custom YAML — use advanced editor'
-            : String(value ?? '')
-        }
-        readOnly={unsupported}
-        onBlur={(event) => {
-          if (event.target.value === String(value ?? '')) {
-            return;
-          }
-          const text = event.target.value;
-          onChange(
-            text === 'true'
-              ? true
-              : text === 'false'
-                ? false
-                : text.trim() !== '' && Number.isFinite(Number(text))
-                  ? Number(text)
-                  : text
-          );
-        }}
-      />
-    </label>
-  );
-}
-
 export default function CaseWizard({ onClose }: Props) {
   const context = useConfigContext();
   const [initialError] = useState(() => {
@@ -286,8 +237,24 @@ function CaseDraft({ onClose }: Props) {
       : createCase(base.current, 'case')
   );
   const [step, setStep] = useState(0);
+  const [assets, setAssets] = useState<Record<string, string>>({});
+  const [automatic, setAutomatic] = useState('');
+  const history = useRef<string[]>([]);
+  useEffect(() => {
+    let live = true;
+    loadAssets()
+      .then((value) => {
+        if (live) {
+          setAssets(value);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
   const [error, setError] = useState('');
-  const [view, setView] = useState('assembled');
+  const [view, setView] = useState('plan');
   const [selected, setSelected] = useState('');
   const [feature, setFeature] = useState('');
   const [travel, setTravel] = useState(0);
@@ -298,21 +265,31 @@ function CaseDraft({ onClose }: Props) {
   const doc = useMemo(() => parseDocument(draft), [draft]);
   const data = useMemo(() => doc.toJS(), [doc]);
   const spec = data?.designs?.assemblies?.[name] || {};
-  const preview = useCasePreview(draft, context?.injectionInput);
+  const preview = useCasePreview(draft, context?.injectionInput, assets);
+  const analysis = useCaseAnalysis(draft, context?.injectionInput, assets);
+  const plan = analysis.result?.designs?.analysis?.[name];
+  const board = analysis.result?.designs?.boards?.[name];
   const assembly = preview.result?.designs?.assemblies[name];
   const previewCases = useMemo(
     () => ({ ...preview.result?.cases, ...preview.result?.solids }),
     [preview.result]
   );
-  const findings = assembly?.manufacturing || [];
-  const movement = (assembly?.parameters?.gasket || {}) as Record<
+  const findings = [
+    ...(plan?.findings || []),
+    ...(assembly?.manufacturing || []),
+    ...preview.diagnostics,
+  ];
+  const movement = (plan?.parameters?.gasket || spec.gasket || {}) as Record<
     string,
     number
   >;
   const points = Object.keys(
-    (preview.result?.points || context?.results?.points || {}) as object
+    (analysis.result?.points ||
+      preview.result?.points ||
+      context?.results?.points ||
+      {}) as object
   );
-  const features = preview.result?.designs?.features || {};
+  const features = analysis.result?.designs?.features || {};
   // Keep declared references available when native generation cannot complete.
   const refs = Array.from(
     new Set([
@@ -333,11 +310,16 @@ function CaseDraft({ onClose }: Props) {
   const disconnected = /Expected one connected region/.test(preview.error);
   const staleSource =
     base.current !== (context?.getRealtimeConfigInput() || '');
-  const processes = ['bottom', 'top', 'plate'].every(
-    (part) => spec.manufacturing?.[part]?.process
-  );
+  const processes = [
+    'bottom',
+    'top',
+    'plate',
+    ...(spec.construction === 'midframe' ? ['middle'] : []),
+  ].every((part) => spec.manufacturing?.[part]?.process);
   const blocked =
     preview.pending ||
+    preview.stale ||
+    analysis.stale ||
     !!preview.error ||
     !!error ||
     staleSource ||
@@ -364,6 +346,7 @@ function CaseDraft({ onClose }: Props) {
       return;
     }
     setFeature(id);
+    setView('plan');
     setStep(id.startsWith('mounts.') ? 5 : id.startsWith('gaskets.') ? 2 : 4);
   };
   const change = (transform: (source: string) => string) => {
@@ -373,6 +356,7 @@ function CaseDraft({ onClose }: Props) {
       if (parsed.errors.length) {
         throw new Error(parsed.errors[0].message);
       }
+      history.current.push(draft);
       setDraft(next);
       setError('');
       setConfirmed(false);
@@ -398,7 +382,16 @@ function CaseDraft({ onClose }: Props) {
         vector[axis] = value;
         return editCase(source, name, path.slice(0, -1), vector);
       }
-      return editCase(source, name, path, value);
+      let result = editCase(source, name, path, value);
+      if (['mounts', 'gaskets'].includes(String(path[0])) && path.length > 2) {
+        result = editCase(
+          result,
+          name,
+          [path[0], path[1], 'placement', 'owner'],
+          'manual'
+        );
+      }
+      return result;
     });
   const field = (
     path: SourcePath,
@@ -411,6 +404,7 @@ function CaseDraft({ onClose }: Props) {
       label={label}
       value={doc.getIn(['designs', 'assemblies', name, ...path]) ?? fallback}
       choices={choices}
+      defaultValue={fallback}
       onChange={(value) => edit(path, value)}
     />
   );
@@ -425,6 +419,7 @@ function CaseDraft({ onClose }: Props) {
       label={label}
       value={doc.getIn(path) ?? fallback}
       choices={choices}
+      defaultValue={fallback}
       onChange={(value) => change((source) => editDesign(source, path, value))}
     />
   );
@@ -453,8 +448,11 @@ function CaseDraft({ onClose }: Props) {
       { designs: chosen }
     );
     return (
-      <Card>
-        <legend>{label}</legend>
+      <Card aria-label={label}>
+        <legend>
+          {label}
+          <CaseHelp label={label} />
+        </legend>
         {choices.map((choice) => (
           <label key={choice}>
             <span>
@@ -524,7 +522,7 @@ function CaseDraft({ onClose }: Props) {
       );
     });
   };
-  const apply = () => {
+  const apply = async () => {
     if (blocked || !confirmed || !context) {
       return;
     }
@@ -534,14 +532,133 @@ function CaseDraft({ onClose }: Props) {
           'The source changed. Close and reopen the wizard before applying.'
         );
       }
+      await saveAssets(assets);
       applyDesignEdit(base.current, draft);
-      void context.generateNow(draft, context.injectionInput, {
-        pointsonly: false,
-      });
+      if (preview.result) {
+        context.adoptGenerated(draft, preview.result, assets);
+      }
       onClose();
     } catch (caught) {
       setError(String(caught));
     }
+  };
+  const chooseMounting = (value: unknown) => {
+    edit(['mounting'], value);
+    setAutomatic(String(value));
+    setView('plan');
+  };
+  const redistribute = () =>
+    change((source) => {
+      let result = source;
+      for (const table of ['mounts', 'gaskets']) {
+        for (const [id, definition] of Object.entries(spec[table] || {})) {
+          if ((definition as CaseConfig).placement?.owner === 'automatic') {
+            result = removeCaseField(result, name, [table, id]);
+          }
+        }
+      }
+      for (const suggestion of plan?.suggestions || []) {
+        const table = suggestion.kind === 'gasket' ? 'gaskets' : 'mounts';
+        if (
+          spec[table]?.[suggestion.id]?.placement?.owner !== 'automatic' &&
+          spec[table]?.[suggestion.id]
+        ) {
+          continue;
+        }
+        result = editCase(result, name, [table, suggestion.id], {
+          ...suggestion.definition,
+          placement: { ...suggestion.definition.placement, owner: 'automatic' },
+        });
+      }
+      return result;
+    });
+  const redistributeRef = useRef(redistribute);
+  redistributeRef.current = redistribute;
+  useEffect(() => {
+    if (
+      !automatic ||
+      analysis.stale ||
+      analysis.pending ||
+      !plan ||
+      spec.mounting !== automatic ||
+      plan.parameters.mounting !== automatic
+    ) {
+      return;
+    }
+    setAutomatic('');
+    redistributeRef.current();
+  }, [automatic, analysis.stale, analysis.pending, plan, spec.mounting]);
+  const editPlacement = (item: CasePlacement, definition: CaseConfig) =>
+    change((source) => {
+      const path = [item.kind === 'gasket' ? 'gaskets' : 'mounts', item.id];
+      const next = editCaseChanges(
+        source,
+        name,
+        path,
+        item.definition,
+        definition
+      );
+      return editCase(next, name, [...path, 'placement', 'owner'], 'manual');
+    });
+  const removePlacement = (item: CasePlacement) => {
+    change((source) =>
+      removeCaseField(source, name, [
+        item.kind === 'gasket' ? 'gaskets' : 'mounts',
+        item.id,
+      ])
+    );
+    setFeature('');
+  };
+  const addPlacement = (
+    kind: 'mount' | 'gasket',
+    position: number[],
+    edge: string,
+    angle: number
+  ) => {
+    const table = kind === 'gasket' ? 'gaskets' : 'mounts';
+    let id = `${kind}_1`,
+      i = 1;
+    while (spec[table]?.[id]) {
+      id = `${kind}_${++i}`;
+    }
+    const template =
+      plan?.suggestions.find((s) => s.kind === kind)?.definition ||
+      (kind === 'gasket'
+        ? { size: [10, 6] }
+        : {
+            role: 'case',
+            post: 4,
+            hole: 1.25,
+            clearance: 1.7,
+            head: 3.1,
+            head_depth: 3.3,
+            depth: 6,
+            hardware: 'tapped',
+            thread: 'M3x0.5',
+            access: 'bottom',
+          });
+    edit([table, id], {
+      ...template,
+      anchor: { shift: position, rotate: angle },
+      placement: { owner: 'manual', edge },
+    });
+    setFeature(`${table}.${id}`);
+  };
+  const duplicatePlacement = (item: CasePlacement) => {
+    const table = item.kind === 'gasket' ? 'gaskets' : 'mounts';
+    let id = `${item.id}_copy`;
+    while (spec[table]?.[id]) {
+      id += '_copy';
+    }
+    edit([table, id], {
+      ...item.definition,
+      anchor: {
+        shift: [item.position[0] + 5, item.position[1]],
+        rotate: item.definition.anchor?.rotate || 0,
+      },
+      placement: { owner: 'manual' },
+    });
+    setFeature(`${table}.${id}`);
   };
   const setProcess = (part: string, value: unknown) =>
     change((source) => {
@@ -601,6 +718,7 @@ function CaseDraft({ onClose }: Props) {
         }
       }}
     >
+      <CaseControlHelp root={dialog} />
       <Header>
         <div>
           <h1>Case designer</h1>
@@ -613,6 +731,46 @@ function CaseDraft({ onClose }: Props) {
         </div>
         <button onClick={onClose}>Cancel</button>
       </Header>
+      <Controls>
+        <button
+          onClick={preview.generate}
+          disabled={
+            preview.pending ||
+            analysis.stale ||
+            !!analysis.error ||
+            !spec.mounting
+          }
+          title="Build and validate the current draft; edits only update the 2D plan."
+        >
+          {preview.pending ? 'Generating…' : 'Generate'}
+        </button>
+        {(preview.pending || preview.error) && (
+          <button onClick={preview.generate}>Restart worker and retry</button>
+        )}
+        {(analysis.pending || (analysis.stale && !analysis.error)) && (
+          <span role="status">Calculating mounting plan…</span>
+        )}
+        <span role="status">
+          {preview.pending
+            ? 'Generating geometry…'
+            : preview.stale
+              ? 'Changes not generated'
+              : 'Generated current draft'}
+        </span>
+        <button
+          disabled={!history.current.length}
+          onClick={() => {
+            const previous = history.current.pop();
+            if (previous) {
+              setDraft(previous);
+              setConfirmed(false);
+            }
+          }}
+          title="Undo the last draft edit"
+        >
+          Undo
+        </button>
+      </Controls>
       <Steps aria-label="Case design steps">
         {CASE_STEPS.map((label, index) => (
           <button
@@ -627,6 +785,36 @@ function CaseDraft({ onClose }: Props) {
       <Body>
         <Form>
           <h2>{CASE_STEPS[step]}</h2>
+          {(plan?.findings || [])
+            .filter((issue) => issue.severity === 'error')
+            .map((issue, index) => (
+              <Status key={`${issue.feature}-${index}`}>
+                <strong>{issue.message}</strong>
+                <p>{issue.action}</p>
+                <button
+                  onClick={() => {
+                    const path =
+                      issue.feature.split(`assemblies.${name}.`)[1] || '';
+                    setStep(
+                      path.startsWith('board.components')
+                        ? 4
+                        : path.startsWith('board.holes') ||
+                            path.startsWith('mounts')
+                          ? 5
+                          : path.startsWith('gasket')
+                            ? 2
+                            : path.startsWith('seam')
+                              ? 3
+                              : 0
+                    );
+                    setFeature(path);
+                    setView('plan');
+                  }}
+                >
+                  Review affected setting
+                </button>
+              </Status>
+            ))}
           {step === 0 && (
             <>
               <Field
@@ -661,12 +849,111 @@ function CaseDraft({ onClose }: Props) {
                 Use one assembly per connected case body. Keep split halves
                 separate or add a named bridge.
               </p>
+              <Field
+                label="Board source"
+                value={
+                  spec.board ? `${spec.board.source}:${spec.board.name}` : ''
+                }
+                choices={[
+                  '',
+                  `layout:${name}_layout`,
+                  ...Object.keys(data.pcbs || {}).map(
+                    (key) => `generated:${key}`
+                  ),
+                  ...Object.keys(assets)
+                    .filter((key) => key.endsWith('.kicad_pcb'))
+                    .map((key) => `asset:${key}`),
+                ]}
+                onChange={(value) => {
+                  const [source, ...parts] = String(value).split(':');
+                  if (!source) {
+                    change((text) => removeCaseField(text, name, ['board']));
+                    return;
+                  }
+                  edit(['board'], { source, name: parts.join(':') });
+                }}
+              />
+              {spec.board?.source === 'layout' && (
+                <>
+                  <Field
+                    label="Switch family"
+                    value={spec.board.family || ''}
+                    choices={['', 'mx', 'choc-v1', 'choc-v2']}
+                    onChange={(value) => edit(['board', 'family'], value)}
+                  />
+                  <p>
+                    Layout board is a mechanical reference. Choose a switch
+                    family to resolve the stack. Import your routed PCB before
+                    manufacturing it.
+                  </p>
+                </>
+              )}
+              <label>
+                Import KiCad PCB
+                <input
+                  type="file"
+                  accept=".kicad_pcb"
+                  onChange={async (event) => {
+                    const file = event.target.files?.[0];
+                    if (!file) {
+                      return;
+                    }
+                    const text = await file.text();
+                    setAssets((previous) => ({
+                      ...previous,
+                      [file.name]: text,
+                    }));
+                    edit(['board'], { source: 'asset', name: file.name });
+                  }}
+                />
+              </label>
+              <Field
+                label="Mounting system"
+                value={spec.mounting || ''}
+                choices={['', ...MOUNT_STYLES]}
+                onChange={chooseMounting}
+              />
+              <Field
+                label="Manufacturing preset"
+                value={spec.supplier || 'custom'}
+                choices={[JLC_PRESET, 'custom']}
+                onChange={(value) => {
+                  if (value === JLC_PRESET) {
+                    change((source) => applyPreset(source, name));
+                  } else {
+                    edit(['supplier'], 'custom');
+                  }
+                }}
+              />
+              <Field
+                label="Enclosure construction"
+                value={spec.construction || 'cover'}
+                choices={['cover', 'midframe']}
+                onChange={(value) =>
+                  change((source) => {
+                    let result = editCase(
+                      source,
+                      name,
+                      ['construction'],
+                      value
+                    );
+                    if (value === 'midframe' && spec.supplier === JLC_PRESET) {
+                      result = applyPreset(result, name);
+                    }
+                    return result;
+                  })
+                }
+              />
               {field(
                 ['profile'],
                 'Board profile',
                 '',
                 refs.filter((ref) => !ref.startsWith('sketches.'))
               )}
+              <ProfilePreview
+                label="Board profile"
+                model={plan?.model || features[spec.profile]?.model}
+              />
               {data.designs.regions?.[`${name}_keys`] && (
                 <>
                   {globalField(
@@ -675,6 +962,10 @@ function CaseDraft({ onClose }: Props) {
                     '',
                     ['', ...Object.keys(data.outlines || {})]
                   )}
+                  <ProfilePreview
+                    label="Existing board outline"
+                    model={features[`regions.${name}_keys`]?.model}
+                  />
                   <p>
                     Choose an existing outline for the case boundary, or leave
                     it empty to build from selected layout points.
@@ -699,8 +990,8 @@ function CaseDraft({ onClose }: Props) {
                     14
                   )}
                   {globalField(
-                    ['designs', 'regions', `${name}_switches`, 'corner_radius'],
-                    'Switch cutout corner radius (mm)',
+                    ['designs', 'regions', `${name}_switches`, 'corner_relief'],
+                    'Switch corner relief radius (mm)',
                     0
                   )}
                   {selection(
@@ -796,10 +1087,21 @@ function CaseDraft({ onClose }: Props) {
           {step === 1 && (
             <>
               <p>
-                Choose a process for each part. Suggested values need
-                confirmation against your machine and material.
+                Choose a process for each part. The JLCCNC preset uses
+                depth-dependent tooling. Supplier minimums differ from our case
+                defaults.
               </p>
-              {['bottom', 'top', 'plate'].map((part) => (
+              <p>
+                <a href={JLC_GUIDE} target="_blank" rel="noreferrer">
+                  JLCCNC design guidance
+                </a>
+              </p>
+              {[
+                'bottom',
+                'top',
+                'plate',
+                ...(spec.construction === 'midframe' ? ['middle'] : []),
+              ].map((part) => (
                 <Card key={part}>
                   <legend>{part}</legend>
                   <Field
@@ -914,7 +1216,15 @@ function CaseDraft({ onClose }: Props) {
           )}
           {step === 2 && (
             <>
-              {field(['mounting'], 'Mounting system', 'tray', MOUNT_STYLES)}
+              <Field
+                label="Mounting system"
+                value={spec.mounting || ''}
+                choices={['', ...MOUNT_STYLES]}
+                onChange={chooseMounting}
+              />
+              <button onClick={() => setAutomatic(spec.mounting)}>
+                Redistribute automatic mounts
+              </button>
               <p>
                 {
                   {
@@ -969,68 +1279,71 @@ function CaseDraft({ onClose }: Props) {
                     Choose contact regions below. Pockets and wall reliefs
                     follow them. Travel shows clearance, not simulated flex.
                   </p>
-                  <button
-                    onClick={() =>
-                      edit(
-                        [
-                          'gaskets',
-                          `contact_${Object.keys(spec.gaskets || {}).length + 1}`,
-                        ],
-                        {
-                          anchor: { ref: points[0], shift: [0, 0] },
-                          size: [10, 6],
-                        }
-                      )
-                    }
-                  >
-                    Add gasket contact
-                  </button>
-                  {assembly?.suggestions
-                    .filter((item) => item.kind === 'gasket')
-                    .slice(0, 16)
-                    .map((item) => (
-                      <button key={item.id} onClick={() => accept(item)}>
-                        Add {item.id}
-                      </button>
-                    ))}
-                  {Object.keys(spec.gaskets || {}).map((id) => (
-                    <Card key={id} id={`case-feature-gaskets.${id}`}>
-                      <legend>{id}</legend>
-                      {spec.gaskets[id].anchor?.feature ? (
-                        <p>Anchored to {spec.gaskets[id].anchor.feature}</p>
-                      ) : (
-                        field(
-                          ['gaskets', id, 'anchor', 'ref'],
-                          'Contact anchor',
-                          '',
-                          points
+                  <details>
+                    <summary>Advanced / Manual gasket contacts</summary>
+                    <button
+                      onClick={() =>
+                        edit(
+                          [
+                            'gaskets',
+                            `contact_${Object.keys(spec.gaskets || {}).length + 1}`,
+                          ],
+                          {
+                            anchor: { ref: points[0], shift: [0, 0] },
+                            size: [10, 6],
+                          }
                         )
-                      )}
-                      {local(
-                        ['gaskets', id, 'anchor', 'shift'],
-                        ['Contact X offset (mm)', 'Contact Y offset (mm)']
-                      )}
-                      {local(
-                        ['gaskets', id, 'size'],
-                        ['Contact length (mm)', 'Contact width (mm)'],
-                        [10, 6]
-                      )}
-                      {field(
-                        ['gaskets', id, 'anchor', 'rotate'],
-                        'Contact rotation (degrees)',
-                        0
-                      )}
-                      <button
-                        onClick={() =>
-                          change((source) =>
-                            removeCaseField(source, name, ['gaskets', id])
+                      }
+                    >
+                      Add gasket contact
+                    </button>
+                    {assembly?.suggestions
+                      .filter((item) => item.kind === 'gasket')
+                      .slice(0, 16)
+                      .map((item) => (
+                        <button key={item.id} onClick={() => accept(item)}>
+                          Add {item.id}
+                        </button>
+                      ))}
+                    {Object.keys(spec.gaskets || {}).map((id) => (
+                      <Card key={id} id={`case-feature-gaskets.${id}`}>
+                        <legend>{id}</legend>
+                        {spec.gaskets[id].anchor?.feature ? (
+                          <p>Anchored to {spec.gaskets[id].anchor.feature}</p>
+                        ) : (
+                          field(
+                            ['gaskets', id, 'anchor', 'ref'],
+                            'Contact anchor',
+                            '',
+                            points
                           )
-                        }
-                      >
-                        Remove {id}
-                      </button>
-                    </Card>
-                  ))}
+                        )}
+                        {local(
+                          ['gaskets', id, 'anchor', 'shift'],
+                          ['Contact X offset (mm)', 'Contact Y offset (mm)']
+                        )}
+                        {local(
+                          ['gaskets', id, 'size'],
+                          ['Contact length (mm)', 'Contact width (mm)'],
+                          [10, 6]
+                        )}
+                        {field(
+                          ['gaskets', id, 'anchor', 'rotate'],
+                          'Contact rotation (degrees)',
+                          0
+                        )}
+                        <button
+                          onClick={() =>
+                            change((source) =>
+                              removeCaseField(source, name, ['gaskets', id])
+                            )
+                          }
+                        >
+                          Remove {id}
+                        </button>
+                      </Card>
+                    ))}
+                  </details>
                 </>
               ) : (
                 <>
@@ -1065,6 +1378,7 @@ function CaseDraft({ onClose }: Props) {
                 Case dimensions are millimetres. Formulas using your layout
                 units remain editable.
               </p>
+              <StackDiagram spec={plan?.parameters || spec} />
               {field(['wall'], 'Wall thickness (mm)', 3)}
               {field(['floor'], 'Floor thickness (mm)', 2)}
               {field(['height'], 'Shell height (mm)', 24)}
@@ -1081,11 +1395,11 @@ function CaseDraft({ onClose }: Props) {
               {field(['typing_angle'], 'Typing angle (degrees)', 0)}
               {field(['fillet'], 'Upper edge fillet (mm)', 0)}
               {field(['chamfer'], 'Upper edge chamfer (mm)', 0)}
-              {field(['seam', 'type'], 'Mating seam', 'plain', [
+              {field(['seam', 'type'], 'Alignment joint', 'plain', [
                 'plain',
                 'stepped',
               ])}
-              {field(['seam', 'z'], 'Seam height (mm)', spec.plate_z)}
+              {field(['seam', 'z'], 'Shell split height (mm)', spec.plate_z)}
               {spec.seam?.type === 'stepped' && (
                 <>
                   {field(['seam', 'depth'], 'Registration depth (mm)', 1)}
@@ -1100,6 +1414,16 @@ function CaseDraft({ onClose }: Props) {
                 )}
             </>
           )}
+          <div hidden={step !== 4}>
+            <CaseComponents
+              board={board}
+              spec={spec}
+              assets={assets}
+              onAssets={setAssets}
+              onEdit={edit}
+              onConfig={(source) => change(() => source)}
+            />
+          </div>
           {step === 4 && (
             <>
               <p>
@@ -1206,112 +1530,156 @@ function CaseDraft({ onClose }: Props) {
                 Case screws close the shells. Plate and PCB mounts belong to
                 their selected support system.
               </p>
-              <button
-                onClick={() =>
-                  edit(
-                    [
-                      'mounts',
-                      `mount_${Object.keys(spec.mounts || {}).length + 1}`,
-                    ],
-                    {
-                      role: spec.mounting === 'gasket' ? 'case' : 'plate',
-                      anchor: { ref: points[0], shift: [0, 0] },
-                      hole: 1,
-                      post: 3,
-                      depth: 4,
-                      access: 'top',
-                      hardware: 'plain',
-                    }
-                  )
-                }
-              >
-                Add mount
+              <button onClick={() => setAutomatic(spec.mounting)}>
+                Redistribute automatic mounts
               </button>
-              <h3>Suggested case fasteners</h3>
-              {assembly?.suggestions
-                .filter((item) => item.kind === 'mount')
-                .slice(0, 16)
-                .map((item) => (
-                  <button key={item.id} onClick={() => accept(item)}>
-                    Add {item.id}
-                  </button>
-                ))}
-              {Object.keys(spec.mounts || {}).map((id) => (
-                <Card key={id} id={`case-feature-mounts.${id}`}>
-                  <legend>{id}</legend>
-                  {field(['mounts', id, 'role'], 'Mount target', 'case', [
-                    'case',
-                    'plate',
-                    'pcb',
-                  ])}
-                  {spec.mounts[id].anchor?.feature ? (
-                    <p>Anchored to {spec.mounts[id].anchor.feature}</p>
-                  ) : (
-                    field(
-                      ['mounts', id, 'anchor', 'ref'],
-                      'Mount anchor',
-                      '',
-                      points
-                    )
-                  )}
-                  {local(
-                    ['mounts', id, 'anchor', 'shift'],
-                    ['Mount X offset (mm)', 'Mount Y offset (mm)']
-                  )}
-                  {diameter(['mounts', id, 'hole'], 'Hole diameter (mm)', 1)}
-                  {diameter(['mounts', id, 'post'], 'Post diameter (mm)', 3)}
-                  {field(
-                    ['mounts', id, 'depth'],
-                    'Hole depth (mm)',
-                    spec.height
-                  )}
-                  {field(
-                    ['mounts', id, 'access'],
-                    'Insertion direction',
-                    'top',
-                    ['top', 'bottom']
-                  )}
-                  {field(
-                    ['mounts', id, 'hardware'],
-                    'Fastener pocket',
-                    'plain',
-                    ['plain', 'insert', 'nut', 'tapped']
-                  )}
-                  {spec.mounts[id].hardware !== 'plain' && (
-                    <>
-                      {diameter(
-                        ['mounts', id, 'pocket'],
-                        'Pocket diameter / nut across-flats (mm)',
-                        1.5
-                      )}
-                      {field(
-                        ['mounts', id, 'pocket_depth'],
-                        'Pocket depth (mm)',
-                        ''
-                      )}
-                      {field(
-                        ['mounts', id, 'thread'],
-                        'Thread specification',
-                        ''
-                      )}
-                    </>
-                  )}
-                  {field(
-                    ['mounts', id, 'min_wall'],
-                    'Material around pocket (mm)',
-                    1.5
-                  )}
-                  <button
-                    onClick={() =>
-                      change((source) =>
-                        removeCaseField(source, name, ['mounts', id])
-                      )
-                    }
-                  >
-                    Remove {id}
-                  </button>
+              {plan?.holeProposals?.length ? (
+                <Card>
+                  <legend>Proposed PCB holes</legend>
+                  <p>
+                    New holes require a changed PCB. Copper and keepouts are
+                    checked before inclusion.
+                  </p>
+                  {plan.holeProposals.map((hole) => (
+                    <div key={hole.id}>
+                      <button
+                        disabled={analysis.stale}
+                        onClick={() => {
+                          edit(
+                            ['board', 'holes'],
+                            [...(spec.board?.holes || []), hole]
+                          );
+                          setAutomatic(spec.mounting);
+                        }}
+                      >
+                        Include {hole.id} at{' '}
+                        {hole.position.map((v) => v.toFixed(1)).join(', ')} mm
+                      </button>
+                      <button
+                        disabled={analysis.stale}
+                        aria-label={`Reject ${hole.id}`}
+                        onClick={() =>
+                          edit(
+                            ['board', 'rejected_holes'],
+                            [...(spec.board?.rejected_holes || []), hole.id]
+                          )
+                        }
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  ))}
                 </Card>
-              ))}
+              ) : null}
+              <details>
+                <summary>Advanced / Manual hardware</summary>
+                <button
+                  onClick={() =>
+                    edit(
+                      [
+                        'mounts',
+                        `mount_${Object.keys(spec.mounts || {}).length + 1}`,
+                      ],
+                      {
+                        role: spec.mounting === 'gasket' ? 'case' : 'plate',
+                        anchor: { ref: points[0], shift: [0, 0] },
+                        hole: 1,
+                        post: 3,
+                        depth: 4,
+                        access: 'top',
+                        hardware: 'plain',
+                      }
+                    )
+                  }
+                >
+                  Add mount
+                </button>
+                <h3>Suggested case fasteners</h3>
+                {assembly?.suggestions
+                  .filter((item) => item.kind === 'mount')
+                  .slice(0, 16)
+                  .map((item) => (
+                    <button key={item.id} onClick={() => accept(item)}>
+                      Add {item.id}
+                    </button>
+                  ))}
+                {Object.keys(spec.mounts || {}).map((id) => (
+                  <Card key={id} id={`case-feature-mounts.${id}`}>
+                    <legend>{id}</legend>
+                    {field(['mounts', id, 'role'], 'Mount target', 'case', [
+                      'case',
+                      'plate',
+                      'pcb',
+                    ])}
+                    {spec.mounts[id].anchor?.feature ? (
+                      <p>Anchored to {spec.mounts[id].anchor.feature}</p>
+                    ) : (
+                      field(
+                        ['mounts', id, 'anchor', 'ref'],
+                        'Mount anchor',
+                        '',
+                        points
+                      )
+                    )}
+                    {local(
+                      ['mounts', id, 'anchor', 'shift'],
+                      ['Mount X offset (mm)', 'Mount Y offset (mm)']
+                    )}
+                    {diameter(['mounts', id, 'hole'], 'Hole diameter (mm)', 1)}
+                    {diameter(['mounts', id, 'post'], 'Post diameter (mm)', 3)}
+                    {field(
+                      ['mounts', id, 'depth'],
+                      'Hole depth (mm)',
+                      spec.height
+                    )}
+                    {field(
+                      ['mounts', id, 'access'],
+                      'Insertion direction',
+                      'top',
+                      ['top', 'bottom']
+                    )}
+                    {field(
+                      ['mounts', id, 'hardware'],
+                      'Fastener pocket',
+                      'plain',
+                      ['plain', 'insert', 'nut', 'tapped']
+                    )}
+                    {spec.mounts[id].hardware !== 'plain' && (
+                      <>
+                        {diameter(
+                          ['mounts', id, 'pocket'],
+                          'Pocket diameter / nut across-flats (mm)',
+                          1.5
+                        )}
+                        {field(
+                          ['mounts', id, 'pocket_depth'],
+                          'Pocket depth (mm)',
+                          ''
+                        )}
+                        {field(
+                          ['mounts', id, 'thread'],
+                          'Thread specification',
+                          ''
+                        )}
+                      </>
+                    )}
+                    {field(
+                      ['mounts', id, 'min_wall'],
+                      'Material around pocket (mm)',
+                      1.5
+                    )}
+                    <button
+                      onClick={() =>
+                        change((source) =>
+                          removeCaseField(source, name, ['mounts', id])
+                        )
+                      }
+                    >
+                      Remove {id}
+                    </button>
+                  </Card>
+                ))}
+              </details>
             </>
           )}
           {step === 6 && (
@@ -1363,7 +1731,8 @@ function CaseDraft({ onClose }: Props) {
                       draft,
                       context?.injectionInput,
                       false,
-                      true
+                      true,
+                      assets
                     )
                   }
                 >
@@ -1378,15 +1747,17 @@ function CaseDraft({ onClose }: Props) {
         </Form>
         <Preview>
           <Controls>
-            {['assembled', 'exploded', 'section', 'part'].map((mode) => (
-              <button
-                key={mode}
-                aria-pressed={view === mode}
-                onClick={() => setView(mode)}
-              >
-                {mode}
-              </button>
-            ))}
+            {['plan', 'assembled', 'exploded', 'section', 'part'].map(
+              (mode) => (
+                <button
+                  key={mode}
+                  aria-pressed={view === mode}
+                  onClick={() => setView(mode)}
+                >
+                  {mode}
+                </button>
+              )
+            )}
             <span>
               {name} · {spec.mounting}
             </span>
@@ -1396,6 +1767,7 @@ function CaseDraft({ onClose }: Props) {
               The source changed. Cancel and reopen before applying.
             </Status>
           )}
+          {analysis.error && <Status role="alert">{analysis.error}</Status>}
           {(error || preview.error) && (
             <Status role="alert">{error || preview.error}</Status>
           )}
@@ -1406,95 +1778,127 @@ function CaseDraft({ onClose }: Props) {
               cases for separate keyboard halves.
             </Status>
           )}
-          {(error || preview.error) && assembly && (
+          {(error || preview.error || preview.stale) && assembly && (
             <Status role="status">Showing the last valid geometry.</Status>
           )}
           {preview.pending && !error && !preview.error && (
             <Status role="status">Updating geometry…</Status>
           )}
-          <View>
-            {assembly ? (
-              <AssemblyPreview
-                parts={assembly.parts}
-                cases={previewCases}
-                exploded={view === 'exploded'}
-                mode={
-                  view === 'section'
-                    ? 'section'
-                    : view === 'part'
-                      ? 'part'
-                      : 'assembly'
-                }
-                selected={selected}
-                onSelect={setSelected}
-                onPick={pick}
-                travel={travel}
-                lateral={lateral}
-                angle={Number(assembly.parameters?.typing_angle || 0)}
-              />
-            ) : (
-              <Status>
-                Define a connected layout to build your first preview.
-              </Status>
-            )}
-          </View>
-          <Controls>
-            {Object.keys(assembly?.parts || {})
-              .filter((part) => !assembly?.parts[part].reference)
-              .map((part) => (
-                <button
-                  key={part}
-                  aria-pressed={selected === part}
-                  onClick={() => setSelected(part)}
-                >
-                  {part.replace(`${name}_`, '')}
-                </button>
-              ))}
-            <select
-              aria-label="Inspect part"
-              value={selected}
-              onChange={(event) => setSelected(event.target.value)}
-            >
-              <option value="">Choose part or reference</option>
-              {Object.keys(assembly?.parts || {}).map((part) => (
-                <option key={part} value={part}>
-                  {part.replace(`${name}_`, '')}
-                </option>
-              ))}
-            </select>
-          </Controls>
-          <Motion>
-            {spec.mounting === 'gasket' && (
-              <label>
-                Declared vertical movement (mm)
-                <input
-                  type="range"
-                  aria-label="Suspension travel"
-                  min={-Number(movement.travel_down ?? 0.2)}
-                  max={Number(movement.travel_up ?? 0.2)}
-                  step="0.01"
-                  value={travel}
-                  onChange={(event) => setTravel(Number(event.target.value))}
+          {view === 'plan' && (
+            <CasePlanPreview
+              analysis={plan}
+              pcb={board?.model}
+              cutouts={(plan?.parameters.cutouts || spec.cutouts || [])
+                .map((ref: string) => features[ref]?.model)
+                .filter(Boolean)}
+              selected={feature}
+              onSelect={setFeature}
+              onEdit={editPlacement}
+              onAdd={addPlacement}
+              onRemove={removePlacement}
+              onDuplicate={duplicatePlacement}
+            />
+          )}
+          {view !== 'plan' && (
+            <View>
+              {assembly ? (
+                <AssemblyPreview
+                  parts={assembly.parts}
+                  cases={previewCases}
+                  exploded={view === 'exploded'}
+                  mode={
+                    view === 'section'
+                      ? 'section'
+                      : view === 'part'
+                        ? 'part'
+                        : 'assembly'
+                  }
+                  selected={selected}
+                  onSelect={setSelected}
+                  onPick={pick}
+                  travel={travel}
+                  lateral={lateral}
+                  angle={Number(assembly.parameters?.typing_angle || 0)}
                 />
-                <span>{travel.toFixed(2)} mm</span>
-              </label>
-            )}
-            {spec.mounting === 'gasket' && (
-              <label>
-                Lateral movement (mm)
-                <input
-                  type="range"
-                  aria-label="Lateral travel"
-                  min={-Number(movement.travel_side ?? 0.1)}
-                  max={Number(movement.travel_side ?? 0.1)}
-                  step="0.01"
-                  value={lateral}
-                  onChange={(event) => setLateral(Number(event.target.value))}
-                />
-                <span>{lateral.toFixed(2)} mm</span>
-              </label>
-            )}
-          </Motion>
+              ) : (
+                <Status>
+                  Define a connected layout to build your first preview.
+                </Status>
+              )}
+            </View>
+          )}
+          {view !== 'plan' && (
+            <Controls>
+              {Object.keys(assembly?.parts || {})
+                .filter((part) => !assembly?.parts[part].reference)
+                .map((part) => (
+                  <button
+                    key={part}
+                    aria-pressed={selected === part}
+                    onClick={() => setSelected(part)}
+                  >
+                    {part.replace(`${name}_`, '')}
+                  </button>
+                ))}
+              <select
+                aria-label="Inspect part"
+                value={selected}
+                onChange={(event) => setSelected(event.target.value)}
+              >
+                <option value="">Choose part or reference</option>
+                {Object.keys(assembly?.parts || {}).map((part) => (
+                  <option key={part} value={part}>
+                    {part.replace(`${name}_`, '')}
+                  </option>
+                ))}
+              </select>
+            </Controls>
+          )}
+          {spec.mounting === 'gasket' && view !== 'plan' && (
+            <details>
+              <summary>Preview displacement</summary>
+              <p>
+                Preview displacement — the plate, PCB and attached components
+                move together.
+              </p>
+              <Motion>
+                {spec.mounting === 'gasket' && (
+                  <label>
+                    Preview vertical displacement (mm)
+                    <input
+                      type="range"
+                      aria-label="Suspension travel"
+                      min={-Number(movement.travel_down ?? 0.2)}
+                      max={Number(movement.travel_up ?? 0.2)}
+                      step="0.01"
+                      value={travel}
+                      onChange={(event) =>
+                        setTravel(Number(event.target.value))
+                      }
+                    />
+                    <span>{travel.toFixed(2)} mm</span>
+                  </label>
+                )}
+                {spec.mounting === 'gasket' && (
+                  <label>
+                    Preview lateral displacement (mm)
+                    <input
+                      type="range"
+                      aria-label="Lateral travel"
+                      min={-Number(movement.travel_side ?? 0.1)}
+                      max={Number(movement.travel_side ?? 0.1)}
+                      step="0.01"
+                      value={lateral}
+                      onChange={(event) =>
+                        setLateral(Number(event.target.value))
+                      }
+                    />
+                    <span>{lateral.toFixed(2)} mm</span>
+                  </label>
+                )}
+              </Motion>
+            </details>
+          )}
           {feature && <p>Selected feature: {feature}</p>}
           {selected && preview.result?.solids?.[selected] && (
             <p>

@@ -1,3 +1,4 @@
+import { packageAssets, loadAssets, CaseAssets } from './caseAssets';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import yaml from 'js-yaml';
@@ -78,9 +79,18 @@ export const createZip = async (
   config: string,
   injections: string[][] | undefined,
   debug: boolean,
-  stlPreview: boolean
+  stlPreview: boolean,
+  assets?: CaseAssets
 ) => {
   const zip = new JSZip();
+  const projectAssets =
+    assets ||
+    (results.designs?.boards && typeof indexedDB !== 'undefined'
+      ? await loadAssets()
+      : undefined);
+  if (projectAssets) {
+    packageAssets(zip, projectAssets, Object.keys(results.pcbs || {}));
+  }
 
   // Root folder
   zip.file('config.yaml', config);
@@ -285,7 +295,8 @@ export const exportAllConfigs = async (
   configs: { name: string; config: string }[],
   injections: string[][] | undefined,
   debug: boolean,
-  stlPreview: boolean
+  stlPreview: boolean,
+  assets?: CaseAssets
 ) => {
   const zip = new JSZip();
 
@@ -307,6 +318,13 @@ export const exportAllConfigs = async (
       }
 
       configFolder.file('config.yaml', configRecord.config);
+      if (assets) {
+        packageAssets(
+          configFolder,
+          assets,
+          Object.keys(finalResults.pcbs || {})
+        );
+      }
 
       const outputsFolder = configFolder.folder('outputs');
 
@@ -385,6 +403,7 @@ export const exportAllConfigs = async (
     } catch (e) {
       console.error(`Failed to compile config ${configRecord.name}:`, e);
       configFolder.file('config.yaml', configRecord.config);
+
       configFolder.file(
         'error.txt',
         `Compilation failed: ${e instanceof Error ? e.message : String(e)}`
@@ -411,6 +430,7 @@ export const downloadAllConfigs = async (
   injections: string[][] | undefined
 ) => {
   const zip = new JSZip();
+
   const usedNames = new Set<string>();
 
   // Add YAML configs to the root
@@ -456,6 +476,7 @@ export const exportConfigsProgressively = async (
   isAborted: () => boolean
 ) => {
   const zip = new JSZip();
+
   const usedNames = new Set<string>();
 
   if (onlyConfigs) {
@@ -740,6 +761,7 @@ export const exportConfigsProgressively = async (
       } catch (e) {
         console.error(`Failed to compile config ${configRecord.name}:`, e);
         configFolder.file('config.yaml', configRecord.config);
+
         configFolder.file(
           'error.txt',
           `Compilation failed: ${e instanceof Error ? e.message : String(e)}`

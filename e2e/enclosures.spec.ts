@@ -41,15 +41,36 @@ const open = async (page: Page) => {
     .click();
   return page.getByRole('dialog', { name: 'Case designer' });
 };
+const choose = async (page: Page) => {
+  const dialog = page.getByRole('dialog', { name: 'Case designer' });
+  await dialog.getByRole('button', { name: 'Layout', exact: true }).click();
+  if (await dialog.getByLabel('Switch family', { exact: true }).count()) {
+    await dialog
+      .getByLabel('Switch family', { exact: true })
+      .selectOption('mx');
+  }
+  await dialog
+    .getByLabel('Mounting system', { exact: true })
+    .selectOption('gasket');
+  await expect(
+    dialog.getByRole('button', { name: /^gasket gasket_/ }).first()
+  ).toBeVisible({ timeout: 30000 });
+};
 const ready = async (page: Page) => {
   const dialog = page.getByRole('dialog', { name: 'Case designer' });
   await expect(
-    dialog.getByRole('button', { name: 'bottom', exact: true })
+    dialog.getByRole('button', { name: 'Generate', exact: true })
+  ).toBeEnabled();
+  await dialog.getByRole('button', { name: 'Generate', exact: true }).click();
+  await expect(
+    dialog.getByText('Generated current draft', { exact: true })
   ).toBeVisible({ timeout: 90000 });
-  await expect(dialog.getByText('Updating geometry…')).not.toBeVisible({
-    timeout: 90000,
-  });
   await expect(dialog.getByRole('alert')).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'assembled', exact: true }).click();
+  await expect(dialog.getByLabel('3D assembly preview')).toHaveAttribute(
+    'data-rendered',
+    'true'
+  );
 };
 
 test.setTimeout(180000);
@@ -60,15 +81,15 @@ test('creates a full gasket case through forms, exports and applies one undo ste
   await load(page, source);
   const original = await saved(page);
   let dialog = await open(page);
-  await ready(page);
+  await choose(page);
   await dialog.getByRole('button', { name: 'Enclosure', exact: true }).click();
-  await dialog.getByLabel('Wall thickness (mm)').fill('4');
-  await dialog.getByLabel('Wall thickness (mm)').press('Tab');
+  await dialog.getByLabel('Wall thickness (mm)', { exact: true }).fill('4');
+  await dialog.getByLabel('Wall thickness (mm)', { exact: true }).press('Tab');
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   expect(await saved(page)).toBe(original);
 
   dialog = await open(page);
-  await ready(page);
+  await choose(page);
   await dialog
     .getByRole('button', { name: 'Manufacturing', exact: true })
     .click();
@@ -77,20 +98,12 @@ test('creates a full gasket case through forms, exports and applies one undo ste
       .getByLabel(`${part} process`, { exact: true })
       .selectOption('fdm');
   }
-  await dialog.getByRole('button', { name: 'Mounting', exact: true }).click();
-  await dialog.getByLabel('Mounting system').selectOption('gasket');
-  await dialog
-    .getByRole('button', { name: /^Add gasket_/ })
-    .first()
-    .click();
-  await ready(page);
-  await dialog.getByRole('button', { name: 'Hardware', exact: true }).click();
-  await dialog
-    .getByRole('button', { name: /^Add mount_/ })
-    .first()
-    .click();
   await ready(page);
   await dialog.getByRole('button', { name: 'section', exact: true }).click();
+  await dialog
+    .locator('summary')
+    .filter({ hasText: 'Preview displacement' })
+    .click();
   await dialog.getByLabel('Suspension travel').fill('0.1');
   await dialog.getByLabel('Lateral travel').fill('0.05');
   await dialog.getByRole('button', { name: 'Review', exact: true }).click();
@@ -170,38 +183,23 @@ test('reopens a gasket enclosure offline without touching production storage', a
   }
 });
 
-test('configures machinable shells and rounded plate cutouts through forms', async ({
+test('uses the supplier CNC preset with explicit corner relief', async ({
   page,
 }) => {
   await load(page, source);
   const dialog = await open(page);
-  await ready(page);
-  await dialog.getByLabel('Switch cutout corner radius (mm)').fill('1');
-  await dialog.getByLabel('Switch cutout corner radius (mm)').press('Tab');
-  await dialog.getByRole('button', { name: 'Enclosure', exact: true }).click();
-  await dialog.getByLabel('Internal corner radius (mm)').fill('2');
-  await dialog.getByLabel('Internal corner radius (mm)').press('Tab');
-  await dialog
-    .getByRole('button', { name: 'Manufacturing', exact: true })
-    .click();
-  for (const part of ['bottom', 'top', 'plate']) {
-    await dialog
-      .getByLabel(`${part} process`, { exact: true })
-      .selectOption('cnc');
-  }
-  await dialog.getByLabel('plate cutter diameter (mm)').fill('2');
-  await dialog.getByLabel('plate cutter diameter (mm)').press('Tab');
-  await dialog.getByLabel('plate minimum wall (mm)').fill('1');
-  await dialog.getByLabel('plate minimum wall (mm)').press('Tab');
+  await choose(page);
   await ready(page);
   await dialog.getByRole('button', { name: 'Review', exact: true }).click();
   await dialog.getByRole('checkbox').check();
   await expect(
-    dialog.getByRole('button', { name: 'Apply design' })
-  ).toBeEnabled({ timeout: 90000 });
-  await dialog.getByRole('button', { name: 'Apply design' }).click();
-  expect(await saved(page)).toContain('corner_radius: 1');
-  expect(await saved(page)).toContain('process: cnc');
+    dialog.getByRole('button', { name: 'Apply design', exact: true })
+  ).toBeEnabled();
+  await dialog
+    .getByRole('button', { name: 'Apply design', exact: true })
+    .click();
+  await expect.poll(() => saved(page)).toContain('corner_relief: 0.5');
+  expect(await saved(page)).toContain('supplier: jlccnc-6061-2026-09');
 });
 
 test('repairs a disconnected BHK boundary without losing point selections', async ({
@@ -213,10 +211,12 @@ test('repairs a disconnected BHK boundary without losing point selections', asyn
   ).toBeVisible({ timeout: 30000 });
   const original = await saved(page);
   const dialog = await open(page);
-  await expect(dialog.getByRole('alert')).toContainText(
-    'Expected one connected region; found 2',
-    { timeout: 90000 }
-  );
+  await dialog.getByLabel('Board source', { exact: true }).selectOption('');
+  await expect(
+    dialog.getByText('The case boundary contains separate bodies.', {
+      exact: true,
+    })
+  ).toBeVisible({ timeout: 30000 });
   await expect(
     dialog.getByText('Showing the last valid geometry.')
   ).not.toBeVisible();
@@ -252,8 +252,15 @@ test('repairs a disconnected BHK boundary without losing point selections', asyn
       await box.uncheck();
     }
   }
-  await dialog.getByLabel('Existing board outline').selectOption('bhk');
-  await ready(page);
+  await dialog
+    .getByLabel('Existing board outline', { exact: true })
+    .selectOption('bhk');
+  await expect(dialog.getByLabel('Interactive mounting plan')).toBeVisible();
+  await expect(
+    dialog.getByText('The case boundary contains separate bodies.', {
+      exact: true,
+    })
+  ).not.toBeVisible();
   await page.screenshot({
     path: 'test-results/bhk-boundary-recovered.png',
     fullPage: true,
@@ -267,8 +274,62 @@ test('repairs a disconnected BHK boundary without losing point selections', asyn
       await box.uncheck();
     }
   }
-  await dialog.getByLabel('Existing board outline').selectOption('bhk');
-  await ready(page);
+  await dialog
+    .getByLabel('Existing board outline', { exact: true })
+    .selectOption('bhk');
+  await expect(dialog.getByLabel('Interactive mounting plan')).toBeVisible();
+  await expect(
+    dialog.getByText('The case boundary contains separate bodies.', {
+      exact: true,
+    })
+  ).not.toBeVisible();
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   expect(await saved(page)).toBe(original);
+});
+
+test('inspects BHK in every 3D view and selects a gasket in 3D', async ({
+  page,
+}) => {
+  const config = readFileSync(
+    '../ergogen/docs/examples/enclosure-bhk-gasket.yaml',
+    'utf8'
+  );
+  await load(page, config);
+  const dialog = await open(page);
+  await ready(page);
+  for (const view of ['assembled', 'section', 'exploded', 'part']) {
+    await dialog.getByRole('button', { name: view, exact: true }).click();
+    if (view === 'part') {
+      await dialog.getByRole('button', { name: 'bottom', exact: true }).click();
+    }
+    await page.mouse.move(5, 5);
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve))
+        )
+    );
+    await page.screenshot({ path: `test-results/bhk-guided-${view}.png` });
+  }
+  const select = dialog.getByLabel('Inspect part', { exact: true });
+  const gasket = await select
+    .locator('option')
+    .evaluateAll((options) =>
+      options
+        .map((o) => (o as HTMLOptionElement).value)
+        .find((value) => value.includes('gasket_') && value.includes('lower'))
+    );
+  expect(gasket).toBeTruthy();
+  await select.selectOption(gasket!);
+  await page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve))
+      )
+  );
+  const canvas = dialog.getByLabel('3D assembly preview').locator('canvas');
+  await canvas.click();
+  await expect(
+    dialog.getByRole('dialog', { name: /^Edit gasket_/ })
+  ).toBeVisible();
 });

@@ -18,12 +18,27 @@ vi.mock('../context/ConfigContext', () => ({
     injectionInput: [],
     results: null,
     generateNow: mocks.generate,
+    adoptGenerated: vi.fn(),
+    setError: vi.fn(),
   }),
 }));
 vi.mock('../hooks/useCasePreview', () => ({
+  useCaseAnalysis: () => ({
+    result: mocks.result,
+    error: '',
+    pending: false,
+    stale: false,
+  }),
   useCasePreview: (source: string) => {
     mocks.draft(source);
-    return { result: mocks.result, error: mocks.error, pending: true };
+    return {
+      result: mocks.result,
+      error: mocks.error,
+      pending: false,
+      stale: true,
+      diagnostics: [],
+      generate: mocks.generate,
+    };
   },
 }));
 vi.mock('./AssemblyPreview', () => ({
@@ -80,6 +95,7 @@ it('uses resolved dimensions for the preview when a field contains a formula', (
   const angle = screen.getByLabelText('Typing angle (degrees)');
   fireEvent.change(angle, { target: { value: 'pitch / 3' } });
   fireEvent.blur(angle);
+  fireEvent.click(screen.getByRole('button', { name: 'assembled' }));
   expect(mocks.preview.mock.lastCall?.[0].angle).toBe(6);
 });
 
@@ -119,4 +135,33 @@ it('keeps layout controls usable before a disconnected case has a preview', () =
     parse(mocks.draft.mock.lastCall![0]).designs.regions.case_keys.outline
   ).toBe('board');
   expect(screen.getByText(/Exclude helper points/)).toBeVisible();
+});
+
+it('provides named help for wizard and advanced controls across every step', () => {
+  const { container } = render(<CaseWizard onClose={mocks.close} />);
+  for (const step of [
+    'Layout',
+    'Manufacturing',
+    'Mounting',
+    'Enclosure',
+    'Components',
+    'Hardware',
+    'Review',
+  ]) {
+    fireEvent.click(screen.getByRole('button', { name: step, exact: true }));
+    for (const control of container.querySelectorAll<HTMLElement>(
+      'button,input,select,summary'
+    )) {
+      fireEvent.pointerOver(control);
+      const description = control.getAttribute('aria-describedby');
+      expect(
+        description,
+        `${step}: ${control.getAttribute('aria-label') || control.textContent}`
+      ).toBeTruthy();
+      expect(
+        document.getElementById(description!)?.textContent?.length
+      ).toBeGreaterThan(20);
+      fireEvent.pointerOut(control);
+    }
+  }
 });

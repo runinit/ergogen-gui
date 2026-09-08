@@ -1604,3 +1604,37 @@ it('publishes a design only after every STL part succeeds', async () => {
   expect(context!.error).toContain('Invalid tray mesh');
   expect(context!.resultsStale).toBe(true);
 });
+
+it('adopts the case result without rebuilding the same captured draft', async () => {
+  localStorage.clear();
+  mockInitialConfig(mockConfig);
+  let context: ReturnType<typeof useConfigContext>;
+  const Capture = () => {
+    context = useConfigContext();
+    return null;
+  };
+  render(
+    <ConfigContextProvider>
+      <Capture />
+    </ConfigContextProvider>
+  );
+  const edited = 'points: {zones: {caseDraft: {}}}';
+  const result = { outlines: { generated: { svg: 'captured' } } };
+  act(() => {
+    context!.updateRealtimeConfigInput(edited);
+    context!.setConfigInput(edited);
+    context!.adoptGenerated(edited, result as never, {});
+  });
+  const count = mockErgogenWorker.postMessage.mock.calls.length;
+  await act(async () => {
+    await context!.generateNow(edited, [], { pointsonly: false });
+  });
+  expect(mockErgogenWorker.postMessage.mock.calls.length).toBe(count);
+  expect(context!.results?.outlines).toHaveProperty('generated');
+  await act(async () => {
+    await context!.generateNow(edited + '\n# changed', [], {
+      pointsonly: false,
+    });
+  });
+  expect(mockErgogenWorker.postMessage.mock.calls.length).toBe(count + 1);
+});

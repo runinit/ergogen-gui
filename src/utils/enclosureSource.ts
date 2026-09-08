@@ -1,4 +1,5 @@
-import { isMap, isScalar, isSeq, parseDocument } from 'yaml';
+import { isMap, isScalar, isSeq, parseDocument, stringify } from 'yaml';
+import { cncDefaults, JLC_PRESET, supplierPreset } from './casePresets';
 import { editDesign, SourcePath } from './designSource';
 
 export const CASE_STEPS = [
@@ -42,7 +43,10 @@ export function createCase(source: string, name: string): string {
   }
   const definitions: [SourcePath, unknown][] = [
     [['regions', `${name}_keys`], { where: true, close: 2 }],
-    [['regions', `${name}_switches`], { where: true, size: 14 }],
+    [
+      ['regions', `${name}_switches`],
+      { where: true, size: 14, corner_relief: 0.5 },
+    ],
     [
       ['boundaries', `${name}_body`],
       { from: `regions.${name}_keys`, clearance: 2 },
@@ -53,14 +57,23 @@ export function createCase(source: string, name: string): string {
       {
         preset: 'enclosure',
         profile: `profiles.${name}_board`,
-        mounting: 'tray',
+        mounting: '',
+        construction: 'cover',
+        supplier: JLC_PRESET,
+        board: { source: 'layout', name: `${name}_layout`, family: '' },
+        manufacturing: {
+          bottom: cncDefaults(13, 'bottom'),
+          top: cncDefaults(11, 'top'),
+          plate: cncDefaults(1.5, 'plate'),
+        },
+        internal_radius: 2.5,
         wall: 3,
         floor: 2,
         height: 24,
         plate: 1.5,
         plate_z: 13,
-        bezel: 8,
-        fit: 0.3,
+        bezel: 10,
+        fit: 0.5,
         cutouts: [`regions.${name}_switches`],
       },
     ],
@@ -69,7 +82,17 @@ export function createCase(source: string, name: string): string {
   for (const [path, value] of definitions) {
     result = editDesign(result, ['designs', ...path], value);
   }
-  return editDesign(result, ['meta', 'enclosures', name], { version: 1 });
+  const boards = Object.keys(doc.toJS()?.pcbs || {});
+  if (boards.length === 1) {
+    result = editCase(result, name, ['board'], {
+      source: 'generated',
+      name: boards[0],
+    });
+  }
+  return editDesign(result, ['meta', 'enclosures', name], {
+    version: 2,
+    supplier: supplierPreset,
+  });
 }
 
 export function editCase(
@@ -78,7 +101,45 @@ export function editCase(
   path: SourcePath,
   value: unknown
 ): string {
-  return editDesign(source, ['designs', 'assemblies', name, ...path], value);
+  const full = ['designs', 'assemblies', name, ...path];
+  const node = parseDocument(source).getIn(full, true);
+  if (
+    isMap(node) &&
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value)
+  ) {
+    let result = source;
+    const entries = value as Record<string, unknown>;
+    for (const pair of node.items) {
+      if (isScalar(pair.key) && !(String(pair.key.value) in entries)) {
+        result = removeCaseField(result, name, [
+          ...path,
+          String(pair.key.value),
+        ]);
+      }
+    }
+    for (const [key, next] of Object.entries(entries)) {
+      result = editCase(result, name, [...path, key], next);
+    }
+    return result;
+  }
+  if (isSeq(node) && Array.isArray(value) && node.range) {
+    if (node.items.length === value.length) {
+      return value.reduce(
+        (result, next, index) => editCase(result, name, [...path, index], next),
+        source
+      );
+    }
+    const rendered = stringify(value, {
+      collectionStyle: 'flow',
+      lineWidth: 0,
+    }).trimEnd();
+    return (
+      source.slice(0, node.range[0]) + rendered + source.slice(node.range[1])
+    );
+  }
+  return editDesign(source, full, value);
 }
 
 export function appendDesignRef(
@@ -128,7 +189,7 @@ export function removeCaseField(
   const doc = parseDocument(source, { keepSourceTokens: true });
   const full = ['designs', 'assemblies', name, ...path];
   const parent = doc.getIn(full.slice(0, -1), true);
-  if (!isMap(parent) || parent.flow) {
+  if (!isMap(parent)) {
     throw new Error('Remove this custom entry in the advanced editor.');
   }
   const pair = parent.items.find(
@@ -145,6 +206,25 @@ export function removeCaseField(
     !value.range
   ) {
     throw new Error('This entry cannot be removed safely.');
+  }
+  if (parent.flow && parent.range) {
+    const index = parent.items.indexOf(pair!);
+    const start = key.range[0],
+      end = (value.range as [number, number, number])[1];
+    if (parent.items.length === 1) {
+      return (
+        source.slice(0, parent.range[0]) + '{}' + source.slice(parent.range[1])
+      );
+    }
+    if (index < parent.items.length - 1) {
+      const comma = source.indexOf(',', end);
+      return source.slice(0, start) + source.slice(comma + 1);
+    }
+    const previous = parent.items[index - 1].value as {
+      range: [number, number, number];
+    };
+    const comma = source.indexOf(',', previous.range[1]);
+    return source.slice(0, comma) + source.slice(end);
   }
   if (parent.items.length === 1 && parent.range) {
     return (
@@ -196,4 +276,39 @@ export function toggleDesignRef(
   }
   const start = source.lastIndexOf('\n', item.range[0] - 1) + 1;
   return source.slice(0, start) + source.slice(item.range[2]);
+}
+
+// Apply only fields the gesture changed; analysis may describe an older draft.
+export function editCaseChanges(
+  source: string,
+  name: string,
+  path: SourcePath,
+  before: unknown,
+  after: unknown
+): string {
+  if (JSON.stringify(before) === JSON.stringify(after)) {
+    return source;
+  }
+  if (
+    before &&
+    after &&
+    typeof before === 'object' &&
+    typeof after === 'object' &&
+    Array.isArray(before) === Array.isArray(after)
+  ) {
+    let result = source;
+    for (const key of Array.from(
+      new Set([...Object.keys(before), ...Object.keys(after)])
+    )) {
+      const child = Array.isArray(after) ? Number(key) : key;
+      const previous = (before as Record<string, unknown>)[key];
+      const next = (after as Record<string, unknown>)[key];
+      result =
+        next === undefined
+          ? removeCaseField(result, name, [...path, child])
+          : editCaseChanges(result, name, [...path, child], previous, next);
+    }
+    return result;
+  }
+  return editCase(source, name, path, after);
 }

@@ -1,108 +1,133 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { useCasePreview } from './useCasePreview';
+import { useCaseAnalysis, useCasePreview } from './useCasePreview';
 
-const mocks = vi.hoisted(() => ({
-  available: true,
-  worker: {
-    postMessage: vi.fn(),
-    terminate: vi.fn(),
-    onmessage: null as null | ((event: { data: unknown }) => void),
-    onerror: null,
-  },
-}));
+const mocks = vi.hoisted(() => ({ available: true, workers: [] as any[] }));
 vi.mock('../workers/workerFactory', () => ({
-  createErgogenWorker: () => (mocks.available ? mocks.worker : null),
+  createErgogenWorker: () => {
+    if (!mocks.available) {
+      return null;
+    }
+    const worker = {
+      postMessage: vi.fn(),
+      terminate: vi.fn(),
+      onmessage: null,
+      onerror: null,
+    };
+    mocks.workers.push(worker);
+    return worker;
+  },
 }));
 beforeEach(() => {
   mocks.available = true;
+  mocks.workers = [];
   vi.useFakeTimers();
-  vi.clearAllMocks();
 });
 afterEach(() => vi.useRealTimers());
+const injections: string[][] = [];
+const respond = (worker: any, type = 'success') =>
+  act(() =>
+    worker.onmessage({
+      data: {
+        type,
+        requestId: worker.postMessage.mock.calls.at(-1)[0].requestId,
+        results: { canonical: 'generated' },
+        error: 'Invalid seam',
+        diagnostics: [
+          { feature: 'seam', code: 'clearance', message: 'Invalid seam' },
+        ],
+      },
+    })
+  );
 
-it('ignores superseded work and terminates the draft worker on close', () => {
-  const injections: string[][] = [];
+it('does not generate on open or repeated edits, and captures an explicit request', () => {
+  const hook = renderHook(({ source }) => useCasePreview(source, injections), {
+    initialProps: { source: 'one' },
+  });
+  hook.rerender({ source: 'two' });
+  act(() => vi.advanceTimersByTime(1000));
+  expect(mocks.workers.flatMap((w) => w.postMessage.mock.calls)).toHaveLength(
+    0
+  );
+  act(() => hook.result.current.generate());
+  expect(mocks.workers.at(-1).postMessage).toHaveBeenCalledOnce();
+  expect(mocks.workers.at(-1).postMessage.mock.calls[0][0].inputConfig).toBe(
+    'two'
+  );
+  respond(mocks.workers.at(-1));
+  expect(hook.result.current.stale).toBe(false);
+  hook.unmount();
+});
+it('keeps valid geometry but marks edits and asset changes stale', () => {
+  const hook = renderHook(
+    ({ source, assets }) => useCasePreview(source, injections, assets),
+    { initialProps: { source: 'one', assets: {} as Record<string, string> } }
+  );
+  act(() => hook.result.current.generate());
+  respond(mocks.workers.at(-1));
+  hook.rerender({ source: 'one', assets: { model: 'changed' } });
+  expect(hook.result.current.stale).toBe(true);
+  expect(hook.result.current.result?.canonical).toBe('generated');
+  expect(hook.result.current.pending).toBe(false);
+  hook.unmount();
+});
+it('does not accept an older revision after editing during generation', () => {
   const hook = renderHook(({ source }) => useCasePreview(source, injections), {
     initialProps: { source: 'old' },
   });
-  act(() => vi.advanceTimersByTime(500));
-  const oldId = mocks.worker.postMessage.mock.calls[0][0].requestId;
+  act(() => hook.result.current.generate());
   hook.rerender({ source: 'new' });
-  act(() =>
-    mocks.worker.onmessage?.({
-      data: {
-        type: 'success',
-        requestId: oldId,
-        results: { canonical: 'old' },
-      },
-    })
-  );
-  expect(hook.result.current.result).toBeNull();
-  act(() => vi.advanceTimersByTime(500));
-  const newId = mocks.worker.postMessage.mock.calls[1][0].requestId;
-  act(() =>
-    mocks.worker.onmessage?.({
-      data: {
-        type: 'success',
-        requestId: newId,
-        results: { canonical: 'new' },
-      },
-    })
-  );
-  expect(hook.result.current.result?.canonical).toBe('new');
-  hook.unmount();
-  expect(mocks.worker.terminate).toHaveBeenCalledOnce();
-});
-
-it('marks changed injections stale even when YAML is identical', () => {
-  const hook = renderHook(
-    ({ injections }) => useCasePreview('same', injections),
-    { initialProps: { injections: [] as string[][] } }
-  );
-  act(() => vi.advanceTimersByTime(500));
-  const requestId = mocks.worker.postMessage.mock.calls[0][0].requestId;
-  act(() =>
-    mocks.worker.onmessage?.({
-      data: { type: 'success', requestId, results: {} },
-    })
-  );
+  respond(mocks.workers.at(-1));
+  expect(hook.result.current.stale).toBe(true);
   expect(hook.result.current.pending).toBe(false);
-  hook.rerender({ injections: [['footprint', 'changed', 'source']] });
-  expect(hook.result.current.pending).toBe(true);
+  expect(mocks.workers.at(-1).postMessage).toHaveBeenCalledOnce();
   hook.unmount();
 });
-
-it('keeps only the latest queued draft while a generation is running', () => {
-  const injections: string[][] = [];
-  const hook = renderHook(({ source }) => useCasePreview(source, injections), {
-    initialProps: { source: 'one' },
-  });
-  act(() => vi.advanceTimersByTime(500));
-  const requestId = mocks.worker.postMessage.mock.calls[0][0].requestId;
-  hook.rerender({ source: 'two' });
-  act(() => vi.advanceTimersByTime(500));
-  hook.rerender({ source: 'three' });
-  act(() => vi.advanceTimersByTime(500));
-  expect(mocks.worker.postMessage).toHaveBeenCalledOnce();
-  act(() =>
-    mocks.worker.onmessage?.({
-      data: { type: 'success', requestId, results: {} },
-    })
-  );
-  expect(mocks.worker.postMessage.mock.calls[1][0].inputConfig).toBe('three');
+it('clears running state on errors and retries without losing the source', () => {
+  const hook = renderHook(() => useCasePreview('draft', injections));
+  act(() => hook.result.current.generate());
+  respond(mocks.workers.at(-1), 'error');
+  expect(hook.result.current.pending).toBe(false);
+  expect(hook.result.current.error).toContain('Invalid seam');
+  expect(hook.result.current.diagnostics[0].feature).toBe('seam');
+  act(() => hook.result.current.generate());
+  respond(mocks.workers.at(-1));
+  expect(hook.result.current.error).toBe('');
   hook.unmount();
 });
-
-it('retains worker-start failures when draft effects run', () => {
+it('can retry a worker startup failure and terminates workers on close', () => {
   mocks.available = false;
-  const injections: string[][] = [];
+  const hook = renderHook(() => useCasePreview('draft', injections));
+  act(() => hook.result.current.generate());
+  expect(hook.result.current.error).toContain('could not start');
+  expect(hook.result.current.pending).toBe(false);
+  mocks.available = true;
+  act(() => hook.result.current.generate());
+  hook.unmount();
+  expect(mocks.workers.at(-1).terminate).toHaveBeenCalled();
+});
+
+it('does not restart analysis for equivalent injection and asset objects', () => {
+  const hook = renderHook(() =>
+    useCaseAnalysis('draft', [], { model: 'bytes' })
+  );
+  act(() => vi.advanceTimersByTime(1000));
+  expect(mocks.workers).toHaveLength(1);
+  hook.rerender();
+  act(() => vi.advanceTimersByTime(1000));
+  expect(mocks.workers).toHaveLength(1);
+  hook.unmount();
+});
+
+it('ignores a worker error from a previous draft revision', () => {
   const hook = renderHook(({ source }) => useCasePreview(source, injections), {
-    initialProps: { source: 'one' },
+    initialProps: { source: 'old' },
   });
-  expect(hook.result.current.error).toContain('could not start');
-  hook.rerender({ source: 'two' });
-  expect(hook.result.current.error).toContain('could not start');
-  expect(hook.result.current.pending).toBe(true);
+  act(() => hook.result.current.generate());
+  const worker = mocks.workers.at(-1);
+  hook.rerender({ source: 'new' });
+  act(() => worker.onerror({ message: 'Old draft failed' }));
+  expect(hook.result.current.error).toBe('');
+  expect(hook.result.current.pending).toBe(false);
   hook.unmount();
 });

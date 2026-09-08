@@ -3,6 +3,8 @@ import solverWasm from '@salusoft89/planegcs/dist/planegcs_dist/planegcs.wasm?ur
 import cadWasm from 'replicad-opencascadejs/wasm?url';
 import { WorkerRequest } from './ergogen.worker.types';
 import { createInjectionModule } from '../utils/injectionEvaluator';
+import { attachModelMeshes } from '../utils/modelPreview';
+import { loadAssets } from '../utils/caseAssets';
 import footprints from '../../.generated/footprints.json';
 
 // Register the pinned libraries before processing user configurations.
@@ -32,11 +34,9 @@ self.onerror = (error) => {
 self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
   const { type, inputConfig, injectionInput, requestId } = event.data || {};
 
-  console.log(
-    `<<< Ergogen worker received a message: ${JSON.stringify(event.data)}`
-  );
+  console.log(`<<< Ergogen worker request: ${type} ${requestId}`);
 
-  if (type !== 'generate') {
+  if (type !== 'generate' && type !== 'analyze') {
     console.log('>>> Unknown message type:', type);
     self.postMessage({
       type: 'error',
@@ -72,10 +72,13 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 
     // Run Ergogen generation
     console.log('<-> Running Ergogen in worker');
+    const assets = event.data.assets || (await loadAssets().catch(() => ({})));
     const results = await ergogen.process(
       inputConfig,
       {
         debug: true,
+        analysis: type === 'analyze',
+        assets,
         svg: true,
         solverWasm,
         loadSolver: () => import('@salusoft89/planegcs'),
@@ -84,6 +87,9 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       }, // Debug option enabled to ensure `demo.dxf` is generated
       (m: string) => console.log(m) // logger
     );
+    if (type === 'generate') {
+      attachModelMeshes(results, assets);
+    }
     console.log('>>> Ergogen finished in worker');
 
     // Post success message with results and warnings

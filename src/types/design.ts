@@ -33,6 +33,8 @@ export interface DesignFeature {
   constraints?: Record<string, unknown>;
 }
 export interface DesignReport {
+  analysis?: Record<string, import('./case').CaseAnalysis>;
+  boards?: Record<string, import('./case').BoardInventory>;
   features: Record<string, DesignFeature>;
   diagnostics: { feature: string; message: string; code: string }[];
   adjustments: {

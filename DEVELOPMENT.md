@@ -542,4 +542,10 @@ choices remain available when native generation fails.
 
 The shipped BHK example retains its original source, outlines and PCB.
 Offline CAD tests use a synthetic gasket fixture; BHK browser tests cover
-the original preview and case generation from its existing board outline.
+the original preview and lightweight case-boundary analysis.
+
+The case designer separates automatic 2D analysis from explicit CAD generation.
+Its board linker resolves mechanical inventory before solids while retaining
+final PCB export after outline publication. Source, injections and asset bytes
+identify a generation revision; Apply adopts that result instead of rebuilding.
+Model assets live outside YAML in IndexedDB and are included in project ZIPs.

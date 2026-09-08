@@ -1,102 +1,126 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createErgogenWorker } from '../workers/workerFactory';
-import { WorkerRequest } from '../workers/ergogen.worker.types';
 import { Results } from '../types/results';
 
-const PREVIEW_DELAY_MS = 400;
+export type CaseFinding = {
+  feature: string;
+  code: string;
+  message: string;
+  severity?: string;
+  action?: string;
+};
+const ANALYSIS_DELAY_MS = 180;
+const EMPTY_ASSETS: Record<string, string> = {};
 
-// Keep one active job and one replaceable draft; native geometry never overlaps.
-export function useCasePreview(
+// Each explicit build owns its snapshot. A changed draft never queues a solid build.
+function useCaseWorker(
   source: string,
-  injections: string[][] | undefined
+  injections: string[][] | undefined,
+  assets: Record<string, string>,
+  mode: 'generate' | 'analyze'
 ) {
   const [result, setResult] = useState<Results | null>(null);
+  const [completed, setCompleted] = useState('');
   const [error, setError] = useState('');
-  const [pending, setPending] = useState(true);
+  const [diagnostics, setDiagnostics] = useState<CaseFinding[]>([]);
+  const [pending, setPending] = useState(false);
+  const owned = useRef<Worker | null>(null);
   const serial = useRef(0);
-  const failure = useRef('');
-  const active = useRef<string | null>(null);
-  const queued = useRef<WorkerRequest | null>(null);
-  const dispatch = useRef<() => void>(() => {});
-
-  useEffect(() => {
-    failure.current = '';
-    const owned = createErgogenWorker();
-    active.current = null;
-    queued.current = null;
-    if (!owned) {
-      failure.current =
-        'This browser could not start the geometry worker. Close and reopen the designer to retry.';
-      setError(failure.current);
+  const revision = JSON.stringify([source, injections, assets]);
+  const latest = useRef(revision);
+  latest.current = revision;
+  const generate = useCallback(() => {
+    owned.current?.terminate();
+    const worker = createErgogenWorker();
+    owned.current = worker;
+    setError('');
+    setDiagnostics([]);
+    setCompleted('');
+    if (!worker) {
+      setError(
+        'This browser could not start the geometry worker. Press Generate to retry.'
+      );
+      setPending(false);
       return;
     }
-    dispatch.current = () => {
-      if (failure.current || active.current || !queued.current) {
-        return;
-      }
-      const request = queued.current;
-      queued.current = null;
-      active.current = request.requestId || null;
-      owned.postMessage(request);
-    };
-    owned.onerror = (event) => {
-      failure.current =
-        event.message ||
-        'Geometry worker failed. Close and reopen the designer to retry.';
-      setError(failure.current);
-    };
-    owned.onmessage = (event) => {
-      const { requestId, type } = event.data;
-      if (!requestId && type === 'error') {
-        failure.current = event.data.error;
-        setError(failure.current);
-        return;
-      }
-      if (requestId !== active.current) {
-        return;
-      }
-      active.current = null;
-      if (requestId === `case-draft-${serial.current}`) {
-        if (type === 'success') {
-          setResult(event.data.results);
-          setPending(false);
-          setError('');
-        } else if (type === 'error') {
-          setError(event.data.error);
-        }
-      }
-      dispatch.current();
-    };
-    return () => {
-      owned.onmessage = null;
-      owned.onerror = null;
-      owned.terminate();
-      active.current = null;
-      queued.current = null;
-      dispatch.current = () => {};
-    };
-  }, [injections]);
-
-  useEffect(() => {
-    setError(failure.current);
     setPending(true);
-    queued.current = null;
-    const requestId = `case-draft-${++serial.current}`;
-    const timer = window.setTimeout(() => {
-      if (!source) {
+    const requestId = `case-${mode}-${++serial.current}`;
+    worker.onerror = (event) => {
+      if (owned.current !== worker) {
         return;
       }
-      queued.current = {
-        type: 'generate',
-        inputConfig: source,
-        injectionInput: injections,
-        requestId,
-        options: { debug: true },
-      };
-      dispatch.current();
-    }, PREVIEW_DELAY_MS);
+      setPending(false);
+      if (latest.current !== revision) {
+        return;
+      }
+      setError(
+        event.message || 'Geometry worker failed. Press Generate to retry.'
+      );
+    };
+    worker.onmessage = ({ data }) => {
+      if (
+        owned.current !== worker ||
+        (data.requestId && data.requestId !== requestId)
+      ) {
+        return;
+      }
+      setPending(false);
+      if (latest.current !== revision) {
+        return;
+      }
+      if (data.type === 'success') {
+        setResult(data.results);
+        setCompleted(revision);
+        setError('');
+      } else {
+        setError(data.error || 'Generation failed.');
+        setDiagnostics(data.diagnostics || []);
+      }
+    };
+    const [inputConfig, injectionInput, capturedAssets] = JSON.parse(revision);
+    worker.postMessage({
+      type: mode,
+      inputConfig,
+      injectionInput,
+      assets: capturedAssets,
+      requestId,
+      options: { debug: true },
+    });
+  }, [mode, revision]);
+  useEffect(
+    () => () => {
+      owned.current?.terminate();
+      owned.current = null;
+    },
+    []
+  );
+  useEffect(() => {
+    if (mode !== 'analyze') {
+      return;
+    }
+    const timer = window.setTimeout(generate, ANALYSIS_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [source, injections]);
-
-  return { result, error, pending };
+  }, [generate, mode]);
+  return {
+    result,
+    error,
+    diagnostics,
+    pending,
+    stale: completed !== revision,
+    generate,
+  };
+}
+export function useCasePreview(
+  source: string,
+  injections: string[][] | undefined,
+  assets = EMPTY_ASSETS
+) {
+  return useCaseWorker(source, injections, assets, 'generate');
+}
+export function useCaseAnalysis(
+  source: string,
+  injections: string[][] | undefined,
+  assets = EMPTY_ASSETS
+) {
+  return useCaseWorker(source, injections, assets, 'analyze');
 }
