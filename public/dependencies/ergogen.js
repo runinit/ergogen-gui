@@ -2133,6 +2133,251 @@
 
 	var pcbs = {};
 
+	var cap_0603;
+	var hasRequiredCap_0603;
+
+	function requireCap_0603 () {
+		if (hasRequiredCap_0603) return cap_0603;
+		hasRequiredCap_0603 = 1;
+		// footprints/cap_0603.js
+		// Converted from KiCad 8 Footprint: Capacitor_0603
+		// Description: Capacitor SMD 0603 (1608 Metric), IPC_7351 nominal.
+
+		cap_0603 = {
+		    params: {
+		        designator: 'C',
+		        side: 'F',
+		        reversible: false,
+		        include_traces_vias: false,
+		        trace_distance: { type: 'number', value: 1.2 }, // Distance from pad center to via
+		        trace_width: 0.25,
+		        via_size: 0.6,
+		        via_drill: 0.3,
+		        from: { type: 'net', value: undefined },
+		        to: { type: 'net', value: undefined }
+		    },
+		    body: p => {
+		        
+		        const standard_opening = `
+        (footprint "Capacitor_0603"
+            (layer "${p.reversible ? 'F' : p.side}.Cu")
+            ${p.at}
+            (property "Reference" "${p.ref}"
+                (at 0 -1.43 ${p.r})
+                (layer "${p.reversible ? 'F' : p.side}.SilkS")
+                (effects (font (size 1 1) (thickness 0.15)))
+            )
+            (property "Value" "Capacitor_0603"
+                (at 0 1.43 ${p.r})
+                (layer "F.Fab")
+                (hide yes)
+                (effects (font (size 1 1) (thickness 0.15)))
+            )
+            (attr smd)
+        `;
+
+		        // Silk screen lines based on KiCad courtyard/fab layers
+		        const front_silk = `
+            (fp_line (start -1.48 -0.73) (end 1.48 -0.73) (layer "F.CrtYd") (stroke (width 0.05) (type solid)))
+            (fp_line (start -1.48 0.73) (end -1.48 -0.73) (layer "F.CrtYd") (stroke (width 0.05) (type solid)))
+            (fp_line (start 1.48 -0.73) (end 1.48 0.73) (layer "F.CrtYd") (stroke (width 0.05) (type solid)))
+            (fp_line (start 1.48 0.73) (end -1.48 0.73) (layer "F.CrtYd") (stroke (width 0.05) (type solid)))
+            (fp_line (start -0.8 -0.4) (end 0.8 -0.4) (layer "F.Fab") (stroke (width 0.1) (type solid)))
+            (fp_line (start -0.8 0.4) (end -0.8 -0.4) (layer "F.Fab") (stroke (width 0.1) (type solid)))
+            (fp_line (start 0.8 -0.4) (end 0.8 0.4) (layer "F.Fab") (stroke (width 0.1) (type solid)))
+            (fp_line (start 0.8 0.4) (end -0.8 0.4) (layer "F.Fab") (stroke (width 0.1) (type solid)))
+        `;
+
+		        const back_silk = `
+            (fp_line (start -1.48 -0.73) (end 1.48 -0.73) (layer "B.CrtYd") (stroke (width 0.05) (type solid)))
+            (fp_line (start -1.48 0.73) (end -1.48 -0.73) (layer "B.CrtYd") (stroke (width 0.05) (type solid)))
+            (fp_line (start 1.48 -0.73) (end 1.48 0.73) (layer "B.CrtYd") (stroke (width 0.05) (type solid)))
+            (fp_line (start 1.48 0.73) (end -1.48 0.73) (layer "B.CrtYd") (stroke (width 0.05) (type solid)))
+            (fp_line (start -0.8 -0.4) (end 0.8 -0.4) (layer "B.Fab") (stroke (width 0.1) (type solid)))
+            (fp_line (start -0.8 0.4) (end -0.8 -0.4) (layer "B.Fab") (stroke (width 0.1) (type solid)))
+            (fp_line (start 0.8 -0.4) (end 0.8 0.4) (layer "B.Fab") (stroke (width 0.1) (type solid)))
+            (fp_line (start 0.8 0.4) (end -0.8 0.4) (layer "B.Fab") (stroke (width 0.1) (type solid)))
+        `;
+
+		        // SMD Pads
+		        const front_pads = `
+            (pad "1" smd roundrect (at -0.775 0 ${p.r}) (size 0.9 0.95) (layers "F.Cu" "F.Paste" "F.Mask") (roundrect_rratio 0.25) ${p.from.str})
+            (pad "2" smd roundrect (at 0.775 0 ${p.r}) (size 0.9 0.95) (layers "F.Cu" "F.Paste" "F.Mask") (roundrect_rratio 0.25) ${p.to.str})
+        `;
+
+		        const back_pads = `
+            (pad "1" smd roundrect (at -0.775 0 ${p.r}) (size 0.9 0.95) (layers "B.Cu" "B.Paste" "B.Mask") (roundrect_rratio 0.25) ${p.from.str})
+            (pad "2" smd roundrect (at 0.775 0 ${p.r}) (size 0.9 0.95) (layers "B.Cu" "B.Paste" "B.Mask") (roundrect_rratio 0.25) ${p.to.str})
+        `;
+
+		        // Reversible Traces & Vias logic
+		        const traces = `
+            ${'' /* Right Pad (2) Trace & Via */}
+            (segment
+                (start ${p.eaxy(0.775, 0)})
+                (end ${p.eaxy(0.775 + p.trace_distance, 0)})
+                (width ${p.trace_width})
+                (layer "F.Cu")
+                (net ${p.to.index})
+            )
+            (via
+                (at ${p.eaxy(0.775 + p.trace_distance, 0)})
+                (size ${p.via_size})
+                (drill ${p.via_drill})
+                (layers "F.Cu" "B.Cu")
+                (net ${p.to.index})
+            )
+            (segment
+                (start ${p.eaxy(0.775 + p.trace_distance, 0)})
+                (end ${p.eaxy(0.775, 0)})
+                (width ${p.trace_width})
+                (layer "B.Cu")
+                (net ${p.to.index})
+            )
+
+            ${'' /* Left Pad (1) Trace & Via */}
+            (segment
+                (start ${p.eaxy(-0.775, 0)})
+                (end ${p.eaxy(-0.775 - p.trace_distance, 0)})
+                (width ${p.trace_width})
+                (layer "F.Cu")
+                (net ${p.from.index})
+            )
+            (via
+                (at ${p.eaxy(-0.775 - p.trace_distance, 0)})
+                (size ${p.via_size})
+                (drill ${p.via_drill})
+                (layers "F.Cu" "B.Cu")
+                (net ${p.from.index})
+            )
+            (segment
+                (start ${p.eaxy(-0.775 - p.trace_distance, 0)})
+                (end ${p.eaxy(-0.775, 0)})
+                (width ${p.trace_width})
+                (layer "B.Cu")
+                (net ${p.from.index})
+            )
+        `;
+
+		        const model_3d = `
+            (model "\${KICAD8_3DMODEL_DIR}/Capacitor_SMD.3dshapes/C_0603_1608Metric.wrl"
+                (offset (xyz 0 0 0))
+                (scale (xyz 1 1 1))
+                (rotate (xyz 0 0 0))
+            )
+        `;
+
+		        let final = standard_opening;
+
+		        if (p.side == "F" || p.reversible) {
+		            final += front_silk;
+		            final += front_pads;
+		        }
+		        if (p.side == "B" || p.reversible) {
+		            final += back_silk;
+		            final += back_pads;
+		        }
+
+		        final += model_3d;
+		        final += `)`; // Close footprint structure
+
+		        // Append traces AFTER the footprint closing parenthesis if enabled
+		        if (p.reversible && p.include_traces_vias) {
+		            final += traces;
+		        }
+
+		        return final;
+		    }
+		};
+		return cap_0603;
+	}
+
+	var thqwgd001c;
+	var hasRequiredThqwgd001c;
+
+	function requireThqwgd001c () {
+		if (hasRequiredThqwgd001c) return thqwgd001c;
+		hasRequiredThqwgd001c = 1;
+		thqwgd001c = {
+		    params: {
+		        designator: 'MOD',
+		        reversible: true,
+		        P1: { type: 'net', value: 'GND' },
+		        P2: { type: 'net', value: 'VCC' },
+		        P3: { type: 'net', value: 'SDA' },
+		        P4: { type: 'net', value: 'SCL' }
+		    },
+		    body: p => {
+		        // 1. Common Setup (Outline, Properties, Holes)
+		        const standard = `
+            (footprint "THQWGD001C" (layer "F.Cu")
+            ${p.at /* Place footprint at anchor */}
+            (property "Reference" "${p.ref}" (at 0 -8 ${p.r}) (layer "F.SilkS")
+                (effects (font (size 1 1) (thickness 0.15)))
+            )
+            (attr through_hole)
+
+            ${'' /* Mounting Holes (NPTH) - Static coordinates from KiCad file */}
+            (pad "" np_thru_hole oval (at -7.2 -5.1 ${p.r + 270}) (size 2 1.4) (drill oval 2 1.4) (layers "*.Cu" "*.Mask"))
+            (pad "" np_thru_hole oval (at -7.2 5.1 ${p.r + 270}) (size 2 1.4) (drill oval 2 1.4) (layers "*.Cu" "*.Mask"))
+            (pad "" np_thru_hole oval (at -6.4 -4.8 ${p.r + 180}) (size 3 1.4) (drill oval 3 1.4) (layers "*.Cu" "*.Mask"))
+            (pad "" np_thru_hole oval (at -6.4 4.8 ${p.r}) (size 3 1.4) (drill oval 3 1.4) (layers "*.Cu" "*.Mask"))
+            (pad "" np_thru_hole oval (at -6 -6.25 ${p.r + 270}) (size 1.7 5.85) (drill oval 1.7 5.85) (layers "*.Cu" "*.Mask"))
+            (pad "" np_thru_hole oval (at -6 6.25 ${p.r + 270}) (size 1.7 5.85) (drill oval 1.7 5.85) (layers "*.Cu" "*.Mask"))
+            (pad "" np_thru_hole oval (at -5.6 -5.1 ${p.r + 270}) (size 2 1.4) (drill oval 2 1.4) (layers "*.Cu" "*.Mask"))
+            (pad "" np_thru_hole oval (at -5.6 5.1 ${p.r + 270}) (size 2 1.4) (drill oval 2 1.4) (layers "*.Cu" "*.Mask"))
+            (pad "" np_thru_hole circle (at 7 -5 ${p.r}) (size 2.05 2.05) (drill 2.05) (layers "*.Cu" "*.Mask"))
+            (pad "" np_thru_hole circle (at 7 5 ${p.r}) (size 2.05 2.05) (drill 2.05) (layers "*.Cu" "*.Mask"))
+
+            ${'' /* Visual Silk Screen Box */}
+            (fp_line (start -9.5 -9.5) (end 9.5 -9.5) (stroke (width 0.12) (type solid)) (layer "F.SilkS"))
+            (fp_line (start 9.5 -9.5) (end 9.5 9.5) (stroke (width 0.12) (type solid)) (layer "F.SilkS"))
+            (fp_line (start 9.5 9.5) (end -9.5 9.5) (stroke (width 0.12) (type solid)) (layer "F.SilkS"))
+            (fp_line (start -9.5 9.5) (end -9.5 -9.5) (stroke (width 0.12) (type solid)) (layer "F.SilkS"))
+        `;
+
+		        // 2. Logic for Pads
+		        // KiCad data shows asymmetric layout (-7.8 for Front, -4.9 for Back), so we define them separately.
+		        
+		        const front_pads = `
+            (pad "A" thru_hole roundrect (at -7.8 2.5 ${p.r + 90}) (size 1.5 1.6) (drill 0.9) (layers "*.Cu" "*.Mask") (roundrect_rratio 0.25) ${p.P3.str})
+            (pad "B" thru_hole roundrect (at -7.8 0 ${p.r + 90}) (size 1.6 1.6) (drill 0.9) (layers "*.Cu" "*.Mask") (roundrect_rratio 0.25) ${p.P4.str})
+            (pad "C" thru_hole roundrect (at -7.8 -2.5 ${p.r + 90}) (size 1.5 1.6) (drill 0.9) (layers "*.Cu" "*.Mask") (roundrect_rratio 0.25) ${p.P1.str})
+            
+            ${'' /* Module support pads Front/Back shared? The dump put them at positive X. Assuming they pass through. */}
+            (pad "1" thru_hole roundrect (at 3.25 -2.25 ${p.r}) (size 1.6 1.6) (drill 1) (layers "*.Cu" "*.Mask") (roundrect_rratio 0.25) ${p.P1.str})
+            (pad "2" thru_hole roundrect (at 3.25 2.25 ${p.r}) (size 1.6 1.6) (drill 1) (layers "*.Cu" "*.Mask") (roundrect_rratio 0.25) ${p.P2.str})
+            (pad "1" thru_hole roundrect (at 9.75 -2.25 ${p.r}) (size 1.6 1.6) (drill 1) (layers "*.Cu" "*.Mask") (roundrect_rratio 0.25) ${p.P1.str})
+            (pad "2" thru_hole roundrect (at 9.75 2.25 ${p.r}) (size 1.6 1.6) (drill 1) (layers "*.Cu" "*.Mask") (roundrect_rratio 0.25) ${p.P2.str})
+        `;
+
+		        const back_pads = `
+            ${'' /* Note: KiCad dump shows these at -4.9, which is the "Reversible" offset */}
+            (pad "A" thru_hole roundrect (at -4.9 2.5 ${p.r + 90}) (size 1.5 1.5) (drill 0.9) (layers "*.Cu" "*.Mask") (roundrect_rratio 0.25) ${p.P3.str})
+            (pad "B" thru_hole roundrect (at -4.9 0 ${p.r + 90}) (size 1.5 1.5) (drill 0.9) (layers "*.Cu" "*.Mask") (roundrect_rratio 0.25) ${p.P4.str})
+            (pad "C" thru_hole roundrect (at -4.9 -2.5 ${p.r + 90}) (size 1.5 1.5) (drill 0.9) (layers "*.Cu" "*.Mask") (roundrect_rratio 0.25) ${p.P1.str})
+        `;
+
+		        // 3. Return combined string based on reversibility
+		        if (p.reversible) {
+		            return `
+                ${standard}
+                ${front_pads}
+                ${back_pads}
+                )
+            `
+		        } else {
+		            return `
+                ${standard}
+                ${front_pads}
+                )
+            `
+		        }
+		    }
+		};
+		return thqwgd001c;
+	}
+
 	var alps;
 	var hasRequiredAlps;
 
@@ -13820,6 +14065,8 @@
 		if (hasRequiredFootprints) return footprints;
 		hasRequiredFootprints = 1;
 		footprints = {
+		  'bhkfp/cap_0603': requireCap_0603(),
+		  'bhkfp/thqwgd001c': requireThqwgd001c(),
 		  alps: requireAlps(),
 		  button: requireButton(),
 		  choc: requireChoc$1(),

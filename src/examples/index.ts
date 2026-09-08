@@ -10,6 +10,7 @@ import Tiny20 from './tiny20';
 import Alpha from './alpha';
 import Plank from './plank';
 import Curly45 from './curly45';
+import BHK from './bhk';
 
 /**
  * Represents a group of configuration options for the react-select component.
@@ -49,7 +50,14 @@ const emptyExamples = [EmptyYAML];
 
 const simpleExamples = [Absolem, Atreus];
 
-const completeExamples = [Adux, CorneyIsland, Sweeplike, Reviung41, Tiny20];
+const completeExamples = [
+  BHK,
+  Adux,
+  CorneyIsland,
+  Sweeplike,
+  Reviung41,
+  Tiny20,
+];
 
 const miscExamples = [Wubbo, Alpha, Plank, Curly45];
 

@@ -509,6 +509,13 @@ Run `pnpm install --frozen-lockfile` and `pnpm run build` without `ERGOGEN_VERSI
 The build stages and patches a disposable copy; the generator needs no npm
 publication. `vendor/README.md` records the source commit and archive hash.
 
+## BHK example
+
+The BHK example uses the original KiCad 8 configuration with an Ergogen 5
+engine requirement. Its two custom footprints are bundled through the existing
+footprint staging flow; provenance is in `vendor/bhk/README.md`. Gallery
+thumbnails generate only points and outlines, without requiring PCB footprints.
+
 ## Bundled UI fonts
 
 Roboto, Nunito, and Material Symbols are installed through pinned Fontsource

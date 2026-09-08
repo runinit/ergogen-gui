@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const ergogen = require('ergogen');
+const yaml = require('js-yaml');
 const { exampleOptions } = require('../src/examples/index.ts');
 
 const previewsDir = path.join(process.cwd(), 'public', 'images', 'previews');
@@ -17,7 +18,11 @@ async function generatePreview(example) {
   console.log(`Generating preview for ${example.label}...`);
 
   try {
-    const output = await ergogen.process(example.value, {
+    // Thumbnails only need geometry, including examples with custom footprints.
+    const config = yaml.load(example.value);
+    delete config.pcbs;
+    delete config.cases;
+    const output = await ergogen.process(config, {
       svg: true,
       debug: true
     });

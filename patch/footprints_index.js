@@ -1,4 +1,6 @@
 module.exports = {
+  'bhkfp/cap_0603': require('./bhkfp/cap_0603'),
+  'bhkfp/thqwgd001c': require('./bhkfp/thqwgd001c'),
   alps: require('./alps'),
   button: require('./button'),
   choc: require('./choc'),

@@ -28,6 +28,7 @@ INFUSED_KIM_REV=bb80a207d8a6fa7b9245caad2c2d97e2adc2f612
 git clone https://github.com/infused-kim/kb_ergogen_fp.git "$ERGOGEN_BUILD/src/footprints/infused-kim"
 git -C "$ERGOGEN_BUILD/src/footprints/infused-kim" checkout --detach "$INFUSED_KIM_REV"
 cp patch/footprints_index.js "$ERGOGEN_BUILD/src/footprints/index.js"
+cp -R vendor/bhk/footprints "$ERGOGEN_BUILD/src/footprints/bhkfp"
 
 node <<'JS'
 const fs = require('node:fs');
