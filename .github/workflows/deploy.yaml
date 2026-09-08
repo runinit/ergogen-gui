@@ -33,7 +33,7 @@ jobs:
           const assert = require('node:assert/strict');
           const pkg = require('ergogen/package.json');
           assert.equal(pkg.name, '@runinit/ergogen');
-          assert.equal(pkg.version, '5.0.0');
+          assert.equal(pkg.version, '5.1.0-develop');
           JS
       - run: pnpm run test:release
       - run: pnpm run precommit
@@ -51,7 +51,7 @@ jobs:
 
   deploy:
     needs: check
-    if: github.repository == 'runinit/ergogen-gui' && github.ref == 'refs/heads/main'
+    if: (github.repository == 'runinit/ergogen-gui' || github.repository == 'runinit/ergogen-gui-preview') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       pages: write

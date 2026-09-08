@@ -2,7 +2,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
-const deploymentPath = '/ergogen-gui/';
+const preview = process.env.GITHUB_REPOSITORY === 'runinit/ergogen-gui-preview';
+const deploymentPath = preview ? '/ergogen-gui-preview/' : '/ergogen-gui/';
 
 // We will use standard React plugin and PWA plugin in injectManifest mode
 export default defineConfig(({ mode }) => {
@@ -10,6 +11,8 @@ export default defineConfig(({ mode }) => {
   const envDefines: Record<string, any> = {
     'process.env.NODE_ENV': JSON.stringify(mode),
     'process.env.PUBLIC_URL': JSON.stringify(deploymentPath.slice(0, -1)),
+    'process.env.REACT_APP_DEPLOYMENT_CHANNEL': JSON.stringify(preview ? 'preview' : 'production'),
+    'process.env.REACT_APP_BUILD_REVISION': JSON.stringify(process.env.GITHUB_SHA || 'local'),
   };
 
   for (const key in process.env) {
@@ -52,9 +55,10 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: 'dist',
+      commonjsOptions: {include: [/node_modules/, /public\/dependencies\/openjscad\.js$/]},
     },
     worker: {
-      format: 'iife',
+      format: 'es',
     },
   };
 });

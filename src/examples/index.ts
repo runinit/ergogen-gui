@@ -11,6 +11,7 @@ import Alpha from './alpha';
 import Plank from './plank';
 import Curly45 from './curly45';
 import BHK from './bhk';
+import EnclosureBHK from './enclosure-bhk';
 
 /**
  * Represents a group of configuration options for the react-select component.
@@ -59,7 +60,7 @@ const completeExamples = [
   Tiny20,
 ];
 
-const miscExamples = [Wubbo, Alpha, Plank, Curly45];
+const miscExamples = [EnclosureBHK, Wubbo, Alpha, Plank, Curly45];
 
 /**
  * An array of grouped example configurations to be displayed in the select dropdown.

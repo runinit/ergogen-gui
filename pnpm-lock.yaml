@@ -28,13 +28,16 @@ importers:
         version: 4.7.0(monaco-editor@0.55.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@react-three/drei':
         specifier: ^9.92.0
-        version: 9.122.0(@react-three/fiber@8.18.0(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.180.0))(@types/react@18.3.28)(@types/three@0.181.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.180.0)(use-sync-external-store@1.6.0(react@18.3.1))
+        version: 9.122.0(@react-three/fiber@8.18.0(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.180.0))(@types/react@18.3.28)(@types/three@0.180.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.180.0)(use-sync-external-store@1.6.0(react@18.3.1))
       '@react-three/fiber':
         specifier: ^8.15.0
         version: 8.18.0(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.180.0)
+      '@salusoft89/planegcs':
+        specifier: 1.2.0
+        version: 1.2.0
       ergogen:
-        specifier: file:vendor/runinit-ergogen-5.0.0.tgz
-        version: '@runinit/ergogen@file:vendor/runinit-ergogen-5.0.0.tgz'
+        specifier: file:vendor/ergogen-dcc4db6.tgz
+        version: '@runinit/ergogen@file:vendor/ergogen-dcc4db6.tgz'
       file-saver:
         specifier: ^2.0.5
         version: 2.0.5
@@ -74,6 +77,12 @@ importers:
       react-use:
         specifier: ^17.5.0
         version: 17.6.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      replicad:
+        specifier: 1.1.0
+        version: 1.1.0
+      replicad-opencascadejs:
+        specifier: 1.1.0
+        version: 1.1.0
       styled-components:
         specifier: ^6.1.8
         version: 6.4.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -104,6 +113,9 @@ importers:
       workbox-strategies:
         specifier: ^7.4.1
         version: 7.4.1
+      yaml:
+        specifier: 2.8.2
+        version: 2.8.2
     devDependencies:
       '@eslint/js':
         specifier: ^9.36.0
@@ -138,6 +150,9 @@ importers:
       '@types/styled-components':
         specifier: ^5.1.34
         version: 5.1.36
+      '@types/three':
+        specifier: 0.180.0
+        version: 0.180.0
       '@typescript-eslint/eslint-plugin':
         specifier: ^8.45.0
         version: 8.59.0(@typescript-eslint/parser@8.59.0(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3))(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3)
@@ -1027,7 +1042,7 @@ packages:
     engines: {node: '>=18.18'}
 
   '@ijprest/kle-serial@https://codeload.github.com/ergogen/kle-serial/tar.gz/61f29f317d87bbfed0b0b7e646e1b91d4384ac02':
-    resolution: {gitHosted: true, integrity: sha512-5el3/Ee9aTG6iWQpVZmE2szFMnQDMRAUQ0J6BfVNGE5mshIx+CMR5a5RpOF6JBz/Ibfi235JbczQPpv3Hn6Tvg==, tarball: https://codeload.github.com/ergogen/kle-serial/tar.gz/61f29f317d87bbfed0b0b7e646e1b91d4384ac02}
+    resolution: {gitHosted: true, tarball: https://codeload.github.com/ergogen/kle-serial/tar.gz/61f29f317d87bbfed0b0b7e646e1b91d4384ac02}
     version: 0.15.1
 
   '@isaacs/balanced-match@4.0.1':
@@ -1484,10 +1499,13 @@ packages:
   '@rtsao/scc@1.1.0':
     resolution: {integrity: sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g==}
 
-  '@runinit/ergogen@file:vendor/runinit-ergogen-5.0.0.tgz':
-    resolution: {integrity: sha512-QHx2D2IcJ5FToZd7Qgr0cdUu5zO79Cl5j8KZl0Fp+qKcNHRCqjVRixcHpcY/ElDr4sdbn+e7LmZsTACujohc+g==, tarball: file:vendor/runinit-ergogen-5.0.0.tgz}
-    version: 5.0.0
+  '@runinit/ergogen@file:vendor/ergogen-dcc4db6.tgz':
+    resolution: {integrity: sha512-LaUVoYPAuCOzAXn76NGC1lUePUeBdMMKhTzoZowIQnAwVrRo7VkENYCwici81CvGjJeCkAP49qkzGnKjOU4LdQ==, tarball: file:vendor/ergogen-dcc4db6.tgz}
+    version: 5.1.0-develop
     hasBin: true
+
+  '@salusoft89/planegcs@1.2.0':
+    resolution: {integrity: sha512-NcdWJnJRCnIDvM9yJD98Jm8qaK//wRqMEbJ0WtibKnhbzI484TjIEbYD6EVUZejndXGC9yBkuKgqXg+9buzi6Q==}
 
   '@testing-library/dom@10.4.1':
     resolution: {integrity: sha512-o4PXJQidqJl82ckFaXUeoAW+XysPLauYI43Abki5hABd853iMhitooc6znOnczgbTYmEP6U6/y1ZyKAIsvMKGg==}
@@ -1616,6 +1634,9 @@ packages:
   '@types/opentype.js@0.7.2':
     resolution: {integrity: sha512-Riz6WyBUBEFs7YqSsJya3SbDHJZ6BmMkY7bzNoue6rtwj+RNilLc+mgOX/eJ0Y0asq16FSU6DatBeOg8ZMy2UQ==}
 
+  '@types/opentype.js@1.3.10':
+    resolution: {integrity: sha512-F67EFyk6j02okHz5JCgata3ZRAcZi9GLnzmkHw/rzJq3OCc8/ZVdoKrxMTYjcQP6IYHGBz2cav1cpzkOkPiPCQ==}
+
   '@types/pdfkit@0.7.36':
     resolution: {integrity: sha512-9eRA6MuW+n78yU3HhoIrDxjyAX2++B5MpLDYqHOnaRTquCw+5sYXT+QN8E1eSaxvNUwlRfU3tOm4UzTeGWmBqg==}
 
@@ -1647,8 +1668,8 @@ packages:
   '@types/styled-components@5.1.36':
     resolution: {integrity: sha512-pGMRNY5G2rNDKEv2DOiFYa7Ft1r0jrhmgBwHhOMzPTgCjO76bCot0/4uEfqj7K0Jf1KdQmDtAuaDk9EAs9foSw==}
 
-  '@types/three@0.181.0':
-    resolution: {integrity: sha512-MLF1ks8yRM2k71D7RprFpDb9DOX0p22DbdPqT/uAkc6AtQXjxWCVDjCy23G9t1o8HcQPk7woD2NIyiaWcWPYmA==}
+  '@types/three@0.180.0':
+    resolution: {integrity: sha512-ykFtgCqNnY0IPvDro7h+9ZeLY+qjgUWv+qEvUt84grhenO60Hqd4hScHE7VTB9nOQ/3QM8lkbNE+4vKjEpUxKg==}
 
   '@types/trusted-types@2.0.7':
     resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
@@ -2518,6 +2539,12 @@ packages:
     resolution: {integrity: sha512-f7ccFPK3SXFHpx15UIGyRJ/FJQctuKZ0zVuN3frBo4HnK3cay9VEW0R6yPYFHC0AgqhukPzKjq22t5DmAyqGyw==}
     engines: {node: '>=16'}
 
+  flatbush@4.6.2:
+    resolution: {integrity: sha512-nNT7MFJ58Q4IAm3aYsEg+zgZGpdRcmR1i4U+aa8c+r91jmYZg7FTQwNnIMC0FyBqVZTbClKdAnrJkKkfp1BOvw==}
+
+  flatqueue@3.1.0:
+    resolution: {integrity: sha512-Ia4qIYrrsEqIRx3c3XhkT+QDLQuUV5ovsr6ah1rIgKT5wclhoGK3lAMS1bWRAWxlx7wtlTBpV7QXB5d9fOSRxA==}
+
   flatted@3.4.2:
     resolution: {integrity: sha512-PjDse7RzhcPkIJwy5t7KPWQSZ9cAbzQXcafsetQoD7sOJRQlGikNbx7yZp2OotDnJyrDcbyRq3Ttb18iYOqkxA==}
 
@@ -2678,7 +2705,7 @@ packages:
     engines: {node: ^20.19.0 || ^22.12.0 || >=24.0.0}
 
   hull.js@https://codeload.github.com/andriiheonia/hull/tar.gz/5847b0a4fa23f8e5aa3c37a8e6d7b8cf58f24082:
-    resolution: {gitHosted: true, integrity: sha512-gJKrk0RK3quNin8EaOIDhQjQJhZJCVMIUeMbUnHuXlA3h1HNnBdozt0tELooiyIL2yoMYhYYuHsefHd1tGLgag==, tarball: https://codeload.github.com/andriiheonia/hull/tar.gz/5847b0a4fa23f8e5aa3c37a8e6d7b8cf58f24082}
+    resolution: {gitHosted: true, tarball: https://codeload.github.com/andriiheonia/hull/tar.gz/5847b0a4fa23f8e5aa3c37a8e6d7b8cf58f24082}
     version: 1.0.12
 
   hyphenate-style-name@1.1.0:
@@ -3280,6 +3307,11 @@ packages:
     resolution: {integrity: sha512-gXah6aZrcUxjWg2zR2MwouP2eHlCBzdV4pygudehaKXSGW4v2AsRQUK+lwwXhii6KFZcunEnmSUoYp5CXibxtA==}
     engines: {node: '>= 0.4'}
 
+  opentype.js@1.3.4:
+    resolution: {integrity: sha512-d2JE9RP/6uagpQAVtJoF0pJJA/fgai89Cc50Yp0EJHk+eLp6QQ7gBoblsnubRULNY132I0J1QKMJ+JTbMqz4sw==}
+    engines: {node: '>= 8.0.0'}
+    hasBin: true
+
   optionator@0.9.4:
     resolution: {integrity: sha512-6IpQ7mKUxRcZNLIObR0hz7lxsapSSIYNZJwXPGeF0mTVqGKFIXj1DQcMoT22S3ROcLyY/rz0PWaWZ9ayWmad9g==}
     engines: {node: '>= 0.8.0'}
@@ -3546,6 +3578,12 @@ packages:
     resolution: {integrity: sha512-NZQZdC5wOE/H3UT28fVGL+ikOZcEzfMGk/c3iN9UGxzWHMa1op7274oyiUVrAG4B2EuFhus8SvkaYnhvW92p9Q==}
     hasBin: true
 
+  replicad-opencascadejs@1.1.0:
+    resolution: {integrity: sha512-s0KHR5V+ivsOE4nZXfuoW70lW0/rldkb3ZDY34LpXOQRFLQN5qVydQm3BRo7boZPdFkkAZBERJ+NzB0DYxrivw==}
+
+  replicad@1.1.0:
+    resolution: {integrity: sha512-TJw32OTe6+HASPpfrLEjYUI66VvSmYC2F/za4iDFWIWo4RVYbiA62dmUbXUp8ZEqkIS//jK6TqrxnmFqX6cbkA==}
+
   require-directory@2.1.1:
     resolution: {integrity: sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q==}
     engines: {node: '>=0.10.0'}
@@ -3768,6 +3806,9 @@ packages:
     resolution: {integrity: sha512-HnLOCR3vjcY8beoNLtcjZ5/nxn2afmME6lhrDrebokqMap+XbeW8n9TXpPDOqdGK5qcI3oT0GKTW6wC7EMiVqA==}
     engines: {node: '>=12'}
 
+  string.prototype.codepointat@0.2.1:
+    resolution: {integrity: sha512-2cBVCj6I4IOvEnjgO/hWqXjqBGsY+zwPmHl12Srk9IXSZ56Jwwmy+66XO5Iut/oQVR7t5ihYdLB0GMa4alEUcg==}
+
   string.prototype.includes@2.0.1:
     resolution: {integrity: sha512-o7+c9bW6zpAdJHTtujeePODAhkuicdAryFsfVKwA+wGw89wJ4GTY484WTucM9hLtDEOpOvI+aHnzqnC5lHp4Rg==}
     engines: {node: '>= 0.4'}
@@ -3902,6 +3943,9 @@ packages:
 
   tiny-emitter@2.1.0:
     resolution: {integrity: sha512-NB6Dk1A9xgQPMoGqC5CVXn123gWyte215ONT5Pp5a0yt4nlEoO1ZWeCwpncaekPHXO60i47ihFnZPiRPjRMq4Q==}
+
+  tiny-inflate@1.0.3:
+    resolution: {integrity: sha512-pkY1fj1cKHb2seWDy0B16HeWyczlJA9/WW3u3c4z/NiWDsO3DOU5D7nhTLE9CF0yXv/QZFY7sEJmj24dK+Rrqw==}
 
   tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
@@ -4317,6 +4361,11 @@ packages:
 
   yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
+
+  yaml@2.8.2:
+    resolution: {integrity: sha512-mplynKqc1C2hTVYxd0PU2xQAc22TI1vShAYGksCCfxbn/dFwnHTNi1bvYsBTkhdUNtGIf5xNOg938rrSSYvS9A==}
+    engines: {node: '>= 14.6'}
+    hasBin: true
 
   yaml@2.8.3:
     resolution: {integrity: sha512-AvbaCLOO2Otw/lW5bmh9d/WEdcDFdQp2Z2ZUH3pX9U2ihyUY0nvLv7J6TrWowklRGPYbB/IuIMfYgxaCPg5Bpg==}
@@ -5479,7 +5528,7 @@ snapshots:
 
   '@react-spring/types@9.7.5': {}
 
-  '@react-three/drei@9.122.0(@react-three/fiber@8.18.0(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.180.0))(@types/react@18.3.28)(@types/three@0.181.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.180.0)(use-sync-external-store@1.6.0(react@18.3.1))':
+  '@react-three/drei@9.122.0(@react-three/fiber@8.18.0(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.180.0))(@types/react@18.3.28)(@types/three@0.180.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.180.0)(use-sync-external-store@1.6.0(react@18.3.1))':
     dependencies:
       '@babel/runtime': 7.29.7
       '@mediapipe/tasks-vision': 0.10.17
@@ -5492,11 +5541,11 @@ snapshots:
       detect-gpu: 5.0.70
       glsl-noise: 0.0.0
       hls.js: 1.6.15
-      maath: 0.10.8(@types/three@0.181.0)(three@0.180.0)
+      maath: 0.10.8(@types/three@0.180.0)(three@0.180.0)
       meshline: 3.3.1(three@0.180.0)
       react: 18.3.1
       react-composer: 5.0.3(react@18.3.1)
-      stats-gl: 2.4.2(@types/three@0.181.0)(three@0.180.0)
+      stats-gl: 2.4.2(@types/three@0.180.0)(three@0.180.0)
       stats.js: 0.17.0
       suspend-react: 0.1.3(react@18.3.1)
       three: 0.180.0
@@ -5657,8 +5706,9 @@ snapshots:
 
   '@rtsao/scc@1.1.0': {}
 
-  '@runinit/ergogen@file:vendor/runinit-ergogen-5.0.0.tgz':
+  '@runinit/ergogen@file:vendor/ergogen-dcc4db6.tgz':
     dependencies:
+      '@salusoft89/planegcs': 1.2.0
       fs-extra: 11.3.6
       hull: hull.js@https://codeload.github.com/andriiheonia/hull/tar.gz/5847b0a4fa23f8e5aa3c37a8e6d7b8cf58f24082
       js-yaml: 3.15.0
@@ -5666,7 +5716,11 @@ snapshots:
       kle-serial: '@ijprest/kle-serial@https://codeload.github.com/ergogen/kle-serial/tar.gz/61f29f317d87bbfed0b0b7e646e1b91d4384ac02'
       makerjs: 0.18.2
       mathjs: 15.2.0
+      replicad: 1.1.0
+      replicad-opencascadejs: 1.1.0
       yargs: 17.7.3
+
+  '@salusoft89/planegcs@1.2.0': {}
 
   '@testing-library/dom@10.4.1':
     dependencies:
@@ -5802,6 +5856,8 @@ snapshots:
 
   '@types/opentype.js@0.7.2': {}
 
+  '@types/opentype.js@1.3.10': {}
+
   '@types/pdfkit@0.7.36':
     dependencies:
       '@types/node': 24.10.1
@@ -5835,7 +5891,7 @@ snapshots:
       '@types/react': 18.3.28
       csstype: 3.2.3
 
-  '@types/three@0.181.0':
+  '@types/three@0.180.0':
     dependencies:
       '@dimforge/rapier3d-compat': 0.12.0
       '@tweenjs/tween.js': 23.1.3
@@ -6876,6 +6932,12 @@ snapshots:
       flatted: 3.4.2
       keyv: 4.5.4
 
+  flatbush@4.6.2:
+    dependencies:
+      flatqueue: 3.1.0
+
+  flatqueue@3.1.0: {}
+
   flatted@3.4.2: {}
 
   for-each@0.3.5:
@@ -7417,9 +7479,9 @@ snapshots:
 
   lz-string@1.5.0: {}
 
-  maath@0.10.8(@types/three@0.181.0)(three@0.180.0):
+  maath@0.10.8(@types/three@0.180.0)(three@0.180.0):
     dependencies:
-      '@types/three': 0.181.0
+      '@types/three': 0.180.0
       three: 0.180.0
 
   magic-string@0.30.21:
@@ -7792,6 +7854,11 @@ snapshots:
       define-properties: 1.2.1
       es-object-atoms: 1.1.1
 
+  opentype.js@1.3.4:
+    dependencies:
+      string.prototype.codepointat: 0.2.1
+      tiny-inflate: 1.0.3
+
   optionator@0.9.4:
     dependencies:
       deep-is: 0.1.4
@@ -8092,6 +8159,14 @@ snapshots:
     dependencies:
       jsesc: 3.1.0
 
+  replicad-opencascadejs@1.1.0: {}
+
+  replicad@1.1.0:
+    dependencies:
+      '@types/opentype.js': 1.3.10
+      flatbush: 4.6.2
+      opentype.js: 1.3.4
+
   require-directory@2.1.1: {}
 
   require-from-string@2.0.2: {}
@@ -8315,9 +8390,9 @@ snapshots:
 
   state-local@1.0.7: {}
 
-  stats-gl@2.4.2(@types/three@0.181.0)(three@0.180.0):
+  stats-gl@2.4.2(@types/three@0.180.0)(three@0.180.0):
     dependencies:
-      '@types/three': 0.181.0
+      '@types/three': 0.180.0
       three: 0.180.0
 
   stats.js@0.17.0: {}
@@ -8340,6 +8415,8 @@ snapshots:
       eastasianwidth: 0.2.0
       emoji-regex: 9.2.2
       strip-ansi: 7.1.2
+
+  string.prototype.codepointat@0.2.1: {}
 
   string.prototype.includes@2.0.1:
     dependencies:
@@ -8487,6 +8564,8 @@ snapshots:
   throttle-debounce@3.0.1: {}
 
   tiny-emitter@2.1.0: {}
+
+  tiny-inflate@1.0.3: {}
 
   tinybench@2.9.0: {}
 
@@ -8987,6 +9066,8 @@ snapshots:
   y18n@5.0.8: {}
 
   yallist@3.1.1: {}
+
+  yaml@2.8.2: {}
 
   yaml@2.8.3: {}
 

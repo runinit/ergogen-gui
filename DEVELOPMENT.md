@@ -531,3 +531,8 @@ Serve fonts from the app's own assets; do not add external font services.
 Reuse packaged fonts and established SVG libraries (currently Lucide), rather
 than drawing replacement icons. KiCanvas uses the same bundled fonts and its
 source patch removes the upstream Google Fonts stylesheet request.
+
+## Full enclosure designer
+
+See [ENCLOSURES.md](ENCLOSURES.md) for the guided flow, source transactions,
+native STEP/STL pipeline, process reports and isolated preview deployment.

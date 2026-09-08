@@ -1,3 +1,4 @@
+import { storageKey } from '../utils/storageKey';
 import React, {
   createContext,
   Dispatch,
@@ -79,7 +80,7 @@ interface AppSettings {
 const getLegacySetting = (key: string, defaultValue: boolean): boolean => {
   if (typeof window === 'undefined') return defaultValue;
   try {
-    const item = localStorage.getItem(key);
+    const item = localStorage.getItem(storageKey(key));
     return item !== null ? JSON.parse(item) : defaultValue;
   } catch {
     return defaultValue;
@@ -87,11 +88,14 @@ const getLegacySetting = (key: string, defaultValue: boolean): boolean => {
 };
 
 const getDefaultSettings = (): AppSettings => ({
-  debug: getLegacySetting('ergogen:config:debug', false),
-  autoGen: getLegacySetting('ergogen:config:autoGen', true),
-  autoGen3D: getLegacySetting('ergogen:config:autoGen3D', true),
-  kicanvasPreview: getLegacySetting('ergogen:config:kicanvasPreview', true),
-  stlPreview: getLegacySetting('ergogen:config:stlPreview', true),
+  debug: getLegacySetting(storageKey('ergogen:config:debug'), false),
+  autoGen: getLegacySetting(storageKey('ergogen:config:autoGen'), true),
+  autoGen3D: getLegacySetting(storageKey('ergogen:config:autoGen3D'), true),
+  kicanvasPreview: getLegacySetting(
+    storageKey('ergogen:config:kicanvasPreview'),
+    true
+  ),
+  stlPreview: getLegacySetting(storageKey('ergogen:config:stlPreview'), true),
   sendUsageMetrics: getSendUsageMetricsEnabled(),
 });
 
@@ -162,6 +166,7 @@ type ContextProps = {
   setInfo: Dispatch<SetStateAction<string | null>>;
   clearInfo: () => void;
   results: Results | null;
+  resultsStale: boolean;
   resultsVersion: number;
   setResultsVersion: Dispatch<SetStateAction<number>>;
   showSettings: boolean;
@@ -239,7 +244,7 @@ interface DeletedConfig extends SavedConfig {
   deletedAt: string;
 }
 
-const STORAGE_KEY_DELETED = 'ergogen:deleted-config';
+const STORAGE_KEY_DELETED = storageKey('ergogen:deleted-config');
 
 const saveToDeletedStorage = (config: SavedConfig) => {
   try {
@@ -514,6 +519,11 @@ const ConfigContextProvider = ({
   }, [configInputState]);
 
   const updateRealtimeConfigInput = useCallback((val: string | undefined) => {
+    if (val !== realtimeConfigInputRef.current) {
+      activeRequestRef.current = null;
+      currentConfigVersion.current += 1;
+      setResultsStale(true);
+    }
     realtimeConfigInputRef.current = val;
   }, []);
 
@@ -547,7 +557,7 @@ const ConfigContextProvider = ({
   }, []);
 
   const [injectionInput, setInjectionInput] = useLocalStorage<string[][]>(
-    'ergogen:injection',
+    storageKey('ergogen:injection'),
     initialInjectionInput
   );
   const [error, setError] = useState<string | null>(null);
@@ -555,10 +565,12 @@ const ConfigContextProvider = ({
     null
   );
   const [info, setInfo] = useState<string | null>(null);
+  const activeRequestRef = useRef<string | null>(null);
+  const [resultsStale, setResultsStale] = useState(false);
   const [results, setResults] = useState<Results | null>(null);
   const [resultsVersion, setResultsVersion] = useState<number>(0);
   const [settings, setSettings] = useLocalStorage<AppSettings>(
-    'ergogen:settings',
+    storageKey('ergogen:settings'),
     getDefaultSettings()
   );
 
@@ -733,7 +745,15 @@ const ConfigContextProvider = ({
         return;
       }
 
+      if (
+        response.requestId &&
+        response.requestId !== activeRequestRef.current
+      ) {
+        return;
+      }
+
       if (response.type === 'error') {
+        setResultsStale(true);
         console.error('--- Ergogen worker error:', response.error);
         setError(response.error);
         setIsGenerating(false);
@@ -856,8 +876,12 @@ const ConfigContextProvider = ({
             }
           }
 
-          setResults(newResults);
-          setResultsVersion((v) => v + 1);
+          // Keep the last valid design until all assembly parts are converted.
+          if (!newResults.designs || !willConvertStl) {
+            setResultsStale(false);
+            setResults(newResults);
+            setResultsVersion((v) => v + 1);
+          }
 
           // Only clear isGenerating if we're not waiting for STL conversion
           if (!willConvertStl) {
@@ -886,9 +910,12 @@ const ConfigContextProvider = ({
 
       if (response.type === 'error') {
         console.error('--- JSCAD worker error:', response.error);
+        setError(response.error || 'STL conversion failed');
+        setResultsStale(true);
         setIsJscadConverting(false);
         setIsGenerating(false);
       } else if (response.type === 'success' && response.results) {
+        setResultsStale(false);
         setResults(response.results as Results);
         setResultsVersion((v) => v + 1);
         setIsJscadConverting(false);
@@ -1046,6 +1073,8 @@ const ConfigContextProvider = ({
       setIsGenerating(true);
       generationStartTimeRef.current = performance.now();
       currentConfigVersion.current += 1;
+      setResultsStale(true);
+      activeRequestRef.current = `ergogen-generate-${currentConfigVersion.current}-${Date.now()}`;
 
       const warning = checkForDeprecationWarnings(parsedConfig);
       const skippedWarning = getSkippedInjectionsWarning(injectionInput);
@@ -1065,7 +1094,7 @@ const ConfigContextProvider = ({
             type: 'generate',
             inputConfig,
             injectionInput: inputInjection,
-            requestId: `ergogen-generate-${currentConfigVersion.current}-${Date.now()}`,
+            requestId: activeRequestRef.current,
             options: {
               debug: debug,
               svg: true,
@@ -1122,6 +1151,11 @@ const ConfigContextProvider = ({
           : valueOrFunc;
 
       if (newVal === prevVal) return;
+      if (newVal !== realtimeConfigInputRef.current) {
+        activeRequestRef.current = null;
+        currentConfigVersion.current += 1;
+        setResultsStale(true);
+      }
 
       setConfigInputState(newVal);
 
@@ -1532,7 +1566,10 @@ const ConfigContextProvider = ({
    * Effect to process the input configuration whenever it or the auto-generation settings change.
    */
   useEffect(() => {
-    localStorage.setItem('ergogen:injection', JSON.stringify(injectionInput));
+    localStorage.setItem(
+      storageKey('ergogen:injection'),
+      JSON.stringify(injectionInput)
+    );
     if (autoGen && !showSettings) {
       processInput(configInputState, injectionInput, {
         pointsonly: !autoGen3D,
@@ -1616,6 +1653,7 @@ const ConfigContextProvider = ({
       setInfo,
       clearInfo,
       results,
+      resultsStale,
       resultsVersion,
       setResultsVersion,
       showSettings,
@@ -1677,6 +1715,7 @@ const ConfigContextProvider = ({
       setInfo,
       clearInfo,
       results,
+      resultsStale,
       resultsVersion,
       setResultsVersion,
       showSettings,

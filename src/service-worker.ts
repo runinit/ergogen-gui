@@ -94,7 +94,7 @@ registerRoute(
   ({ url }: { url: URL }) =>
     url.pathname.startsWith(`${publicUrl}/dependencies/`),
   new CacheFirst({
-    cacheName: `public-dependencies-${packageJson.version}`,
+    cacheName: `public-dependencies-${publicUrl}-${packageJson.version}`,
     plugins: [
       new CacheableResponsePlugin({ statuses: [0, 200] }),
       new ExpirationPlugin({
@@ -115,7 +115,7 @@ registerRoute(
     url.pathname === `${publicUrl}/ergogen.png` ||
     url.pathname === `${publicUrl}/favicon.ico`,
   new CacheFirst({
-    cacheName: 'public-images-v1',
+    cacheName: `public-images-${publicUrl}-v1`,
     plugins: [
       new CacheableResponsePlugin({ statuses: [0, 200] }),
       new ExpirationPlugin({
@@ -139,7 +139,7 @@ registerRoute(
     url.hostname === 'www.googletagmanager.com' ||
     url.hostname === 'www.google-analytics.com',
   new NetworkFirst({
-    cacheName: 'google-analytics-scripts',
+    cacheName: `google-analytics-scripts-${publicUrl}`,
     networkTimeoutSeconds: 3,
     plugins: [
       new CacheableResponsePlugin({ statuses: [0, 200] }),
@@ -157,3 +157,19 @@ registerRoute(
 // --------------------------------------------------------------------------
 
 initializeGoogleAnalytics();
+
+// CAD and solver binaries load on demand; keep content-hashed assets for offline reuse.
+const HTTP_OK = 200;
+registerRoute(
+  ({ url }: { url: URL }) =>
+    url.origin === self.location.origin &&
+    url.pathname.startsWith(`${publicUrl}/assets/`) &&
+    url.pathname.endsWith('.wasm'),
+  new CacheFirst({
+    cacheName: `design-wasm-${publicUrl}`,
+    plugins: [
+      new CacheableResponsePlugin({ statuses: [HTTP_OK] }),
+      new ExpirationPlugin({ maxEntries: 4 }),
+    ],
+  })
+);

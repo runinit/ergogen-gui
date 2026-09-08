@@ -1,3 +1,4 @@
+import { storageKey } from './storageKey';
 import guiPkg from '../../package.json';
 import { getFullErgogenVersion } from './version';
 
@@ -30,7 +31,9 @@ export const checkIsPWA = (): boolean => {
 export const getSendUsageMetricsEnabled = (): boolean => {
   if (typeof window === 'undefined') return false;
   const isPWA = checkIsPWA();
-  const stored = localStorage.getItem('ergogen:config:sendUsageMetrics');
+  const stored = localStorage.getItem(
+    storageKey('ergogen:config:sendUsageMetrics')
+  );
 
   if (stored !== null) {
     try {

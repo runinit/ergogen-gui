@@ -1,16 +1,15 @@
 # Local Ergogen source
 
-`runinit-ergogen-5.0.0.tgz` contains generator source from
-[`runinit/ergogen@6140bd12828e035b5fd375e83be0edc073a02301`](https://github.com/runinit/ergogen/commit/6140bd12828e035b5fd375e83be0edc073a02301).
-It retains the upstream MIT license and attribution inside the archive.
+`ergogen-dcc4db6.tgz` contains generator source from
+[`runinit/ergogen@dcc4db6`](https://github.com/runinit/ergogen/commit/dcc4db6eefcf04fc161db545a89421628d24d283).
+It retains the upstream MIT license and attribution.
 
-SHA-256: `c1c65aeda48d01d346a9c24743184eac23dcb726e0cb8764a9dccc04f9968994`
+SHA-256: `c922cfb00776094f3802671e3af401f231f21aa5c160ff74f5a70b38cc8f26da`
 
-pnpm installs this local archive through `file:vendor/runinit-ergogen-5.0.0.tgz`.
-The GUI builds the generator in a temporary directory using its existing patch
-recipe. No generator npm publication or version override is required.
+The archive supplies the full enclosure and parametric design pipeline. pnpm
+installs it locally; the patch recipe builds it in a temporary directory.
+No npm publication or version override is required.
 
-To update it, pack a validated generator checkout into this directory, update
-the source revision and hash here, refresh the pnpm lockfile, then run the
-release checks and production build. Commit the archive and generated assets
-together. Do not edit the archive by hand.
+To update: validate and commit the engine, pack that exact checkout, replace
+the archive, record its commit and hash, then refresh the lockfile and build.
+The older 5.0.0 archive records the production baseline.

@@ -1,6 +1,7 @@
 import { Editor, OnMount } from '@monaco-editor/react';
 import React, { useCallback, useEffect, useRef } from 'react';
 import debounce from 'lodash.debounce';
+import { DESIGN_EDIT_EVENT, DesignEditEvent } from '../utils/designSource';
 import { useConfigContext } from '../context/ConfigContext';
 
 /**
@@ -116,6 +117,56 @@ const ConfigEditor = ({
     },
     [debouncedSetConfigInput, updateRealtimeConfigInput]
   );
+
+  useEffect(() => {
+    const apply = (event: Event) => {
+      const detail = (event as CustomEvent<DesignEditEvent>).detail;
+      const editor = editorRef.current;
+      const model = editor?.getModel();
+      if (!editor || !model || editor.getValue() !== detail.before) {
+        return;
+      }
+      let start = 0;
+      while (
+        detail.before[start] === detail.after[start] &&
+        start < detail.before.length &&
+        start < detail.after.length
+      ) {
+        start++;
+      }
+      let end = detail.before.length,
+        nextEnd = detail.after.length;
+      while (
+        end > start &&
+        nextEnd > start &&
+        detail.before[end - 1] === detail.after[nextEnd - 1]
+      ) {
+        end--;
+        nextEnd--;
+      }
+      const from = model.getPositionAt(start),
+        to = model.getPositionAt(end);
+      debouncedSetConfigInput.cancel();
+      editor.pushUndoStop();
+      editor.executeEdits('design', [
+        {
+          range: {
+            startLineNumber: from.lineNumber,
+            startColumn: from.column,
+            endLineNumber: to.lineNumber,
+            endColumn: to.column,
+          },
+          text: detail.after.slice(start, nextEnd),
+        },
+      ]);
+      editor.pushUndoStop();
+      updateRealtimeConfigInput(detail.after);
+      setConfigInput(detail.after);
+      detail.applied = true;
+    };
+    window.addEventListener(DESIGN_EDIT_EVENT, apply);
+    return () => window.removeEventListener(DESIGN_EDIT_EVENT, apply);
+  }, [debouncedSetConfigInput, setConfigInput, updateRealtimeConfigInput]);
 
   const handleEditorDidMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;

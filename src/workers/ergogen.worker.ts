@@ -1,4 +1,6 @@
 import * as ergogen from 'ergogen';
+import solverWasm from '@salusoft89/planegcs/dist/planegcs_dist/planegcs.wasm?url';
+import cadWasm from 'replicad-opencascadejs/wasm?url';
 import { WorkerRequest } from './ergogen.worker.types';
 import { createInjectionModule } from '../utils/injectionEvaluator';
 import footprints from '../../.generated/footprints.json';
@@ -72,7 +74,14 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     console.log('<-> Running Ergogen in worker');
     const results = await ergogen.process(
       inputConfig,
-      { debug: true, svg: true }, // Debug option enabled to ensure `demo.dxf` is generated
+      {
+        debug: true,
+        svg: true,
+        solverWasm,
+        loadSolver: () => import('@salusoft89/planegcs'),
+        cadWasm,
+        loadCad: () => import('replicad-opencascadejs'),
+      }, // Debug option enabled to ensure `demo.dxf` is generated
       (m: string) => console.log(m) // logger
     );
     console.log('>>> Ergogen finished in worker');
@@ -91,6 +100,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     self.postMessage({
       type: 'error',
       error: errorMessage,
+      diagnostics: (error as { diagnostics?: unknown }).diagnostics,
       requestId,
     });
   }

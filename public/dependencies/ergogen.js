@@ -1,5 +1,5 @@
 /*!
- * Ergogen v5.0.0
+ * Ergogen v5.1.0-develop
  * https://ergogen.xyz
  */
 
@@ -442,7 +442,7 @@
 		const a = requireAssert();
 		const kle = requireKle();
 
-		const package_json = {"name":"@runinit/ergogen","version":"5.0.0","description":"Ergonomic keyboard layout generator","author":"Bán Dénes <mr@zealot.hu>","license":"MIT","homepage":"https://ergogen.xyz","repository":"github:runinit/ergogen","bugs":"https://github.com/runinit/ergogen/issues","main":"./src/ergogen.js","bin":{"ergogen":"./src/cli.js"},"scripts":{"build":"rollup -c","test":"mocha -r test/helpers/register test/index.js","coverage":"nyc --reporter=html --reporter=text npm test"},"dependencies":{"fs-extra":"^11.3.2","hull":"github:andriiheonia/hull#5847b0a4fa23f8e5aa3c37a8e6d7b8cf58f24082","js-yaml":"^3.14.1","jszip":"^3.10.1","kle-serial":"github:ergogen/kle-serial#61f29f317d87bbfed0b0b7e646e1b91d4384ac02","makerjs":"^0.18.1","mathjs":"^15.0.0","yargs":"^17.7.2"},"devDependencies":{"@rollup/plugin-commonjs":"^28.0.7","@rollup/plugin-json":"^6.1.0","chai":"^4.5.0","chai-as-promised":"^7.1.2","dir-compare":"^5.0.0","glob":"^11.0.3","mocha":"^11.7.4","nyc":"^17.1.0","rollup":"^4.52.4","sinon":"^21.0.0"},"nyc":{"all":true,"include":["src/**/*.js"]},"publishConfig":{"access":"public"}};
+		const package_json = {"name":"@runinit/ergogen","version":"5.1.0-develop","description":"Ergonomic keyboard layout generator","author":"Bán Dénes <mr@zealot.hu>","license":"MIT","homepage":"https://ergogen.xyz","repository":"github:runinit/ergogen","bugs":"https://github.com/runinit/ergogen/issues","main":"./src/ergogen.js","bin":{"ergogen":"./src/cli.js"},"scripts":{"build":"rollup -c","test":"mocha -r test/helpers/register test/index.js","coverage":"nyc --reporter=html --reporter=text npm test"},"dependencies":{"@salusoft89/planegcs":"1.2.0","fs-extra":"^11.3.2","hull":"github:andriiheonia/hull#5847b0a4fa23f8e5aa3c37a8e6d7b8cf58f24082","js-yaml":"^3.14.1","jszip":"^3.10.1","kle-serial":"github:ergogen/kle-serial#61f29f317d87bbfed0b0b7e646e1b91d4384ac02","makerjs":"^0.18.1","mathjs":"^15.0.0","replicad":"1.1.0","replicad-opencascadejs":"1.1.0","yargs":"^17.7.2"},"devDependencies":{"@rollup/plugin-commonjs":"^28.0.7","@rollup/plugin-json":"^6.1.0","chai":"^4.5.0","chai-as-promised":"^7.1.2","dir-compare":"^5.0.0","glob":"^11.0.3","mocha":"^11.7.4","nyc":"^17.1.0","rollup":"^4.52.4","sinon":"^21.0.0"},"nyc":{"all":true,"include":["src/**/*.js"]},"publishConfig":{"access":"public"}};
 
 		const fake_require = io.fake_require = injection => name => {
 		    const dependencies = {
@@ -2129,6 +2129,1479 @@
 		    return results
 		};
 		return cases;
+	}
+
+	var designs = {};
+
+	var geometry;
+	var hasRequiredGeometry;
+
+	function requireGeometry () {
+		if (hasRequiredGeometry) return geometry;
+		hasRequiredGeometry = 1;
+		const m = require$$0;
+		const u = requireUtils();
+		const a = requireAssert();
+
+		const TOLERANCE = 0.01; // Millimetres; also the maximum Bézier chord error.
+		const EPSILON = 0.000001;
+		const MAX_OFFSET_STEPS = 1000;
+		const REPAIR_OFFSET_STEP = TOLERANCE * 10;
+		const Joint = {Round: 0, Pointed: 1};
+
+		class DesignError extends Error {
+		    constructor(feature, message, code = 'geometry') {
+		        super(`${feature}: ${message}`);
+		        this.name = 'DesignError';
+		        this.diagnostics = [{feature, message, code, severity: 'error'}];
+		    }
+		}
+
+		const fail = (feature, message, code) => { throw new DesignError(feature, message, code) };
+		const number = (value, name, units = {}) => {
+		    let result;
+		    try {
+		        result = a.sane(value, name, 'number')(units);
+		    } catch (error) {
+		        fail(name, error.message, 'dimension');
+		    }
+		    if (!Number.isFinite(result)) {
+		        fail(name, 'Expected a finite dimension', 'dimension');
+		    }
+		    return result
+		};
+		const positive = (value, name, units) => {
+		    const result = number(value, name, units);
+		    if (result <= 0) {
+		        fail(name, 'Expected a positive dimension', 'dimension');
+		    }
+		    return result
+		};
+		const clone = u.deepcopy;
+		const paths = model => {
+		    const result = [];
+		    m.model.walk(model, {onPath: entry => {
+		        result.push(m.path.moveRelative(m.path.clone(entry.pathContext), entry.offset));
+		    }});
+		    return result
+		};
+		const empty = model => !paths(model).length;
+		const combine = (left, right, operation = 'add') => {
+		    if (!['add', 'subtract', 'intersect'].includes(operation)) {
+		        fail('designs', `Unknown operation ${operation}`);
+		    }
+		    if (empty(left)) {
+		        return operation === 'add' ? clone(right) : {paths: {}}
+		    }
+		    if (empty(right)) {
+		        return operation === 'intersect' ? {paths: {}} : clone(left)
+		    }
+		    return u[operation](clone(left), clone(right))
+		};
+		const union = models => models.reduce((result, model) => combine(result, model), {paths: {}});
+		const offset = (model, distance, joints = Joint.Round) => {
+		    if (Math.abs(distance) < EPSILON) {
+		        return clone(model)
+		    }
+		    const direct = m.model.outline(clone(model), Math.abs(distance), joints, distance < 0, {farPoint: u.farPoint});
+		    if (distance < 0) { return direct }
+		    const bounds = m.measure.modelExtents(model);
+		    const valid = result => {
+		        const expanded = m.measure.modelExtents(result);
+		        if (!expanded || !bounds) { return false }
+		        return [0, 1].every(axis => Math.abs(expanded.low[axis] - bounds.low[axis] + distance) < TOLERANCE && Math.abs(expanded.high[axis] - bounds.high[axis] - distance) < TOLERANCE)
+		    };
+		    if (valid(direct)) { return direct }
+		    let result = clone(model);
+		    const radii = paths(model).filter(path => path.type === 'arc' && path.radius > EPSILON).map(path => path.radius);
+		    // Retry failed large arc offsets in steps below the original corner radius.
+		    const steps = radii.length ? Math.max(2, Math.ceil(distance / Math.min(...radii) * 2)) : 2;
+		    if (steps > MAX_OFFSET_STEPS) { fail('designs', 'Offset exceeds the analytic subdivision limit'); }
+		    for (let step = 0; step < steps; step++) {
+		        result = m.model.outline(result, distance / steps, joints, false, {farPoint: u.farPoint});
+		    }
+		    if (!valid(result)) {
+		        // Shallow notches between neighboring keys need smaller analytic steps.
+		        const repairs = Math.ceil(distance / REPAIR_OFFSET_STEP);
+		        if (repairs > MAX_OFFSET_STEPS) { fail('designs', 'Offset exceeds the analytic subdivision limit'); }
+		        result = clone(model);
+		        for (let step = 0; step < repairs; step++) {
+		            result = m.model.outline(result, distance / repairs, joints, false, {farPoint: u.farPoint});
+		        }
+		    }
+		    if (!valid(result)) { fail('designs', 'Offset failed to preserve the profile extent'); }
+		    return result
+		};
+		const chains = model => (m.model.findChains(model, {contain: true}) || []);
+		const partition = model => {
+		    const contour = chain => ({...m.chain.toNewModel(chain),
+		        models: Object.fromEntries((chain.contains || []).map((child, index) => [index, contour(child)]))});
+		    return chains(model).map(contour)
+		};
+		const validate = (model, name, connected = 'multiple') => {
+		    let loose = [];
+		    const contours = m.model.findChains(model, (found, unchained) => { loose = unchained; }, {contain: true});
+		    if (!contours || !contours.length || loose.length || contours.some(chain => !chain.endless)) {
+		        fail(name, 'Expected nonempty closed contours');
+		    }
+		    if (connected === 'single' && contours.length !== 1) {
+		        fail(name, `Expected one connected region; found ${contours.length}`, 'disconnected');
+		    }
+		    const segments = paths(model);
+		    for (let i = 0; i < segments.length; i++) {
+		        for (let j = i + 1; j < segments.length; j++) {
+		            const intersections = m.path.intersection(segments[i], segments[j]);
+		            if (!intersections) { continue }
+		            const ends = [segments[i], segments[j]].map(path => m.point.fromPathEnds(path) || []);
+		            for (const point of intersections.intersectionPoints) {
+		                if (![segments[i], segments[j]].every(path => m.measure.isPointOnPath(point, path, EPSILON))) { continue }
+		                if (!ends.every(pair => pair.some(end => m.measure.pointDistance(point, end) < EPSILON))) {
+		                    fail(name, 'Contours intersect', 'intersection');
+		                }
+		            }
+		        }
+		    }
+		    return contours.length
+		};
+		const contains = (outer, inner) => {
+		    if (JSON.stringify(outer) === JSON.stringify(inner) || empty(inner)) { return true }
+		    if (empty(outer)) { return false }
+		    const outerPaths = paths(outer), innerPaths = paths(inner);
+		    const boundary = (point, segments) => segments.some(segment => m.measure.isPointOnPath(point, segment, TOLERANCE));
+		    const inside = (point, model) => m.measure.isPointInsideModel(point, model, {farPoint: u.farPoint});
+		    // Split analytically before classifying segments, including enclosed cutouts.
+		    const splitInner = paths(m.model.breakPathsAtIntersections(clone(inner), outer));
+		    const splitOuter = paths(m.model.breakPathsAtIntersections(clone(outer), inner));
+		    if (splitInner.some(segment => m.path.toPoints(segment, 3).some(point => !boundary(point, outerPaths) && !inside(point, outer)))) { return false }
+		    return !splitOuter.some(segment => {
+		        const point = m.point.middle(segment);
+		        return !boundary(point, innerPaths) && inside(point, inner)
+		    })
+		};
+		const requireContains = (outer, inner, name) => {
+		    if (!empty(inner) && !contains(outer, inner)) {
+		        fail(name, 'Profile removes occupied area or required clearance', 'clearance');
+		    }
+		};
+		const close = (model, radius) => {
+		    if (!radius) { return clone(model) }
+		    // Regularize exact tangencies within the documented export tolerance.
+		    for (const candidateRadius of [radius, radius + TOLERANCE / 10]) {
+		        try {
+		            const closed = offset(offset(model, candidateRadius), -candidateRadius);
+		            validate(closed, 'designs');
+		            if (contains(closed, model)) { return closed }
+		            const restored = combine(model, closed);
+		            m.model.simplify(restored);
+		            validate(restored, 'designs');
+		            if (contains(restored, model)) { return restored }
+		        } catch (error) {
+		            if (!(error instanceof DesignError)) { throw error }
+		        }
+		    }
+		    fail('designs', 'Gap closing failed to preserve closed occupied geometry');
+		};
+		const round = (model, radius) => {
+		    if (!radius) { return clone(model) }
+		    // Avoid exact arc collapse during erosion, within the export tolerance.
+		    for (const candidate of [radius, radius - TOLERANCE / 10]) {
+		        if (candidate <= 0) { continue }
+		        const inset = offset(model, -candidate);
+		        if (empty(inset)) { continue }
+		        const rounded = offset(inset, candidate);
+		        if (!empty(rounded)) { return rounded }
+		    }
+		    fail('designs', 'Rounding removes the complete profile; reduce its radius');
+		};
+		const describe = (model, source) => ({
+		    source, model: clone(model), bounds: m.measure.modelExtents(model), contours: chains(model).length
+		});
+
+		// Subdivide by the control polygon flatness so exports have a bounded error.
+		const bezier = (points, tolerance = TOLERANCE) => {
+		    const result = [points[0]];
+		    const midpoint = (p, q) => p.map((v, i) => (v + q[i]) / 2);
+		    const distance = (p, a, b) => {
+		        const length = m.measure.pointDistance(a, b);
+		        if (length < EPSILON) { return m.measure.pointDistance(p, a) }
+		        const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * (b[0] - a[0]) + (p[1] - a[1]) * (b[1] - a[1])) / length ** 2));
+		        return m.measure.pointDistance(p, a.map((v, i) => v + t * (b[i] - v)))
+		    };
+		    const split = (p, depth) => {
+		        if (Math.max(distance(p[1], p[0], p[3]), distance(p[2], p[0], p[3])) <= tolerance) {
+		            result.push(p[3]);
+		            return
+		        }
+		        if (depth > 24) { fail('designs.sketches', 'Bézier subdivision limit exceeded'); }
+		        const a = midpoint(p[0], p[1]), b = midpoint(p[1], p[2]), c = midpoint(p[2], p[3]);
+		        const d = midpoint(a, b), e = midpoint(b, c), f = midpoint(d, e);
+		        split([p[0], a, d, f], depth + 1);
+		        split([f, e, c, p[3]], depth + 1);
+		    };
+		    split(points, 0);
+		    return new m.models.ConnectTheDots(false, result)
+		};
+
+		geometry = {TOLERANCE, EPSILON, Joint, DesignError, fail, number, positive, clone, paths, empty,
+		    combine, union, offset, chains, partition, validate, contains, requireContains, close, round, describe, bezier};
+		return geometry;
+	}
+
+	var sketches = {};
+
+	var solver = {};
+
+	var hasRequiredSolver;
+
+	function requireSolver () {
+		if (hasRequiredSolver) return solver;
+		hasRequiredSolver = 1;
+		const g = requireGeometry();
+
+		let modulePromise;
+
+		// Keep the LGPL solver independently loadable in Node and browser workers.
+		solver.solve = async (primitives, name, options = {}) => {
+		    const load = options.loadSolver || (() => import('@salusoft89/planegcs'));
+		    const library = await load();
+		    if (!modulePromise) {
+		        modulePromise = library.init_planegcs_module(options.solverWasm ? {locateFile: () => options.solverWasm} : undefined)
+		            .catch(error => { modulePromise = undefined; throw error });
+		    }
+		    const module = await modulePromise;
+		    const wrapper = new library.GcsWrapper(new module.GcsSystem(), module);
+		    try {
+		        wrapper.push_primitives_and_params(primitives);
+		        const status = wrapper.solve();
+		        if (![library.SolveStatus.Success, library.SolveStatus.Converged].includes(status)) {
+		            g.fail(`${name}.constraints`, `No valid solution (${wrapper.get_gcs_conflicting_constraints().join(', ') || status})`, 'constraint');
+		        }
+		        wrapper.apply_solution();
+		        return wrapper.sketch_index.get_primitives()
+		    } catch (error) {
+		        if (error instanceof g.DesignError) { throw error }
+		        g.fail(`${name}.constraints`, error.message || String(error), 'constraint');
+		    } finally {
+		        wrapper.destroy_gcs_module();
+		    }
+		};
+		return solver;
+	}
+
+	var hasRequiredSketches;
+
+	function requireSketches () {
+		if (hasRequiredSketches) return sketches;
+		hasRequiredSketches = 1;
+		const m = require$$0;
+		const a = requireAssert();
+		const anchor = requireAnchor().parse;
+		const g = requireGeometry();
+		const solver = requireSolver();
+
+		const RADIANS = Math.PI / 180;
+		const RESIDUAL = 0.00001;
+
+		sketches.parse = async (config, name, units, keys, options) => {
+		    a.unexpected(config, name, ['points', 'geometry', 'constraints', 'closed']);
+		    const primitives = [], ids = {}, original = {}, checks = [], adjustments = [], frames = {};
+		    let serial = 0;
+		    const add = (id, primitive) => {
+		        if (ids[id]) { g.fail(name, `Duplicate sketch feature ${id}`); }
+		        ids[id] = String(++serial);
+		        primitives.push({id: ids[id], ...primitive});
+		        return ids[id]
+		    };
+		    const ref = (id, type) => {
+		        if (!ids[id] || (type && original[id]?.type !== type)) { g.fail(name, `Missing ${type || 'geometry'} reference ${id}`, 'reference'); }
+		        return ids[id]
+		    };
+		    const num = (value, path) => g.number(value, `${name}.${path}`, units);
+		    for (const [id, point] of Object.entries(config.points || {})) {
+		        a.unexpected(point, `${name}.points.${id}`, ['at', 'anchor', 'fixed']);
+		        let at = point.at || [0, 0];
+		        if (point.anchor) {
+		            const origin = anchor(point.anchor, `${name}.points.${id}.anchor`, keys)(units);
+		            frames[id] = {angle: origin.r, handedness: origin.meta.mirrored ? -1 : 1};
+		            at = origin.shift(a.xy(at, name)(units)).p;
+		        } else { at = a.xy(at, `${name}.points.${id}.at`)(units); }
+		        original[id] = {type: 'point', x: at[0], y: at[1], fixed: point.fixed === true};
+		        add(id, original[id]);
+		    }
+		    for (const [id, geometry] of Object.entries(config.geometry || {})) {
+		        a.unexpected(geometry, `${name}.geometry.${id}`, ['type', 'points', 'center', 'radius', 'start', 'end', 'construction']);
+		        let primitive;
+		        if (geometry.type === 'line' || geometry.type === 'bezier') {
+		            const count = geometry.type === 'line' ? 2 : 4;
+		            if (geometry.points?.length !== count) { g.fail(name, `${id} requires ${count} named points`); }
+		            const points = geometry.points.map(point => ref(point, 'point'));
+		            primitive = geometry.type === 'line' ? {type: 'line', p1_id: points[0], p2_id: points[1]} : {
+		                type: 'bspline', pole_ids: points, weights: [1, 1, 1, 1], knots: [0, 1], mult: [4, 4], degree: 3, periodic: false
+		            };
+		        } else if (geometry.type === 'circle' || geometry.type === 'arc') {
+		            primitive = {type: geometry.type, c_id: ref(geometry.center, 'point'), radius: g.positive(geometry.radius, `${name}.geometry.${id}.radius`, units)};
+		            if (geometry.type === 'arc') {
+		                const start = original[geometry.start], end = original[geometry.end], center = original[geometry.center];
+		                primitive.start_id = ref(geometry.start, 'point');
+		                primitive.end_id = ref(geometry.end, 'point');
+		                primitive.start_angle = Math.atan2(start.y - center.y, start.x - center.x);
+		                primitive.end_angle = Math.atan2(end.y - center.y, end.x - center.x);
+		                if (primitive.end_angle <= primitive.start_angle) { primitive.end_angle += 2 * Math.PI; }
+		            }
+		        } else { g.fail(name, `Unsupported geometry ${geometry.type}`); }
+		        original[id] = primitive;
+		        const geometryId = add(id, primitive);
+		        if (geometry.type === 'arc') { primitives.push({id: String(++serial), type: 'arc_rules', a_id: geometryId}); }
+		    }
+		    const pointPair = spec => {
+		        if (spec.points?.length !== 2) { g.fail(name, 'Constraint requires two named points'); }
+		        return {p1_id: ref(spec.points[0], 'point'), p2_id: ref(spec.points[1], 'point')}
+		    };
+		    for (const [id, spec] of Object.entries(config.constraints || {})) {
+		        const path = `${name}.constraints.${id}`;
+		        let primitive, measure, target = 0, angle = false;
+		        const line = key => original[key];
+		        const vec = (solved, key) => {
+		            const l = line(key), p = solved[l.p1_id], q = solved[l.p2_id];
+		            return [q.x - p.x, q.y - p.y]
+		        };
+		        const length = v => Math.hypot(...v);
+		        const cross = (v, w) => v[0] * w[1] - v[1] * w[0];
+		        const dot = (v, w) => v[0] * w[0] + v[1] * w[1];
+		        const pairMeasure = solved => {
+		            const p = solved[ref(spec.points[0])], q = solved[ref(spec.points[1])];
+		            return Math.hypot(p.x - q.x, p.y - q.y)
+		        };
+		        switch (spec.type) {
+		            case 'coincident':
+		            case 'distance':
+		                primitive = {type: spec.type === 'distance' ? 'p2p_distance' : 'p2p_coincident', ...pointPair(spec)};
+		                measure = pairMeasure;
+		                break
+		            case 'horizontal':
+		            case 'vertical':
+		                primitive = {type: `${spec.type}_l`, l_id: ref(spec.line, 'line')};
+		                measure = solved => vec(solved, spec.line)[spec.type === 'horizontal' ? 1 : 0];
+		                break
+		            case 'parallel':
+		            case 'perpendicular':
+		            case 'equal_length':
+		            case 'angle': {
+		                const [first, second] = spec.lines || [];
+		                primitive = {type: {parallel: 'parallel', perpendicular: 'perpendicular_ll', equal_length: 'equal_length', angle: 'l2l_angle_ll'}[spec.type], l1_id: ref(first, 'line'), l2_id: ref(second, 'line')};
+		                measure = solved => {
+		                    const v = vec(solved, first), w = vec(solved, second);
+		                    if (spec.type === 'equal_length') { return length(v) - length(w) }
+		                    if (spec.type === 'angle') { return Math.atan2(cross(v, w), dot(v, w)) / RADIANS }
+		                    return (spec.type === 'parallel' ? cross(v, w) : dot(v, w)) / Math.max(g.EPSILON, length(v) * length(w))
+		                };
+		                angle = spec.type === 'angle';
+		                break
+		            }
+		            case 'radius': {
+		                const kind = original[spec.geometry]?.type;
+		                if (!['circle', 'arc'].includes(kind)) { g.fail(path, 'Radius requires a circle or arc'); }
+		                primitive = {type: `${kind}_radius`, [kind === 'circle' ? 'c_id' : 'a_id']: ref(spec.geometry)};
+		                measure = solved => solved[ref(spec.geometry)].radius;
+		                break
+		            }
+		            case 'equal_radius': {
+		                const [first, second] = spec.geometry || [];
+		                const kinds = [first, second].map(id => original[id]?.type);
+		                if (!kinds.every(kind => ['circle', 'arc'].includes(kind))) { g.fail(path, 'Equal radius requires circles or arcs'); }
+		                if (kinds[0] === 'arc' && kinds[1] === 'circle') { g.fail(path, 'List the circle before the arc'); }
+		                primitive = {type: `equal_radius_${kinds.map(kind => kind[0]).join('')}`, [`${kinds[0][0]}1_id`]: ref(first), [`${kinds[1][0]}2_id`]: ref(second)};
+		                measure = solved => solved[ref(first)].radius - solved[ref(second)].radius;
+		                break
+		            }
+		            case 'symmetric': {
+		                primitive = {type: 'p2p_symmetric_ppl', ...pointPair(spec), l_id: ref(spec.line, 'line')};
+		                measure = solved => {
+		                    const p = solved[ref(spec.points[0])], q = solved[ref(spec.points[1])];
+		                    const l = original[spec.line], origin = solved[l.p1_id], v = vec(solved, spec.line);
+		                    const mid = [(p.x + q.x) / 2 - origin.x, (p.y + q.y) / 2 - origin.y];
+		                    return Math.abs(cross(v, mid) / length(v)) + Math.abs(dot(v, [p.x - q.x, p.y - q.y]) / length(v))
+		                };
+		                break
+		            }
+		            case 'tangent': {
+		                if (spec.curves) {
+		                    let [first, second] = spec.curves;
+		                    if (original[first]?.type === 'arc' && original[second]?.type === 'circle') { [first, second] = [second, first]; }
+		                    const kinds = [first, second].map(id => original[id]?.type);
+		                    if (!kinds.every(kind => ['circle', 'arc'].includes(kind))) { g.fail(path, 'Curve-pair tangency requires circles or arcs'); }
+		                    const mixed = kinds[0] !== kinds[1];
+		                    primitive = {type: `tangent_${kinds.map(kind => kind[0]).join('')}`,
+		                        [`${kinds[0][0]}${mixed ? '' : '1'}_id`]: ref(first),
+		                        [`${kinds[1][0]}${mixed ? '' : '2'}_id`]: ref(second)};
+		                    measure = solved => {
+		                        const left = solved[ref(first)], right = solved[ref(second)];
+		                        const p = solved[left.c_id], q = solved[right.c_id];
+		                        const distance = Math.hypot(q.x - p.x, q.y - p.y);
+		                        return Math.min(Math.abs(distance - left.radius - right.radius), Math.abs(distance - Math.abs(left.radius - right.radius)))
+		                    };
+		                    break
+		                }
+		                const kind = original[spec.curve]?.type;
+		                if (kind === 'bspline') {
+		                    const endpoint = spec.at || 'start';
+		                    if (!['start', 'end'].includes(endpoint)) { g.fail(path, 'Bézier tangency uses at: start or end'); }
+		                    // A cubic's endpoint tangent is exactly its adjacent control segment.
+		                    const poles = original[spec.curve].pole_ids;
+		                    const pair = endpoint === 'start' ? poles.slice(0, 2) : poles.slice(2);
+		                    const tangentId = String(++serial), lineId = ref(spec.line, 'line');
+		                    primitives.push({id: tangentId, type: 'line', p1_id: pair[0], p2_id: pair[1]});
+		                    const pointId = endpoint === 'start' ? pair[0] : pair[1];
+		                    primitives.push({id: String(++serial), type: 'p2l_distance', p_id: pointId, l_id: lineId, distance: 0});
+		                    primitive = {type: 'parallel', l1_id: lineId, l2_id: tangentId};
+		                    measure = solved => {
+		                        const p = solved[pair[0]], q = solved[pair[1]], v = vec(solved, spec.line), w = [q.x - p.x, q.y - p.y];
+		                        const contact = solved[pointId], origin = solved[original[spec.line].p1_id];
+		                        return Math.abs(cross(v, w)) / Math.max(g.EPSILON, length(v) * length(w)) + Math.abs(cross(v, [contact.x - origin.x, contact.y - origin.y])) / length(v)
+		                    };
+		                    break
+		                }
+		                if (!['circle', 'arc'].includes(kind)) { g.fail(path, 'Tangency requires a line and circle or arc'); }
+		                primitive = {type: `tangent_l${kind[0]}`, l_id: ref(spec.line, 'line'), [`${kind[0]}_id`]: ref(spec.curve)};
+		                measure = solved => {
+		                    const curve = solved[ref(spec.curve)], center = solved[curve.c_id];
+		                    const origin = solved[original[spec.line].p1_id], v = vec(solved, spec.line);
+		                    return Math.abs(cross(v, [center.x - origin.x, center.y - origin.y])) / length(v) - curve.radius
+		                };
+		                break
+		            }
+		            case 'fixed': {
+		                const point = original[spec.point];
+		                ref(spec.point, 'point');
+		                primitives.find(primitive => primitive.id === ids[spec.point]).fixed = true;
+		                point.fixed = true;
+		                continue
+		            }
+		            default: g.fail(path, `Unknown constraint ${spec.type}`);
+		        }
+		        let flexible;
+		        if (['distance', 'radius', 'angle'].includes(spec.type)) {
+		            if (typeof spec.value === 'object') {
+		                flexible = Object.fromEntries(['target', 'min', 'max', 'priority'].map(key => [key, num(spec.value[key], `constraints.${id}.value.${key}`)]));
+		                if (flexible.min > flexible.target || flexible.max < flexible.target || flexible.priority <= 0) { g.fail(path, 'Invalid flexibility range or priority'); }
+		                target = flexible.target;
+		            } else { target = num(spec.value, `constraints.${id}.value`); }
+		            primitive[{distance: 'distance', radius: 'radius', angle: 'angle'}[spec.type]] = target * (angle ? RADIANS : 1);
+		        }
+		        primitive.id = String(++serial);
+		        if (flexible) { primitive.temporary = true; primitive.scale = flexible.priority; }
+		        primitives.push(primitive);
+		        checks.push({id, spec, path, measure, target, flexible, angle});
+		    }
+		    const solvedList = await solver.solve(primitives, name, options);
+		    const solved = Object.fromEntries(solvedList.map(primitive => [primitive.id, primitive]));
+		    const dimensions = {};
+		    for (const {id, spec, path, measure, target, flexible, angle} of checks) {
+		        const actual = measure(solved);
+		        const error = angle ? Math.abs(((actual - target + 540) % 360) - 180) : Math.abs(actual - target);
+		        if (!Number.isFinite(actual) || (!flexible && error > RESIDUAL)) { g.fail(path, 'Fixed constraint residual exceeds tolerance', 'constraint'); }
+		        if (['distance', 'radius', 'angle'].includes(spec.type)) { dimensions[id] = {...spec, actual}; }
+		        if (!flexible) { continue }
+		        if (actual < flexible.min - RESIDUAL || actual > flexible.max + RESIDUAL) { g.fail(path, `Relaxed value ${actual} exceeds permitted range [${flexible.min}, ${flexible.max}]`, 'constraint'); }
+		        adjustments.push({feature: path, target, actual, min: flexible.min, max: flexible.max, priority: flexible.priority});
+		    }
+		    const positions = {};
+		    for (const [id, point] of Object.entries(config.points || {})) {
+		        const value = solved[ids[id]], start = original[id];
+		        if (![value.x, value.y].every(Number.isFinite)) { g.fail(name, 'Nonfinite solver result'); }
+		        if (start.fixed && Math.hypot(value.x - start.x, value.y - start.y) > RESIDUAL) { g.fail(name, `Fixed point ${id} moved`); }
+		        positions[id] = [value.x, value.y];
+		    }
+		    const model = {paths: {}, models: {}}, geometry = {points: positions, frames, dimensions, entities: {}};
+		    for (const [id, spec] of Object.entries(config.geometry || {})) {
+		        const value = solved[ids[id]];
+		        let shape;
+		        if (spec.type === 'line') { shape = {paths: {edge: new m.paths.Line(...spec.points.map(id => positions[id]))}}; }
+		        if (spec.type === 'bezier') { shape = g.bezier(spec.points.map(id => positions[id])); }
+		        if (spec.type === 'circle') { shape = {paths: {edge: new m.paths.Circle(positions[spec.center], value.radius)}}; }
+		        if (spec.type === 'arc') { shape = {paths: {edge: new m.paths.Arc(positions[spec.center], value.radius, value.start_angle / RADIANS, value.end_angle / RADIANS)}}; }
+		        geometry.entities[id] = {...spec, model: shape};
+		        if (!spec.construction) { model.models[id] = shape; }
+		    }
+		    if (!g.empty(model)) { g.validate(model, name); }
+		    return {model, geometry, adjustments}
+		};
+		return sketches;
+	}
+
+	var assemblies = {};
+
+	var mounts = {};
+
+	var hasRequiredMounts;
+
+	function requireMounts () {
+		if (hasRequiredMounts) return mounts;
+		hasRequiredMounts = 1;
+		const m = require$$0;
+		const a = requireAssert();
+		const g = requireGeometry();
+
+		const DEFAULT_HOLE = 1.2;
+		const DEFAULT_POST_HEIGHT = 5;
+		const DEGREES = 180 / Math.PI;
+		const TANGENT_STEP = 0.0001;
+		const intersects = (left, right) => !g.empty(g.combine(left, right, 'intersect'));
+
+		// Suggestions remain declarations; callers explicitly accept their stable anchors.
+		mounts.suggest = (spec, context) => {
+		    const {base, exterior, units, name, shape, mounts, exclusions, components, gasketModels, height} = context;
+		    const settings = spec.suggest;
+		    if (!settings) { return [] }
+		    a.unexpected(settings, `${name}.suggest`, ['spacing', 'inset', 'post', 'hole', 'height', 'gaskets']);
+		    const suggestions = [], center = m.measure.modelExtents(base).center;
+		    const forbidden = [...exclusions, ...components.map(component => component.model)];
+		    const anchor = (position, rotate = 0) => ({feature: spec.profile, shift: position.map((value, axis) => value - center[axis]), rotate});
+		    const circle = (position, radius) => ({paths: {circle: new m.paths.Circle(position, radius)}});
+		    const clear = model => g.contains(exterior, model) && !forbidden.some(other => intersects(model, other));
+		    if (settings.spacing !== undefined) {
+		        const dim = (key, fallback) => g.positive(settings[key] ?? fallback, `${name}.suggest.${key}`, units);
+		        const spacing = dim('spacing'), inset = dim('inset'), post = dim('post');
+		        const hole = dim('hole', DEFAULT_HOLE), postHeight = dim('height', Math.min(DEFAULT_POST_HEIGHT, height));
+		        if (hole >= post || postHeight > height) { g.fail(`${name}.suggest`, 'Suggested holes and posts must fit'); }
+		        let serial = 0;
+		        for (const chain of g.chains(g.offset(base, -inset))) {
+		            for (const position of m.chain.toPoints(chain, spacing)) {
+		                const id = `mount_${++serial}`, envelope = circle(position, post);
+		                if (mounts[id] || !clear(envelope)) { continue }
+		                if (Object.values(mounts).some(mount => m.measure.pointDistance(mount.position, position) < post + mount.post)) { continue }
+		                if (suggestions.some(suggestion => m.measure.pointDistance(suggestion.position, position) < spacing / 2)) { continue }
+		                const definition = {anchor: anchor(position), hole, post, height: postHeight};
+		                suggestions.push({id, kind: 'mount', position, ...definition, definition});
+		            }
+		        }
+		    }
+		    if (!settings.gaskets) { return suggestions }
+		    const gasket = settings.gaskets, path = `${name}.suggest.gaskets`;
+		    a.unexpected(gasket, path, ['spacing', 'size']);
+		    const spacing = g.positive(gasket.spacing, `${path}.spacing`, units);
+		    const size = a.wh(gasket.size, `${path}.size`)(units);
+		    size.forEach(value => g.positive(value, `${path}.size`));
+		    const occupied = [...gasketModels, ...Object.values(mounts).map(mount => circle(mount.position, mount.post))];
+		    let serial = 0;
+		    for (const edge of g.paths(base)) {
+		        const length = m.measure.pathLength(edge);
+		        if (length < size[0]) { continue }
+		        const count = Math.max(1, Math.floor(length / Math.max(spacing, size[0])));
+		        for (let index = 0; index < count; index++) {
+		            const id = `gasket_${++serial}`, t = (index + 0.5) / count;
+		            if (spec.gaskets?.[id]) { continue }
+		            const position = m.point.middle(edge, t);
+		            const from = m.point.middle(edge, t - TANGENT_STEP), to = m.point.middle(edge, t + TANGENT_STEP);
+		            const rotate = Math.atan2(to[1] - from[1], to[0] - from[0]) * DEGREES;
+		            const definition = {anchor: anchor(position, rotate), size};
+		            const envelope = shape(definition, path);
+		            if (!clear(envelope) || !intersects(envelope, base) || occupied.some(other => intersects(envelope, other))) { continue }
+		            occupied.push(envelope);
+		            suggestions.push({id, kind: 'gasket', position, definition});
+		        }
+		    }
+		    return suggestions
+		};
+		return mounts;
+	}
+
+	var hasRequiredAssemblies;
+
+	function requireAssemblies () {
+		if (hasRequiredAssemblies) return assemblies;
+		hasRequiredAssemblies = 1;
+		const m = require$$0;
+		const a = requireAssert();
+		const g = requireGeometry();
+
+		const circle = (position, radius) => ({paths: {circle: new m.paths.Circle(position, radius)}});
+		const intersects = (left, right) => !g.empty(g.combine(left, right, 'intersect'));
+
+		assemblies.compile = (config, context) => {
+		    const {resolve, locate, shape, publish, units, cases, report} = context;
+		    for (const [id, spec] of Object.entries(config.assemblies || {})) {
+		        const name = `designs.assemblies.${id}`;
+		        a.unexpected(spec, name, ['preset', 'profile', 'wall', 'floor', 'height', 'plate', 'fit', 'lid', 'layers', 'mounts', 'gasket', 'gaskets', 'cutouts', 'components', 'openings', 'suggest', 'exclusions']);
+		        a.in(spec.preset, `${name}.preset`, ['plate', 'tray', 'stacked', 'gasket']);
+		        const dim = (key, fallback) => g.positive(spec[key] ?? fallback, `${name}.${key}`, units);
+		        const fit = g.number(spec.fit ?? 0, `${name}.fit`, units);
+		        if (fit < 0) { g.fail(name, 'Fit allowance must be nonnegative'); }
+		        const base = resolve(spec.profile).model;
+		        g.validate(base, name, 'single');
+		        const plateThickness = dim('plate', 1.5), floor = dim('floor', 2), height = dim('height', 10), wall = dim('wall', 3);
+		        const cavity = g.offset(base, fit), exterior = g.offset(cavity, wall);
+		        const ring = g.combine(exterior, cavity, 'subtract');
+		        const parts = {}, mounts = {}, suggestions = [];
+		        report.assemblies[id] = {preset: spec.preset, parts, mounts, suggestions};
+		        const components = (spec.components || []).map(ref => ({ref, model: resolve(ref).model,
+		            height: a.numarr(config.components[ref.split('.')[1]]?.height, `${name}.${ref}.height`, 2)(units)}));
+		        const exclusions = (spec.exclusions || []).map(ref => resolve(ref).model);
+		        const openings = (spec.openings || []).map(ref => ({ref, model: resolve(ref).model,
+		            height: a.numarr(config.components[ref.split('.')[1]]?.height, `${name}.${ref}.height`, 2)(units)}));
+		        for (const [mountId, mount] of Object.entries(spec.mounts || {})) {
+		            const path = `${name}.mounts.${mountId}`;
+		            a.unexpected(mount, path, ['anchor', 'hole', 'post', 'height']);
+		            const position = locate(mount.anchor, `${path}.anchor`).p;
+		            const hole = g.positive(mount.hole, `${path}.hole`, units), post = g.positive(mount.post, `${path}.post`, units);
+		            const postHeight = g.positive(mount.height ?? height, `${path}.height`, units);
+		            if (hole >= post || postHeight > height) { g.fail(path, 'Post must surround its hole and fit below the lid'); }
+		            const envelope = circle(position, post);
+		            g.requireContains(exterior, envelope, path);
+		            if (exclusions.some(model => intersects(envelope, model))) { g.fail(path, 'Mount intersects an exclusion'); }
+		            mounts[mountId] = {position, hole, post, height: postHeight, anchor: mount.anchor};
+		        }
+		        const holes = g.union(Object.values(mounts).map(mount => circle(mount.position, mount.hole)));
+		        const cutouts = g.union((spec.cutouts || []).map(ref => resolve(ref).model));
+		        let plate = g.combine(base, cutouts, 'subtract');
+		        const gasketModels = [];
+		        for (const [gasketId, gasket] of Object.entries(spec.gaskets || {})) {
+		            const tab = shape(gasket, `${name}.gaskets.${gasketId}`);
+		            if (!intersects(tab, base)) { g.fail(`${name}.gaskets.${gasketId}`, 'Gasket tab must attach to the plate'); }
+		            g.requireContains(exterior, tab, `${name}.gaskets.${gasketId}`);
+		            gasketModels.push(tab);
+		            plate = g.combine(plate, tab);
+		        }
+		        plate = g.combine(plate, holes, 'subtract');
+
+		        // Each slice uses existing outline extrusion; holes share the mount table.
+		        const emit = (partId, slices) => {
+		            const output = `${id}_${partId}`;
+		            const ops = [], layers = [];
+		            for (const [index, slice] of slices.entries()) {
+		                if (slice.thickness <= 0) { g.fail(name, 'Part thickness must be positive'); }
+		                let model = g.combine(slice.model, holes, 'subtract');
+		                if (g.empty(model)) { continue }
+		                g.validate(model, `${name}.${partId}`);
+		                const outline = `_design_${output}_${index}`;
+		                publish(outline, model, name);
+		                ops.push({name: outline, extrude: slice.thickness, shift: [0, 0, slice.z]});
+		                layers.push({model, z: slice.z, thickness: slice.thickness});
+		            }
+		            for (const opening of openings) {
+		                const outline = `_design_${output}_opening_${ops.length}`;
+		                publish(outline, opening.model, name);
+		                ops.push({name: outline, operation: 'subtract', extrude: opening.height[1] - opening.height[0], shift: [0, 0, opening.height[0]]});
+		            }
+		            for (const component of components) {
+		                for (const slice of layers) {
+		                    if (component.height[1] <= slice.z + g.EPSILON || component.height[0] >= slice.z + slice.thickness - g.EPSILON) { continue }
+		                    let material = slice.model;
+		                    for (const opening of openings) {
+		                        if (opening.height[0] <= component.height[0] && opening.height[1] >= component.height[1]) { material = g.combine(material, opening.model, 'subtract'); }
+		                    }
+		                    if (intersects(material, component.model)) { g.fail(`${name}.${partId}`, `Clearance conflict with ${component.ref}`, 'clearance'); }
+		                }
+		            }
+		            if (!ops.length) { g.fail(name, `Empty part ${partId}`); }
+		            cases[output] = ops;
+		            parts[output] = {slices: layers, explode: Object.keys(parts).length * (height + floor), source: name};
+		        };
+		        const posts = z => Object.values(mounts).map(mount => ({model: circle(mount.position, mount.post), z, thickness: mount.height}));
+		        if (spec.preset === 'plate') { emit('plate', [{model: plate, z: 0, thickness: plateThickness}]); }
+		        if (spec.preset === 'tray') {
+		            emit('tray', [{model: exterior, z: 0, thickness: floor}, {model: ring, z: floor, thickness: height}, ...posts(floor)]);
+		            if (spec.lid) { emit('lid', [{model: exterior, z: floor + height, thickness: g.positive(spec.lid, `${name}.lid`, units)}]); }
+		        }
+		        if (spec.preset === 'stacked') {
+		            let z = 0;
+		            if (!Object.keys(spec.layers || {}).length) { g.fail(name, 'Stacked cases require named layers'); }
+		            for (const [layer, settings] of Object.entries(spec.layers)) {
+		                a.unexpected(settings, `${name}.layers.${layer}`, ['thickness', 'cavity', 'profile']);
+		                const thickness = g.positive(settings.thickness, `${name}.layers.${layer}.thickness`, units);
+		                const model = settings.profile ? resolve(settings.profile).model : settings.cavity ? ring : exterior;
+		                emit(layer, [{model, z, thickness}]);
+		                z += thickness;
+		            }
+		        }
+		        if (spec.preset === 'gasket') {
+		            if (!gasketModels.length) { g.fail(name, 'Gasket enclosures require named gasket tabs'); }
+		            const gasket = spec.gasket || {};
+		            const thickness = g.positive(gasket.thickness, `${name}.gasket.thickness`, units);
+		            const compression = g.number(gasket.compression, `${name}.gasket.compression`, units);
+		            const allowance = g.number(gasket.fit, `${name}.gasket.fit`, units);
+		            if (compression < 0 || compression >= 1 || allowance < 0) { g.fail(name, 'Invalid gasket compression or fit'); }
+		            const compressed = thickness * (1 - compression);
+		            const pockets = g.offset(g.union(gasketModels), allowance);
+		            const support = g.combine(exterior, g.combine(cavity, pockets), 'subtract');
+		            const ledge = g.combine(exterior, g.combine(g.offset(base, -wall), pockets), 'subtract');
+		            const plateZ = floor + height;
+		            emit('bottom', [{model: exterior, z: 0, thickness: floor}, {model: ring, z: floor, thickness: height - compressed},
+		                {model: ledge, z: plateZ - compressed - floor, thickness: floor}, {model: support, z: plateZ - compressed, thickness: compressed}, ...posts(floor)]);
+		            emit('plate', [{model: plate, z: plateZ, thickness: plateThickness}]);
+		            emit('top', [{model: support, z: plateZ + plateThickness, thickness: compressed},
+		                {model: ledge, z: plateZ + plateThickness + compressed, thickness: floor}]);
+		            report.assemblies[id].gasket = {thickness, compression, compressed, fit: allowance};
+		        }
+		        suggestions.push(...requireMounts().suggest(spec, {
+		            base, exterior, units, name, shape, mounts, exclusions, components, gasketModels, height
+		        }));
+		    }
+		};
+		return assemblies;
+	}
+
+	var enclosures = {};
+
+	var enclosureSpec = {};
+
+	var hasRequiredEnclosureSpec;
+
+	function requireEnclosureSpec () {
+		if (hasRequiredEnclosureSpec) return enclosureSpec;
+		hasRequiredEnclosureSpec = 1;
+		const g = requireGeometry();
+
+		const MOUNTING = ['tray', 'top', 'bottom', 'gasket'];
+		const DEFAULTS = {wall: 3, floor: 2, height: 18, plate: 1.5, plate_z: 13, bezel: 4,
+		    fit: 0.3, typing_angle: 0, fillet: 0, chamfer: 0, pcb_thickness: 1.6, pcb_z: 6};
+
+		enclosureSpec.normalize = (spec, name, units) => {
+		    const result = {...spec};
+		    for (const [key, fallback] of Object.entries(DEFAULTS)) {
+		        result[key] = g.number(spec[key] ?? fallback, `${name}.${key}`, units);
+		        if (result[key] < 0) { g.fail(`${name}.${key}`, 'Dimension must be nonnegative'); }
+		    }
+		    for (const key of ['wall', 'floor', 'height', 'plate', 'bezel', 'pcb_thickness']) {
+		        g.positive(result[key], `${name}.${key}`);
+		    }
+		    if (!MOUNTING.includes(spec.mounting)) { g.fail(`${name}.mounting`, 'Choose tray, top, bottom or gasket'); }
+		    if (result.plate_z <= result.floor || result.plate_z + result.plate >= result.height) {
+		        g.fail(`${name}.plate_z`, 'Plate must fit between the floor and bezel');
+		    }
+		    if (result.typing_angle >= 45) { g.fail(`${name}.typing_angle`, 'Typing angle must be less than 45 degrees'); }
+		    result.front_height = g.number(spec.front_height ?? result.height, `${name}.front_height`, units);
+		    if (result.front_height < result.height * Math.cos(result.typing_angle * Math.PI / 180)) {
+		        g.fail(`${name}.front_height`, 'Front height cannot remove the required floor thickness');
+		    }
+		    const gasket = {...spec.gasket};
+		    for (const [key, fallback] of Object.entries({thickness: 2, compression: 0.2, fit: 0.2,
+		        travel_up: 0.2, travel_down: 0.2, travel_side: 0.1})) {
+		        gasket[key] = g.number(gasket[key] ?? fallback, `${name}.gasket.${key}`, units);
+		        if (gasket[key] < 0) { g.fail(`${name}.gasket.${key}`, 'Dimension must be nonnegative'); }
+		    }
+		    gasket.kind ||= 'pads';
+		    if (!['pads', 'sleeves'].includes(gasket.kind) || gasket.compression >= 1 || !gasket.thickness) {
+		        g.fail(`${name}.gasket`, 'Invalid gasket interface, thickness or compression');
+		    }
+		    gasket.compressed = gasket.thickness * (1 - gasket.compression);
+		    if (spec.mounting === 'gasket') {
+		        if (!Object.keys(spec.gaskets || {}).length) { g.fail(`${name}.gaskets`, 'Add at least one named gasket contact'); }
+		        if (gasket.travel_down >= gasket.compressed || gasket.travel_up >= gasket.compressed) {
+		            g.fail(`${name}.gasket.travel`, 'Travel must leave positive gasket material before a hard stop');
+		        }
+		    }
+		    result.manufacturing = {};
+		    for (const [part, input] of Object.entries(spec.manufacturing || {})) {
+		        const process = {...input};
+		        for (const key of ['cutter', 'reach', 'drill', 'min_wall', 'nozzle', 'layer']) {
+		            if (process[key] !== undefined) { process[key] = g.positive(process[key], `${name}.manufacturing.${part}.${key}`, units); }
+		        }
+		        for (const key of ['stock', 'build']) {
+		            if (Array.isArray(process[key])) { process[key] = process[key].map(value => g.positive(value, `${name}.manufacturing.${part}.${key}`, units)); }
+		        }
+		        result.manufacturing[part] = process;
+		    }
+		    result.gasket = gasket;
+		    return result
+		};
+		return enclosureSpec;
+	}
+
+	var manufacturing = {};
+
+	var hasRequiredManufacturing;
+
+	function requireManufacturing () {
+		if (hasRequiredManufacturing) return manufacturing;
+		hasRequiredManufacturing = 1;
+		// Findings describe declared process limits, not CAM or physical certification.
+		manufacturing.check = (part, spec, geometry) => {
+		    const findings = [];
+		    const issue = (code, message, severity = 'error') => findings.push({feature: part, code, message, severity});
+		    if (!spec?.process) {
+		        issue('unassessed', 'Choose a manufacturing process and confirm its dimensions.', 'warning');
+		        return findings
+		    }
+		    for (const key of ['stock', 'build']) {
+		        if (spec[key] && (!Array.isArray(spec[key]) || spec[key].length !== 3 || spec[key].some(value => !Number.isFinite(value) || value <= 0))) {
+		            issue('dimensions', `${key} must contain three positive dimensions.`);
+		            return findings
+		        }
+		    }
+		    const {wall, depth, width, height, holes, fillet, angle} = geometry;
+		    if (spec.min_wall > wall) { issue('wall', 'Wall is thinner than the declared minimum.'); }
+		    if (spec.process === 'cnc') {
+		        if (!(spec.cutter > 0 && spec.reach > 0) || !spec.setups?.length) {
+		            issue('unassessed', 'CNC requires cutter diameter, usable reach and setup directions.', 'warning');
+		            return findings
+		        }
+		        if (depth > spec.reach) { issue('reach', 'Pocket depth exceeds declared cutter reach.'); }
+		        if (spec.cutter > width) { issue('access', 'Cutter cannot enter the available pocket.'); }
+		        if (fillet < spec.cutter / 2) { issue('radius', 'The generated pocket has corners smaller than the cutter radius. Add corner relief or choose another process.'); }
+		        if (!spec.setups.includes('top')) { issue('setup', 'An interior-face machining setup is required.'); }
+		        if (holes.some(hole => hole.diameter < spec.cutter && !spec.drill)) {
+		            issue('drill', 'Small holes require a declared drill diameter.', 'warning');
+		        }
+		        if (holes.some(hole => hole.access === 'bottom') && !spec.setups.includes('bottom')) {
+		            issue('setup', 'Underside hardware pockets require a bottom setup.');
+		        }
+		        if (spec.stock && (spec.stock[0] < width || spec.stock[1] < height || spec.stock[2] < depth)) {
+		            issue('stock', 'Part exceeds the declared stock envelope.');
+		        }
+		        if (geometry.sideOpenings && !spec.setups.some(setup => ['left', 'right', 'front', 'back'].includes(setup))) {
+		            issue('side-access', 'Wall openings require a declared side setup and tool-access review.');
+		        }
+		        if (angle) { issue('fixture', 'Typing angle requires an angled fixture or a setup aligned to the mechanical stack.', 'warning'); }
+		        issue('cam', 'Fixture, holder collisions and cutting strategy require external CAM review.', 'info');
+		    } else if (spec.process === 'fdm') {
+		        if (!(spec.nozzle > 0 && spec.layer > 0) || !spec.orientation) {
+		            issue('unassessed', 'FDM requires nozzle width, layer height and orientation.', 'warning');
+		            return findings
+		        }
+		        if (wall < spec.nozzle * 2) { issue('wall', 'Wall is narrower than two nozzle widths.'); }
+		        if (spec.layer > spec.nozzle) { issue('layer', 'Layer height exceeds nozzle width.'); }
+		        if (spec.build && (width > spec.build[0] || height > spec.build[1] || depth > spec.build[2])) {
+		            issue('build-volume', 'Part exceeds the declared printer build volume.');
+		        }
+		        if ((geometry.overhang || angle > 0) && spec.supports !== 'allowed') {
+		            issue('supports', 'Shelves or tilted surfaces need an orientation/support review.', 'warning');
+		        }
+		        issue('slicer', 'Check bridges, support removal and hardware access in the slicer.', 'info');
+		    } else {
+		        issue('process', `Unsupported manufacturing process ${spec.process}`);
+		    }
+		    return findings
+		};
+		return manufacturing;
+	}
+
+	var tooling = {};
+
+	var hasRequiredTooling;
+
+	function requireTooling () {
+		if (hasRequiredTooling) return tooling;
+		hasRequiredTooling = 1;
+		const m = require$$0;
+		const g = requireGeometry();
+		const TANGENT_SAMPLE = 0.00001;
+		const TANGENT_TOLERANCE = 0.0001;
+
+		// Inspect the actual pocket boundary; a declared radius alone proves nothing.
+		tooling.radius = model => {
+		    let radius = Infinity;
+		    for (const chain of g.chains(model)) {
+		        const edges = chain.links.map(link => {
+		            const path = m.path.moveRelative(m.path.clone(link.walkedPath.pathContext), link.walkedPath.offset);
+		            if (path.radius) { radius = Math.min(radius, path.radius); }
+		            if (path.type === 'circle') { return null }
+		            const sample = t => m.point.middle(path, link.reversed ? 1 - t : t);
+		            const unit = (a, b) => {
+		                const length = m.measure.pointDistance(a, b);
+		                return b.map((v, i) => (v - a[i]) / length)
+		            };
+		            return {start: unit(sample(0), sample(TANGENT_SAMPLE)), end: unit(sample(1 - TANGENT_SAMPLE), sample(1))}
+		        });
+		        for (let index = 0; index < edges.length; index++) {
+		            const edge = edges[index], next = edges[(index + 1) % edges.length];
+		            if (!edge || !next) { continue }
+		            if (edge.end.some((v, axis) => Math.abs(v - next.start[axis]) > TANGENT_TOLERANCE)) { return 0 }
+		        }
+		    }
+		    return radius
+		};
+		return tooling;
+	}
+
+	var solidKernel = {};
+
+	var hasRequiredSolidKernel;
+
+	function requireSolidKernel () {
+		if (hasRequiredSolidKernel) return solidKernel;
+		hasRequiredSolidKernel = 1;
+		const m = require$$0;
+		const g = requireGeometry();
+
+		const MESH_TOLERANCE = 0.01;
+		let initialized;
+
+		// Keep WASM and native handles behind one adapter shared by Node and workers.
+		solidKernel.open = async (options = {}) => {
+		    if (!initialized) {
+		        initialized = (async () => {
+		            const r = await import('replicad');
+		            const init = options.loadCad || (() => import('replicad-opencascadejs'));
+		            const {default: load} = await init();
+		            const oc = await load(options.cadWasm ? {locateFile: () => options.cadWasm} : {});
+		            r.setOC(oc);
+		            return {r, oc}
+		        })().catch(error => { initialized = undefined; throw error });
+		    }
+		    const {r, oc} = await initialized;
+		    const owned = new Set();
+		    const keep = value => { owned.add(value); return value };
+		    const vector = p => [p[0], p[1], 0];
+		    const wire = chain => {
+		        const segments = chain.links.map(link => {
+		            const path = m.path.moveRelative(g.clone(link.walkedPath.pathContext), link.walkedPath.offset);
+		            if (path.type === 'circle') { return {path} }
+		            let [start, end] = m.point.fromPathEnds(path);
+		            if (link.reversed) { [start, end] = [end, start]; }
+		            return {path, start, end}
+		        });
+		        const edges = segments.map(({path, start, end}, index) => {
+		            if (path.type === 'circle') { return keep(r.makeCircle(path.radius, vector(path.origin))) }
+		            // MakerJS rounds endpoints more coarsely than the solid kernel.
+		            const next = segments[(index + 1) % segments.length].start;
+		            if (!next || m.measure.pointDistance(end, next) > g.TOLERANCE) {
+		                g.fail('designs.solid', 'Disconnected contour edges');
+		            }
+		            end = next;
+		            if (path.type === 'arc') {
+		                return keep(r.makeThreePointArc(vector(start), vector(m.point.middle(path)), vector(end)))
+		            }
+		            if (path.type !== 'line') { g.fail('designs', `Unsupported solid edge ${path.type}`); }
+		            return keep(r.makeLine(vector(start), vector(end)))
+		        });
+		        return keep(r.assembleWire(edges))
+		    };
+		    const extrudeChain = (chain, height) => {
+		        const sketch = keep(new r.Sketch(wire(chain)));
+		        let result = keep(sketch.extrude(height));
+		        for (const child of chain.contains || []) {
+		            result = keep(result.cut(extrudeChain(child, height)));
+		        }
+		        return result
+		    };
+		    const extrude = (model, height, z = 0) => {
+		        g.validate(model, 'designs.solid');
+		        const chains = m.model.findChains(model, {contain: true});
+		        const solids = chains.map(chain => extrudeChain(chain, height));
+		        let result = solids[0];
+		        for (const next of solids.slice(1)) { result = keep(result.fuse(next)); }
+		        return z ? keep(result.translateZ(z)) : result
+		    };
+		    const bounds = shape => {
+		        const box = shape.boundingBox;
+		        try { return box.bounds } finally { box.delete(); }
+		    };
+		    const validate = shape => {
+		        const check = new oc.BRepCheck_Analyzer(shape.wrapped);
+		        try {
+		            if (!check.IsValid(shape.wrapped) || !(r.measureVolume(shape) > g.EPSILON)) {
+		                g.fail('designs.solid', 'Expected a valid positive-volume solid');
+		            }
+		        } finally { check.delete(); }
+		    };
+		    return {
+		        extrude,
+		        add: (left, right) => keep(left.fuse(right)),
+		        cut: (left, right) => keep(left.cut(right)),
+		        intersect: (left, right) => keep(left.intersect(right)),
+		        move: (shape, offset) => keep(shape.clone().translate(offset)),
+		        rotate: (shape, angle, origin = [0, 0, 0]) => keep(shape.clone().rotate(angle, origin, [1, 0, 0])),
+		        fillet: (shape, radius, z) => keep(shape.fillet(radius, edges => edges.inPlane('XY', z))),
+		        chamfer: (shape, distance, z) => keep(shape.chamfer(distance, edges => edges.inPlane('XY', z))),
+		        volume: shape => Math.abs(r.measureVolume(shape)),
+		        bounds,
+		        validate,
+		        export: async (shape, name) => {
+		            validate(shape);
+		            const solids = shape.solids;
+		            try {
+		                if (solids.length !== 1) { g.fail(`designs.solid.${name}`, 'A manufactured part must contain one connected solid'); }
+		            } finally { solids.forEach(solid => solid.delete()); }
+		            return {name, volume: Math.abs(r.measureVolume(shape)), bounds: bounds(shape),
+		                step: await shape.blobSTEP().text(),
+		                stl: new Uint8Array(await shape.blobSTL({binary: true, tolerance: MESH_TOLERANCE}).arrayBuffer())}
+		        },
+		        assembly: async parts => (await r.exportSTEP(Object.entries(parts).map(([name, shape]) => ({name, shape})), {unit: 'MM', modelUnit: 'MM'})).text(),
+		        import: async step => keep(await r.importSTEP(new Blob([step]))),
+		        retained: () => owned.size,
+		        close: () => {
+		            for (const value of [...owned].reverse()) {
+		                try { value.delete?.(); } catch { /* Some operations consume their input wrapper. */ }
+		            }
+		            owned.clear();
+		        }
+		    }
+		};
+		return solidKernel;
+	}
+
+	var hasRequiredEnclosures;
+
+	function requireEnclosures () {
+		if (hasRequiredEnclosures) return enclosures;
+		hasRequiredEnclosures = 1;
+		const m = require$$0;
+		const g = requireGeometry();
+		const {normalize} = requireEnclosureSpec();
+		const manufacturing = requireManufacturing();
+		const tooling = requireTooling();
+
+		const circle = (p, radius) => ({paths: {circle: new m.paths.Circle(p, radius)}});
+		const rect = (p, size) => m.model.moveRelative(m.model.center(new m.models.Rectangle(...size)), p);
+		const subtract = (left, right) => g.combine(left, right, 'subtract');
+		const intersects = (left, right) => !g.empty(g.combine(left, right, 'intersect'));
+		const RAD = Math.PI / 180;
+
+		// Compile a mechanical assembly once; every export comes from these same solids.
+		enclosures.compile = async (config, context, options = {}) => {
+		    const entries = Object.entries(config.assemblies || {}).filter(([, spec]) => spec.preset === 'enclosure');
+		    if (!entries.length) { return {} }
+		    const kernel = await requireSolidKernel().open(options);
+		    const results = {};
+		    try {
+		        for (const [id, input] of entries) {
+		            const name = `designs.assemblies.${id}`;
+		            const s = normalize(input, name, context.units);
+		            const {resolve, locate, shape, publish, report} = context;
+		            const base = resolve(s.profile).model;
+		            g.validate(base, `${name}.profile`, 'single');
+		            const internalRadius = g.number(s.internal_radius || 0, `${name}.internal_radius`, context.units);
+		            const floating = s.mounting === 'gasket';
+		            const clearance = Math.max(s.fit, internalRadius) + (floating ? s.gasket.travel_side : 0);
+		            if (clearance >= s.bezel) { g.fail(name, 'Increase bezel width to retain walls around the cavity'); }
+		            const cavity = g.round(g.offset(base, clearance), internalRadius);
+		            const exterior = g.offset(base, s.bezel + s.wall);
+		            const opening = s.opening ? resolve(s.opening).model : g.round(g.offset(base, internalRadius), internalRadius);
+		            const ring = subtract(exterior, cavity);
+		            const bezel = subtract(exterior, opening);
+		            const extents = m.measure.modelExtents(exterior);
+		            const seam = g.number(s.seam?.z ?? s.plate_z, `${name}.seam.z`, context.units);
+		            if (seam <= s.floor || seam >= s.height - s.wall) { g.fail(`${name}.seam`, 'Seam must lie between floor and upper bezel'); }
+		            const wedge = extents.height * Math.tan(s.typing_angle * RAD);
+		            let bottom = kernel.extrude(exterior, s.floor + wedge, -wedge);
+		            bottom = kernel.add(bottom, kernel.extrude(ring, seam - s.floor, s.floor));
+		            let top = kernel.extrude(ring, s.height - seam, seam);
+		            const roof = Math.min(s.wall, s.height - s.plate_z - s.plate);
+		            top = kernel.add(top, kernel.extrude(bezel, roof, s.height - roof));
+		            let plateModel = s.plate_profile ? resolve(s.plate_profile).model : g.clone(base);
+		            for (const ref of s.cutouts || []) {
+		                const cutout = resolve(ref).model;
+		                g.requireContains(opening, cutout, `${name}.opening`);
+		                plateModel = subtract(plateModel, cutout);
+		            }
+		            const contacts = [];
+		            const extras = {}, extraMotion = {};
+		            const hardwarePockets = {bottom: [], top: []};
+		            const holes = [];
+		            const features = [];
+
+		            // Gasket pockets clear the floating tabs; shelves stop at compressed pads.
+		            if (floating) {
+		                for (const [tabId, definition] of Object.entries(s.gaskets)) {
+		                    const path = `${name}.gaskets.${tabId}`;
+		                    const tab = shape(definition, path);
+		                    if (!intersects(tab, base)) { g.fail(path, 'Gasket tab must overlap the plate'); }
+		                    const sleeveMargin = s.gasket.kind === 'sleeves' ? s.gasket.thickness : 0;
+		                    const pocketClearance = Math.max(sleeveMargin + s.gasket.fit + s.gasket.travel_side, internalRadius);
+		                    const pocket = g.round(g.offset(tab, pocketClearance), internalRadius);
+		                    g.requireContains(g.offset(exterior, -s.wall), pocket, path);
+		                    plateModel = g.combine(plateModel, tab);
+		                    const low = s.plate_z - s.gasket.compressed;
+		                    const high = s.plate_z + s.plate + s.gasket.compressed;
+		                    if (low - s.wall <= s.floor || high + s.wall >= s.height) {
+		                        g.fail(path, 'Increase case height or adjust plate height for gasket shelves');
+		                    }
+		                    const relief = kernel.extrude(pocket, high - low, low);
+		                    bottom = kernel.cut(bottom, relief);
+		                    top = kernel.cut(top, relief);
+		                    const shelf = g.combine(pocket, g.combine(ring, g.offset(pocket, s.wall), 'intersect'));
+		                    bottom = kernel.add(bottom, kernel.extrude(shelf, s.wall, low - s.wall));
+		                    top = kernel.add(top, kernel.extrude(shelf, s.wall, high));
+		                    if (s.gasket.kind === 'sleeves') {
+		                        const sleeveOuter = g.offset(tab, s.gasket.thickness);
+		                        g.requireContains(exterior, sleeveOuter, path);
+		                        let sleeve = kernel.extrude(sleeveOuter, high - low, low);
+		                        sleeve = kernel.cut(sleeve, kernel.extrude(g.offset(tab, s.gasket.fit), s.plate, s.plate_z));
+		                        extras[`gasket_${tabId}`] = sleeve;
+		                    } else {
+		                        extras[`gasket_${tabId}_lower`] = kernel.extrude(tab, s.gasket.compressed, low);
+		                        extras[`gasket_${tabId}_upper`] = kernel.extrude(tab, s.gasket.compressed, s.plate_z + s.plate);
+		                    }
+		                    contacts.push({id: tabId, model: tab, pocket, low, high});
+		                    features.push({id: `gaskets.${tabId}`, model: pocket, z: low, height: high - low});
+		                }
+		            }
+
+		            // Optional continuous ledge belongs to the fixed plate support system.
+		            if (s.ledge) {
+		                if (floating) { g.fail(`${name}.ledge`, 'A rigid ledge would clamp the floating plate'); }
+		                const width = g.positive(s.ledge.width, `${name}.ledge.width`, context.units);
+		                const thickness = g.positive(s.ledge.thickness, `${name}.ledge.thickness`, context.units);
+		                const ledge = subtract(exterior, g.offset(base, -width));
+		                const z = s.plate_z - thickness;
+		                bottom = kernel.add(bottom, kernel.extrude(ledge, thickness, z));
+		            }
+
+		            // A registration lip aligns shells without joining their exported solids.
+		            if (s.seam?.type === 'stepped') {
+		                const depth = g.positive(s.seam.depth, `${name}.seam.depth`, context.units);
+		                const fit = g.positive(s.seam.fit, `${name}.seam.fit`, context.units);
+		                if (depth >= s.height - seam || fit >= s.wall / 2) { g.fail(`${name}.seam`, 'Registration step exceeds available wall material'); }
+		                const lip = subtract(g.offset(exterior, -s.wall / 2), g.offset(exterior, -s.wall));
+		                bottom = kernel.add(bottom, kernel.extrude(lip, depth, seam));
+		                top = kernel.cut(top, kernel.extrude(g.offset(lip, fit), depth + fit, seam));
+		            }
+
+		            const pcbModel = s.pcb_profile ? resolve(s.pcb_profile).model : null;
+		            const mountTable = {};
+		            for (const [mountId, mount] of Object.entries(s.mounts || {})) {
+		                const path = `${name}.mounts.${mountId}`;
+		                const p = locate(mount.anchor, `${path}.anchor`).p;
+		                const role = mount.role || 'case';
+		                if (!['case', 'plate', 'pcb'].includes(role)) { g.fail(path, 'Unknown mounting target'); }
+		                if (floating && role !== 'case') { g.fail(path, 'Rigid posts cannot support the floating plate or PCB'); }
+		                if (role === 'pcb' && !pcbModel) { g.fail(path, 'PCB supports require a declared PCB profile'); }
+		                const radius = g.positive(mount.post, `${path}.post`, context.units);
+		                const hole = g.positive(mount.hole, `${path}.hole`, context.units);
+		                const envelope = circle(p, radius);
+		                const material = g.number(mount.min_wall ?? s.wall / 2, `${path}.min_wall`, context.units);
+		                if (radius - hole < material) { g.fail(path, 'Post has insufficient material around its hole'); }
+		                g.requireContains(exterior, envelope, path);
+		                const targetZ = role === 'pcb' ? s.pcb_z : role === 'plate' ? s.plate_z : seam;
+		                if (targetZ <= s.floor) { g.fail(path, 'Support height must be above the floor'); }
+		                const topMount = role === 'plate' && s.mounting === 'top';
+		                if (role === 'plate') {
+		                    if (!intersects(base, envelope)) { g.fail(path, 'Plate mounting tab must overlap the plate'); }
+		                    plateModel = g.combine(plateModel, envelope);
+		                }
+		                if (topMount) {
+		                    top = kernel.add(top, kernel.extrude(envelope, s.height - s.plate_z - s.plate, s.plate_z + s.plate));
+		                } else {
+		                    bottom = kernel.add(bottom, kernel.extrude(envelope, targetZ - s.floor, s.floor));
+		                }
+		                if (role === 'case') { top = kernel.add(top, kernel.extrude(envelope, s.height - seam, seam)); }
+		                const depth = g.positive(mount.depth ?? s.height, `${path}.depth`, context.units);
+		                const access = mount.access || 'top';
+		                if (!['top', 'bottom'].includes(access)) { g.fail(path, 'Hardware insertion must be top or bottom'); }
+		                const start = topMount ? s.plate_z : access === 'bottom' ? 0 : Math.max(0, targetZ - depth);
+		                const drill = kernel.extrude(circle(p, hole), depth + (role === 'case' ? s.height - seam : s.plate), start);
+		                bottom = kernel.cut(bottom, drill);
+		                top = kernel.cut(top, drill);
+		                if (role === 'plate') { plateModel = subtract(plateModel, circle(p, hole)); }
+		                if (mount.hardware && mount.hardware !== 'plain') {
+		                    if (!['insert', 'nut', 'tapped'].includes(mount.hardware)) { g.fail(path, 'Unknown fastener type'); }
+		                    if (mount.hardware !== 'tapped') {
+		                        const pocketRadius = g.positive(mount.pocket, `${path}.pocket`, context.units);
+		                        const pocketDepth = g.positive(mount.pocket_depth, `${path}.pocket_depth`, context.units);
+		                        const circumradius = mount.hardware === 'nut' ? pocketRadius / Math.cos(Math.PI / 6) : pocketRadius;
+		                        if (circumradius + material > radius || pocketDepth + material > targetZ) {
+		                            g.fail(path, 'Hardware pocket leaves insufficient surrounding material');
+		                        }
+		                        const pocketModel = mount.hardware === 'nut'
+		                            ? m.model.moveRelative(new m.models.Polygon(6, circumradius), p) : circle(p, pocketRadius);
+		                        hardwarePockets[topMount ? 'top' : 'bottom'].push(pocketModel);
+		                        const pocketZ = topMount ? s.plate_z + s.plate : access === 'top' ? targetZ - pocketDepth : 0;
+		                        const pocket = kernel.extrude(pocketModel, pocketDepth, pocketZ);
+		                        if (topMount) { top = kernel.cut(top, pocket); }
+		                        else { bottom = kernel.cut(bottom, pocket); }
+		                    }
+		                }
+		                holes.push({diameter: hole * 2, access});
+		                features.push({id: `mounts.${mountId}`, model: envelope, z: s.floor, height: targetZ - s.floor});
+		                mountTable[mountId] = {...mount, position: p, role};
+		            }
+
+		            for (const ref of s.openings || []) {
+		                const definition = config.components[ref.split('.')[1]];
+		                const [low, high] = definition.height.map(v => g.number(v, `${name}.${ref}.height`, context.units));
+		                const tool = kernel.extrude(resolve(ref).model, high - low, low);
+		                bottom = kernel.cut(bottom, tool);
+		                top = kernel.cut(top, tool);
+		            }
+		            if (!floating) {
+		                const clearanceModel = g.offset(plateModel, s.fit);
+		                g.requireContains(g.offset(exterior, -s.wall), clearanceModel, `${name}.plate`);
+		                const relief = kernel.extrude(clearanceModel, s.plate, s.plate_z);
+		                bottom = kernel.cut(bottom, relief);
+		                top = kernel.cut(top, relief);
+		            }
+		            if (s.fillet) { top = kernel.fillet(top, s.fillet, s.height); }
+		            if (s.chamfer) { top = kernel.chamfer(top, s.chamfer, s.height); }
+		            const plate = kernel.extrude(plateModel, s.plate, s.plate_z);
+		            const parts = {bottom, top, plate};
+		            const models = {plate: plateModel};
+		            const collision = (solid, label) => {
+		                for (const [part, shell] of Object.entries({bottom, top})) {
+		                    if (kernel.volume(kernel.intersect(shell, solid)) > g.TOLERANCE) {
+		                        g.fail(`${name}.${label}`, `Clearance conflict with ${part} shell`, 'clearance');
+		                    }
+		                }
+		            };
+		            const movement = (model, z, thickness) => {
+		                const shape = floating ? g.offset(model, s.gasket.travel_side) : model;
+		                const down = floating ? s.gasket.travel_down : 0;
+		                const up = floating ? s.gasket.travel_up : 0;
+		                return kernel.extrude(shape, thickness + down + up, z - down)
+		            };
+		            collision(movement(plateModel, s.plate_z, s.plate), 'plate.movement');
+		            if (pcbModel) {
+		                collision(movement(pcbModel, s.pcb_z, s.pcb_thickness), 'pcb.movement');
+		                extras.pcb = kernel.extrude(pcbModel, s.pcb_thickness, s.pcb_z);
+		            }
+		            for (const ref of s.components || []) {
+		                const definition = config.components[ref.split('.')[1]];
+		                const [low, high] = definition.height.map(v => g.number(v, `${name}.${ref}.height`, context.units));
+		                const model = resolve(ref).model;
+		                collision(definition.motion === 'floating' ? movement(model, low, high - low) : kernel.extrude(model, high - low, low), ref);
+		                extras[ref.replace('.', '_')] = kernel.extrude(model, high - low, low);
+		                extraMotion[ref.replace('.', '_')] = definition.motion;
+		            }
+
+		            // Rotate the complete mechanical stack, then trim the bottom to a flat datum.
+		            const origin = [0, extents.low[1], 0];
+		            const lift = s.front_height - s.height * Math.cos(s.typing_angle * RAD);
+		            const placed = {};
+		            for (const [part, solid] of Object.entries({...parts, ...extras})) {
+		                placed[part] = kernel.move(kernel.rotate(solid, s.typing_angle, origin), [0, 0, lift]);
+		            }
+		            if (s.typing_angle || lift) {
+		                const box = kernel.bounds(placed.bottom);
+		                const crop = rect([(box[0][0] + box[1][0]) / 2, (box[0][1] + box[1][1]) / 2],
+		                    [box[1][0] - box[0][0] + s.wall, box[1][1] - box[0][1] + s.wall]);
+		                placed.bottom = kernel.intersect(placed.bottom, kernel.extrude(crop, box[1][2] + s.wall));
+		            }
+		            const platePockets = {models: Object.fromEntries(g.chains(plateModel).flatMap(chain => chain.contains || []).map((chain, index) => [index, m.chain.toNewModel(chain)]))};
+		            const pocketRadius = {
+		                bottom: Math.min(tooling.radius(cavity), ...contacts.map(contact => tooling.radius(contact.pocket)), ...hardwarePockets.bottom.map(tooling.radius)),
+		                top: Math.min(tooling.radius(cavity), tooling.radius(opening), ...contacts.map(contact => tooling.radius(contact.pocket)), ...hardwarePockets.top.map(tooling.radius)),
+		                plate: tooling.radius(platePockets)
+		            };
+		            const partReport = {};
+		            const findings = [];
+		            for (const part of Object.keys(parts)) {
+		                const output = `${id}_${part}`;
+		                if (Object.prototype.hasOwnProperty.call(context.cases, output)) { g.fail(name, `Output-name collision: ${output}`); }
+		                results[output] = await kernel.export(placed[part], output);
+		                partReport[output] = {slices: [], explode: Object.keys(partReport).length * s.height,
+		                    bounds: results[output].bounds, volume: results[output].volume, role: part};
+		                findings.push(...manufacturing.check(`${name}.${part}`, s.manufacturing?.[part], {
+		                    wall: part === 'plate' ? s.plate : Math.min(s.wall, s.floor),
+		                    depth: results[output].bounds[1][2] - results[output].bounds[0][2],
+		                    width: results[output].bounds[1][0] - results[output].bounds[0][0],
+		                    height: results[output].bounds[1][1] - results[output].bounds[0][1],
+		                    holes, fillet: pocketRadius[part], sideOpenings: part !== 'plate' && s.openings?.length,
+		                    angle: s.typing_angle, overhang: floating || Boolean(s.ledge)
+		                }));
+		            }
+		            for (const part of Object.keys(extras)) {
+		                const output = `${id}_${part}`;
+		                results[output] = {...await kernel.export(placed[part], output), reference: true};
+		                partReport[output] = {slices: [], explode: s.height, bounds: results[output].bounds,
+		                    volume: results[output].volume, role: part, reference: true, motion: extraMotion[part]};
+		            }
+		            const assembly = Object.fromEntries(Object.entries(placed).map(([part, shape]) => [`${id}_${part}`, shape]));
+		            const suggest = requireMounts().suggest;
+		            const suggestionContext = {base, exterior, units: context.units, name, shape,
+		                mounts: mountTable, exclusions: [], components: [], gasketModels: contacts.map(contact => contact.model), height: s.height};
+		            const suggestions = suggest({...s, suggest: {gaskets: {spacing: 40, size: [10, 6]}}}, suggestionContext);
+		            suggestions.push(...suggest({...s, suggest: {spacing: 40, inset: 1, post: 2.5, hole: 1, height: seam - s.floor}},
+		                {...suggestionContext, base: g.offset(base, s.bezel / 2 + 1),
+		                    exclusions: [g.offset(plateModel, s.fit + (floating ? s.gasket.travel_side : 0)),
+		                        ...contacts.map(contact => contact.pocket)]}).map(item => ({...item, definition: {...item.definition, role: 'case'}})));
+		            publish(`${id}_plate`, models.plate, name);
+		            report.assemblies[id] = {preset: 'enclosure', mounting: s.mounting, parts: partReport,
+		                suggestions, mounts: mountTable, features, manufacturing: findings,
+		                gasket: floating ? s.gasket : undefined, parameters: s,
+		                step: await kernel.assembly(assembly)};
+		        }
+		        return results
+		    } finally { kernel.close(); }
+		};
+		return enclosures;
+	}
+
+	var hasRequiredDesigns;
+
+	function requireDesigns () {
+		if (hasRequiredDesigns) return designs;
+		hasRequiredDesigns = 1;
+		const m = require$$0;
+		const a = requireAssert();
+		const filter = requireFilter();
+		const anchor = requireAnchor().parse;
+		const Point = requirePoint();
+		const g = requireGeometry();
+
+		const sections = ['regions', 'boundaries', 'sketches', 'profiles', 'components', 'assemblies'];
+		const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
+
+		designs.parse = async (config, points, outlines, units, options = {}) => {
+		    a.unexpected(config, 'designs', sections);
+		    const features = {}, resolved = {}, active = new Set(), generated = {}, cases = {};
+		    const report = {features, diagnostics: [], adjustments: [], assemblies: {}, tolerance: g.TOLERANCE};
+		    const dim = (value, name) => g.number(value, name, units);
+
+		    const locate = (spec, name) => {
+		        if (spec && typeof spec === 'object' && spec.feature) {
+		            const target = resolve(spec.feature);
+		            const bounds = m.measure.modelExtents(target.model);
+		            const point = new Point(...bounds.low.map((v, i) => (v + bounds.high[i]) / 2));
+		            return anchor({shift: spec.shift || [0, 0], rotate: spec.rotate || 0}, name, points, point)(units)
+		        }
+		        try { return anchor(spec || {}, name, points)(units) }
+		        catch (error) { g.fail(name, error.message, 'reference'); }
+		    };
+		    const shape = (spec, name, point = locate(spec.anchor, `${name}.anchor`)) => {
+		        let model;
+		        if (spec.radius !== undefined) {
+		            model = {paths: {circle: new m.paths.Circle([0, 0], g.positive(spec.radius, `${name}.radius`, units))}};
+		        } else {
+		            const scope = {...units, ...point.meta};
+		            const size = a.wh(spec.size || [point.meta.width, point.meta.height], `${name}.size`)(scope);
+		            size.forEach(value => g.positive(value, `${name}.size`));
+		            model = m.model.center(new m.models.Rectangle(...size));
+		        }
+		        return point.position(model)
+		    };
+		    const publish = (name, model, source) => {
+		        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+		            g.fail(source, `Invalid output name ${name}`);
+		        }
+		        if (own(outlines, name) || own(generated, name)) {
+		            g.fail(source, `Output-name collision: ${name}`, 'collision');
+		        }
+		        generated[name] = model;
+		    };
+		    const modify = (model, spec, name, occupied) => {
+		        for (const [id, modification] of Object.entries(spec.modifications || {})) {
+		            const path = `${name}.modifications.${id}`;
+		            const tool = modification.from ? resolve(modification.from).model : shape(modification, path);
+		            model = g.combine(model, tool, modification.operation || 'add');
+		            g.validate(model, path);
+		            g.requireContains(model, occupied, path);
+		            features[path.slice('designs.'.length)] = g.describe(tool, path);
+		        }
+		        return model
+		    };
+		    const finish = (model, spec, name, occupied) => {
+		        const clearance = dim(spec.clearance || 0, `${name}.clearance`);
+		        const rounding = dim(spec.round || 0, `${name}.round`);
+		        if (rounding < 0) { g.fail(name, 'Rounding must be nonnegative'); }
+		        model = g.offset(model, clearance);
+		        model = g.round(model, rounding);
+		        const required = !g.empty(occupied) && clearance > 0 ? g.offset(occupied, clearance) : occupied;
+		        model = modify(model, spec, name, required);
+		        g.validate(model, name, spec.connected || 'multiple');
+		        g.requireContains(model, required, name);
+		        return model
+		    };
+		    const resolve = ref => {
+		        if (typeof ref !== 'string') { g.fail('designs', 'Expected a named feature reference', 'reference'); }
+		        if (own(resolved, ref)) { return resolved[ref] }
+		        if (active.has(ref)) { g.fail(`designs.${ref}`, `Cyclic design reference: ${[...active, ref].join(' -> ')}`, 'cycle'); }
+		        const [section, id, ...tail] = ref.split('.');
+		        const name = `designs.${ref}`;
+		        if (tail.length || !config[section] || !own(config[section], id)) { g.fail(name, 'Missing named feature; repair the reference', 'reference'); }
+		        const spec = config[section][id];
+		        if (!spec || typeof spec !== 'object') { g.fail(name, 'Expected a feature mapping'); }
+		        active.add(ref);
+		        try {
+		            let model, occupied = {paths: {}}, groups = [];
+		            if (section === 'regions') {
+		                a.unexpected(spec, name, ['where', 'asym', 'size', 'outline', 'close', 'clearance', 'round', 'connected', 'modifications']);
+		                if (spec.outline) {
+		                    if (!own(outlines, spec.outline)) { g.fail(name, `Missing outline ${spec.outline}`, 'reference'); }
+		                    groups = [g.clone(outlines[spec.outline])];
+		                } else {
+		                    const selected = filter.parse(spec.where ?? true, `${name}.where`, points, units, a.asym(spec.asym || 'source', name));
+		                    // Close each half independently, even when their gap is small.
+		                    for (const mirrored of [false, true]) {
+		                        const models = selected.filter(p => !!p.meta.mirrored === mirrored && !p.meta.skip).map(p => shape(spec, name, p.clone()));
+		                        if (models.length) { groups.push(g.union(models)); }
+		                    }
+		                }
+		                occupied = g.union(groups);
+		                const radius = dim(spec.close || 0, `${name}.close`);
+		                if (radius < 0) { g.fail(name, 'Gap-closing radius must be nonnegative'); }
+		                groups = groups.map(group => finish(g.close(group, radius), spec, name, group));
+		                model = g.union(groups);
+		                if (g.chains(model).length < groups.reduce((count, group) => count + g.chains(group).length, 0)) {
+		                    g.fail(name, 'Clearance joins separated halves; use a named bridge', 'disconnected');
+		                }
+		            } else if (section === 'boundaries' || section === 'profiles') {
+		                a.unexpected(spec, name, ['from', 'close', 'clearance', 'round', 'connected', 'modifications', 'bridges', 'cutouts']);
+		                const refs = Array.isArray(spec.from) ? spec.from : [spec.from];
+		                const sources = refs.map(resolve);
+		                occupied = g.union(sources.map(source => source.occupied));
+		                groups = sources.flatMap(source => source.groups);
+		                const radius = dim(spec.close || 0, `${name}.close`);
+		                if (radius < 0) { g.fail(name, 'Gap-closing radius must be nonnegative'); }
+		                groups = groups.map(group => g.close(group, radius));
+		                model = g.union(groups);
+		                for (const [bridge, bridgeSpec] of Object.entries(spec.bridges || {})) {
+		                    const path = `${name}.bridges.${bridge}`;
+		                    const from = locate(bridgeSpec.from, `${path}.from`).p;
+		                    const to = locate(bridgeSpec.to, `${path}.to`).p;
+		                    const width = g.positive(bridgeSpec.width, `${path}.width`, units);
+		                    if (m.measure.pointDistance(from, to) < g.EPSILON) { g.fail(path, 'Bridge anchors coincide'); }
+		                    const bridgeModel = new m.models.Slot(from, to, width / 2);
+		                    for (const point of [from, to]) {
+		                        if (!m.measure.isPointInsideModel(point, model)) { g.fail(path, 'Bridge attachment is outside its region'); }
+		                    }
+		                    model = g.combine(model, bridgeModel);
+		                    features[`${ref}.bridges.${bridge}`] = g.describe(bridgeModel, path);
+		                }
+		                const before = g.chains(model).length;
+		                model = finish(model, spec, name, occupied);
+		                if (!Object.keys(spec.bridges || {}).length && g.chains(model).length < before) {
+		                    g.fail(name, 'Profiles cannot join separate regions without a named bridge', 'disconnected');
+		                }
+		                // Intentional cutouts remove material after occupied-area validation.
+		                for (const cutout of spec.cutouts || []) {
+		                    model = g.combine(model, resolve(cutout).model, 'subtract');
+		                    g.validate(model, `${name}.cutouts`);
+		                }
+		                groups = g.partition(model);
+		                if (section === 'profiles') { publish(id, model, name); }
+		            } else if (section === 'components') {
+		                a.unexpected(spec, name, ['anchor', 'size', 'radius', 'height', 'clearance', 'motion']);
+		                model = shape(spec, name);
+		                const height = a.numarr(spec.height, `${name}.height`, 2)(units);
+		                if (height[0] >= height[1]) { g.fail(name, 'Height range must increase'); }
+		                model = g.offset(model, dim(spec.clearance || 0, `${name}.clearance`));
+		                occupied = model;
+		                groups = [model];
+		            } else if (section === 'sketches') {
+		                const sketch = solvedSketches[id];
+		                model = sketch.model;
+		                groups = [model];
+		                report.adjustments.push(...sketch.adjustments);
+		                features[ref] = {...g.describe(model, name), sketch: sketch.geometry, constraints: spec.constraints || {}};
+		            } else { g.fail(name, 'Cannot use an assembly as a 2D reference'); }
+		            active.delete(ref);
+		            resolved[ref] = {model, occupied, groups};
+		            features[ref] = {...g.describe(model, name), ...features[ref]};
+		            return resolved[ref]
+		        } catch (error) {
+		            if (error instanceof g.DesignError && error.diagnostics[0].feature === 'designs') { g.fail(name, error.diagnostics[0].message, error.diagnostics[0].code); }
+		            throw error
+		        } finally { active.delete(ref); }
+		    };
+
+		    // Solving is asynchronous; the geometry graph remains deterministic afterwards.
+		    const solvedSketches = {};
+		    for (const [id, sketch] of Object.entries(config.sketches || {})) {
+		        const solver = requireSketches();
+		        solvedSketches[id] = await solver.parse(sketch, `designs.sketches.${id}`, units, points, options);
+		    }
+		    for (const section of sections.filter(section => section !== 'assemblies')) {
+		        for (const id of Object.keys(config[section] || {})) { resolve(`${section}.${id}`); }
+		    }
+		    if (Object.keys(config.assemblies || {}).length) {
+		        const assemblies = requireAssemblies();
+		        const legacy = Object.fromEntries(Object.entries(config.assemblies).filter(([, spec]) => spec.preset !== 'enclosure'));
+		        assemblies.compile({...config, assemblies: legacy}, {resolve, locate, shape, publish, units, cases, report, outlines: generated});
+		    }
+		    const solids = await requireEnclosures().compile(config, {resolve, locate, shape, publish, units, cases, report}, options);
+		    return {outlines: generated, cases, report, solids}
+		};
+		return designs;
 	}
 
 	var pcbs = {};
@@ -14295,7 +15768,7 @@
 		return kicad5;
 	}
 
-	var version = "5.0.0";
+	var version = "5.1.0-develop";
 	var require$$2 = {
 		version: version};
 
@@ -14871,9 +16344,10 @@ ${content}
 		const points_lib = requirePoints();
 		const outlines_lib = requireOutlines();
 		const cases_lib = requireCases();
+		const designs_lib = requireDesigns();
 		const pcbs_lib = requirePcbs();
 
-		const version = "5.0.0";
+		const version = "5.1.0-develop";
 
 		const process = async (raw, options={}, logger=()=>{}) => {
 
@@ -14929,6 +16403,22 @@ ${content}
 
 		    logger('Generating outlines...');
 		    const outlines = outlines_lib.parse(config.outlines || {}, points, units);
+		    let caseConfig = config.cases || {};
+		    if (config.designs) {
+		        const design = await designs_lib.parse(config.designs, points, outlines, units, options);
+		        Object.assign(outlines, design.outlines);
+		        for (const name of Object.keys(design.cases)) {
+		            if (Object.prototype.hasOwnProperty.call(caseConfig, name)) {
+		                throw new Error(`designs.assemblies: Output-name collision: ${name}`)
+		            }
+		        }
+		        caseConfig = {...caseConfig, ...design.cases};
+		        results.designs = design.report;
+		        if (Object.keys(design.solids).length) {
+		            results.solids = design.solids;
+		            empty = false;
+		        }
+		    }
 		    results.outlines = {};
 		    for (const [name, outline] of Object.entries(outlines)) {
 		        if (!debug && name.startsWith('_')) continue
@@ -14937,7 +16427,7 @@ ${content}
 		    }
 
 		    logger('Modeling cases...');
-		    const cases = cases_lib.parse(config.cases || {}, outlines, units);
+		    const cases = cases_lib.parse(caseConfig, outlines, units);
 		    results.cases = {};
 		    for (const [case_name, case_script] of Object.entries(cases)) {
 		        if (!debug && case_name.startsWith('_')) continue

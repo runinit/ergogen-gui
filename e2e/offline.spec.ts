@@ -65,8 +65,18 @@ if (process.env.BHK_INPUT) {
     await page.evaluate(
       ({ config, injection }) => {
         localStorage.clear();
-        localStorage.setItem('ergogen:config', JSON.stringify(config));
-        localStorage.setItem('ergogen:injection', JSON.stringify(injection));
+        localStorage.setItem(
+          location.pathname.startsWith('/ergogen-gui-preview/')
+            ? 'preview:ergogen:config'
+            : 'ergogen:config',
+          JSON.stringify(config)
+        );
+        localStorage.setItem(
+          location.pathname.startsWith('/ergogen-gui-preview/')
+            ? 'preview:ergogen:injection'
+            : 'ergogen:injection',
+          JSON.stringify(injection)
+        );
       },
       { config, injection }
     );

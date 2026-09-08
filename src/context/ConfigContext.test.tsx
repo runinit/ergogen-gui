@@ -969,9 +969,10 @@ describe('ConfigContextProvider', () => {
       expect(mockJscadWorker.postMessage).not.toHaveBeenCalled();
     });
 
-    it('should save formatted previewSvg to the active configuration when user-initiated generation completes successfully', () => {
+    it('should save formatted previewSvg to the active configuration when user-initiated generation completes successfully', async () => {
+      let context: ReturnType<typeof useConfigContext>;
       const TestComponent = () => {
-        useConfigContext();
+        context = useConfigContext();
         return null;
       };
 
@@ -998,12 +999,19 @@ describe('ConfigContextProvider', () => {
         </ConfigContextProvider>
       );
 
+      await act(async () => {
+        await context!.generateNow('points: {A: {}}', [], {
+          pointsonly: false,
+        });
+      });
+      const requestId =
+        mockErgogenWorker.postMessage.mock.calls.at(-1)![0].requestId;
       // Simulate worker success callback for normal generation
       act(() => {
         mockErgogenWorker.onmessage({
           data: {
             type: 'success',
-            requestId: 'ergogen-generate-12345',
+            requestId,
             results: {
               demo: {
                 svg: '<svg><path stroke="#000" /></svg>',
@@ -1454,4 +1462,145 @@ pcbs:
       expect(capturedContext.deprecationWarning).toBeNull();
     });
   });
+});
+
+describe('Design generation revisions', () => {
+  it('keeps the newest preview when workers finish out of order', async () => {
+    localStorage.clear();
+    mockInitialConfig(mockConfig);
+    let context: ReturnType<typeof useConfigContext>;
+    const Capture = () => {
+      context = useConfigContext();
+      return null;
+    };
+    render(
+      <ConfigContextProvider>
+        <Capture />
+      </ConfigContextProvider>
+    );
+    await act(async () => {
+      await context!.generateNow(mockConfig, [], { pointsonly: false });
+    });
+    const first = mockErgogenWorker.postMessage.mock.calls.at(-1)![0];
+    await act(async () => {
+      await context!.generateNow('points: {zones: {new: {}}}', [], {
+        pointsonly: false,
+      });
+    });
+    const second = mockErgogenWorker.postMessage.mock.calls.at(-1)![0];
+    act(() =>
+      mockErgogenWorker.onmessage({
+        data: {
+          type: 'success',
+          requestId: second.requestId,
+          results: { outlines: { newest: { svg: 'new' } } },
+        },
+      })
+    );
+    act(() =>
+      mockErgogenWorker.onmessage({
+        data: {
+          type: 'success',
+          requestId: first.requestId,
+          results: { outlines: { old: { svg: 'old' } } },
+        },
+      })
+    );
+    expect(context!.results?.outlines).toHaveProperty('newest');
+    act(() =>
+      mockErgogenWorker.onmessage({
+        data: { type: 'error', requestId: first.requestId, error: 'old error' },
+      })
+    );
+    expect(context!.error).toBeNull();
+  });
+});
+
+it('accepts a current result after the editor saves its debounced value', async () => {
+  localStorage.clear();
+  mockInitialConfig(mockConfig);
+  let context: ReturnType<typeof useConfigContext>;
+  const Capture = () => {
+    context = useConfigContext();
+    return null;
+  };
+  render(
+    <ConfigContextProvider>
+      <Capture />
+    </ConfigContextProvider>
+  );
+  const edited = 'points: {zones: {edited: {}}}';
+  act(() => context!.updateRealtimeConfigInput(edited));
+  await act(async () => {
+    await context!.generateNow(edited, [], { pointsonly: false });
+  });
+  const request = mockErgogenWorker.postMessage.mock.calls.at(-1)![0];
+  act(() => context!.setConfigInput(edited));
+  act(() =>
+    mockErgogenWorker.onmessage({
+      data: {
+        type: 'success',
+        requestId: request.requestId,
+        results: { outlines: { edited: { svg: 'new' } } },
+      },
+    })
+  );
+  expect(context!.results?.outlines).toHaveProperty('edited');
+});
+
+it('publishes a design only after every STL part succeeds', async () => {
+  localStorage.clear();
+  mockInitialConfig(mockConfig);
+  let context: ReturnType<typeof useConfigContext>;
+  const Capture = () => {
+    context = useConfigContext();
+    return null;
+  };
+  render(
+    <ConfigContextProvider>
+      <Capture />
+    </ConfigContextProvider>
+  );
+  await act(async () => {
+    await context!.generateNow(mockConfig, [], { pointsonly: false });
+  });
+  const first = mockErgogenWorker.postMessage.mock.calls.at(-1)![0];
+  const valid = {
+    outlines: { old: { svg: 'old' } },
+    designs: { features: {} },
+  };
+  act(() =>
+    mockErgogenWorker.onmessage({
+      data: { type: 'success', requestId: first.requestId, results: valid },
+    })
+  );
+  await act(async () => {
+    await context!.generateNow(mockConfig, [], { pointsonly: false });
+  });
+  const request = mockErgogenWorker.postMessage.mock.calls.at(-1)![0];
+  const pending = {
+    outlines: { new: { svg: 'new' } },
+    cases: { tray: { jscad: 'broken' } },
+    designs: { features: {} },
+  };
+  act(() =>
+    mockErgogenWorker.onmessage({
+      data: { type: 'success', requestId: request.requestId, results: pending },
+    })
+  );
+  expect(context!.results).toEqual(valid);
+  expect(context!.resultsStale).toBe(true);
+  const batch = mockJscadWorker.postMessage.mock.calls.at(-1)![0];
+  act(() =>
+    mockJscadWorker.onmessage({
+      data: {
+        type: 'error',
+        error: 'Invalid tray mesh',
+        configVersion: batch.configVersion,
+      },
+    })
+  );
+  expect(context!.results).toEqual(valid);
+  expect(context!.error).toContain('Invalid tray mesh');
+  expect(context!.resultsStale).toBe(true);
 });

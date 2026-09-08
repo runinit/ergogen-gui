@@ -201,6 +201,23 @@ const Downloads = ({
     }
   }
 
+  for (const [name, solid] of Object.entries(results?.solids || {})) {
+    if (solid.reference) {
+      continue;
+    }
+    downloads.push({ fileName: name, extension: 'step', content: solid.step });
+    downloads.push({
+      fileName: name,
+      extension: 'stl',
+      content: solid.stl,
+      previewKey: `solids.${name}.stl`,
+      preview: {
+        key: `solids.${name}.stl`,
+        extension: 'stl',
+        content: solid.stl,
+      },
+    });
+  }
   if (results?.pcbs) {
     for (const [name, pcb] of Object.entries(results.pcbs)) {
       const pcbString = String(pcb);

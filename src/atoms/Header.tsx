@@ -272,7 +272,8 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
       !configContext?.results ||
       !configContext?.configInput ||
       configContext?.isGenerating ||
-      configContext?.isJscadConverting
+      configContext?.isJscadConverting ||
+      configContext?.resultsStale
     ) {
       return;
     }
@@ -340,6 +341,11 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
           >
             <Icon className="material-symbols-outlined">side_navigation</Icon>
           </SideNavButton>
+          {process.env.REACT_APP_DEPLOYMENT_CHANNEL === 'preview' && (
+            <span>
+              Preview {process.env.REACT_APP_BUILD_REVISION?.slice(0, 7)}
+            </span>
+          )}
           <ErgogenLogo>
             <LogoButton
               to="/"
@@ -493,7 +499,8 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
                 onClick={handleDownloadArchive}
                 disabled={
                   configContext?.isGenerating ||
-                  configContext?.isJscadConverting
+                  configContext?.isJscadConverting ||
+                  configContext?.resultsStale
                 }
                 aria-label="Download archive of all generated files"
                 data-testid="header-download-outputs-button"

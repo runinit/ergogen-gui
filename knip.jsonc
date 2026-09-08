@@ -13,6 +13,7 @@
   ],
   "ignoreDependencies": [
     "@jscad/csg",
+    "replicad",
     "@jscad/stl-serializer",
     "@testing-library/user-event",
     "@types/styled-components",

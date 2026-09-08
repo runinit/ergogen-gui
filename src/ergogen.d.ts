@@ -1,5 +1,4 @@
 declare module 'ergogen';
-declare module 'makerjs';
 declare module 'ergogen/src/utils';
 declare module 'ergogen/src/assert';
 declare module 'ergogen/src/operation';

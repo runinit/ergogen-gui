@@ -1,5 +1,19 @@
 # Changelog
 
+## Full enclosure designer
+
+September 8, 2026
+
+![BHK enclosure in the case designer.](./public/images/changelog/enclosure-wizard.png)
+
+Create cases with continuous walls, separate shells and a switch plate. The
+guided designer supports tray, top, bottom and floating gasket mounts, with
+pad or sleeve interfaces and independent case screws.
+
+Choose FDM or CNC per part, review declared manufacturing limits, and export
+STEP/STL from the same solids. Draft previews stay separate until Apply; Cancel
+discards edits. The BHK gasket enclosure example demonstrates the complete flow.
+
 ## KiCad 10 support
 
 September 7, 2026

@@ -1,4 +1,13 @@
 export const theme = {
+  caseWizard: {
+    gap: '1rem',
+    padding: '1.5rem',
+    radius: '8px',
+    formWidth: '420px',
+    previewHeight: '200px',
+    overlay: 500,
+    smallScreen: '900px',
+  },
   colors: {
     accent: '#28a745',
     accentDark: '#1e8e1e',

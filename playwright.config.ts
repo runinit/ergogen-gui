@@ -1,6 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const baseURL = 'http://127.0.0.1:3000/ergogen-gui/';
+const deploymentPath =
+  process.env.GITHUB_REPOSITORY === 'runinit/ergogen-gui-preview'
+    ? '/ergogen-gui-preview/'
+    : '/ergogen-gui/';
+process.env.REACT_APP_DEPLOYMENT_CHANNEL =
+  process.env.GITHUB_REPOSITORY === 'runinit/ergogen-gui-preview'
+    ? 'preview'
+    : 'production';
+const baseURL = `http://127.0.0.1:3000${deploymentPath}`;
 
 export default defineConfig({
   testDir: './e2e',

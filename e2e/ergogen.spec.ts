@@ -122,7 +122,12 @@ test.describe('Ergogen Configuration Processing', () => {
     await page.addInitScript(
       ({ config, key }) => {
         localStorage.setItem(key, JSON.stringify(config));
-        localStorage.setItem('ergogen:config:stlPreview', 'false');
+        localStorage.setItem(
+          location.pathname.startsWith('/ergogen-gui-preview/')
+            ? 'preview:ergogen:config:stlPreview'
+            : 'ergogen:config:stlPreview',
+          'false'
+        );
       },
       { config: ADux.value, key: CONFIG_LOCAL_STORAGE_KEY }
     );
@@ -161,8 +166,18 @@ test.describe('Ergogen Configuration Processing', () => {
     await page.addInitScript(
       ({ config, key }) => {
         localStorage.setItem(key, JSON.stringify(config));
-        localStorage.setItem('ergogen:config:stlPreview', 'true');
-        localStorage.setItem('ergogen:config:debug', 'false');
+        localStorage.setItem(
+          location.pathname.startsWith('/ergogen-gui-preview/')
+            ? 'preview:ergogen:config:stlPreview'
+            : 'ergogen:config:stlPreview',
+          'true'
+        );
+        localStorage.setItem(
+          location.pathname.startsWith('/ergogen-gui-preview/')
+            ? 'preview:ergogen:config:debug'
+            : 'ergogen:config:debug',
+          'false'
+        );
       },
       { config: ADux.value, key: CONFIG_LOCAL_STORAGE_KEY }
     );
@@ -187,8 +202,18 @@ test.describe('Ergogen Configuration Processing', () => {
     await page.addInitScript(
       ({ config, key }) => {
         localStorage.setItem(key, JSON.stringify(config));
-        localStorage.setItem('ergogen:config:stlPreview', 'true');
-        localStorage.setItem('ergogen:config:debug', 'true');
+        localStorage.setItem(
+          location.pathname.startsWith('/ergogen-gui-preview/')
+            ? 'preview:ergogen:config:stlPreview'
+            : 'ergogen:config:stlPreview',
+          'true'
+        );
+        localStorage.setItem(
+          location.pathname.startsWith('/ergogen-gui-preview/')
+            ? 'preview:ergogen:config:debug'
+            : 'ergogen:config:debug',
+          'true'
+        );
       },
       { config: ADux.value, key: CONFIG_LOCAL_STORAGE_KEY }
     );
@@ -224,7 +249,12 @@ test.describe('Ergogen Configuration Processing', () => {
     await page.addInitScript(
       ({ config, key }) => {
         localStorage.setItem(key, JSON.stringify(config));
-        localStorage.setItem('ergogen:config:stlPreview', 'true');
+        localStorage.setItem(
+          location.pathname.startsWith('/ergogen-gui-preview/')
+            ? 'preview:ergogen:config:stlPreview'
+            : 'ergogen:config:stlPreview',
+          'true'
+        );
       },
       { config: ADux.value, key: CONFIG_LOCAL_STORAGE_KEY }
     );

@@ -1,3 +1,4 @@
+import { storageKey } from './utils/storageKey';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
@@ -325,7 +326,10 @@ const AppContent = ({
     getCurrentInjections: () => configContext?.injectionInput || [],
     onComplete: async (config, injections) => {
       // Store merged result in localStorage to persist
-      localStorage.setItem('ergogen:injection', JSON.stringify(injections));
+      localStorage.setItem(
+        storageKey('ergogen:injection'),
+        JSON.stringify(injections)
+      );
       configContext?.loadPreview(config);
     },
     setError: (error) => configContext?.setError(error),

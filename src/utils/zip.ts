@@ -1,6 +1,9 @@
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import yaml from 'js-yaml';
+import { writeSolids } from './solidExports';
+import type { SolidOutput } from '../types/results';
+import type { DesignReport } from '../types/design';
 import {
   createErgogenWorker,
   createJscadWorker,
@@ -24,6 +27,8 @@ type CaseOutput = {
 type PcbsOutput = Record<string, string>;
 
 type Results = {
+  solids?: Record<string, SolidOutput>;
+  designs?: DesignReport;
   canonical?: unknown;
   points?: unknown;
   units?: unknown;
@@ -84,6 +89,7 @@ export const createZip = async (
   const outputsFolder = zip.folder('outputs');
 
   if (outputsFolder) {
+    writeSolids(outputsFolder, results);
     if (results.demo?.svg) {
       outputsFolder.file('demo.svg', results.demo.svg);
     }
@@ -305,6 +311,7 @@ export const exportAllConfigs = async (
       const outputsFolder = configFolder.folder('outputs');
 
       if (outputsFolder) {
+        writeSolids(outputsFolder, finalResults);
         if (finalResults.demo?.svg) {
           outputsFolder.file('demo.svg', finalResults.demo.svg);
         }
@@ -654,6 +661,7 @@ export const exportConfigsProgressively = async (
         const outputsFolder = configFolder.folder('outputs');
 
         if (outputsFolder) {
+          writeSolids(outputsFolder, finalResults);
           if (finalResults.demo?.svg) {
             outputsFolder.file('demo.svg', finalResults.demo.svg);
           }

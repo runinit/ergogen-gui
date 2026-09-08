@@ -15,6 +15,8 @@ import InjectionEditor from './molecules/InjectionEditor';
 import Downloads from './molecules/Downloads';
 import Injections from './molecules/Injections';
 import FilePreview from './molecules/FilePreview';
+import DesignView from './molecules/DesignView';
+import CaseWizard from './molecules/CaseWizard';
 import ResizablePanel from './molecules/ResizablePanel';
 import { Preview } from './atoms/DownloadRow';
 
@@ -281,6 +283,8 @@ const FlexContainer = styled.div`
  * @returns {JSX.Element | null} The rendered Ergogen application UI, or null if the config context is not available.
  */
 const Ergogen = () => {
+  const [showDesign, setShowDesign] = useState(false);
+  const [showCaseWizard, setShowCaseWizard] = useState(false);
   // Calculate initial widths based on viewport
   const getInitialLeftWidth = () => Math.max(200, window.innerWidth * 0.33);
   const getInitialRightWidth = () => Math.max(150, window.innerWidth * 0.15);
@@ -533,7 +537,8 @@ const Ergogen = () => {
       !configContext.results ||
       !configContext.configInput ||
       configContext.isGenerating ||
-      configContext.isJscadConverting
+      configContext.isJscadConverting ||
+      configContext.resultsStale
     ) {
       return;
     }
@@ -554,6 +559,9 @@ const Ergogen = () => {
 
   return (
     <>
+      {showCaseWizard && (
+        <CaseWizard onClose={() => setShowCaseWizard(false)} />
+      )}
       {showShareDialog && (
         <ShareDialog
           config={configContext.configInput || ''}
@@ -579,6 +587,23 @@ const Ergogen = () => {
               data-testid="mobile-outputs-button"
             >
               Outputs
+            </OutlineIconButton>
+            <OutlineIconButton
+              onClick={() => {
+                setShowDesign(!showDesign);
+                configContext.setShowConfig(true);
+              }}
+              aria-label="Toggle design view"
+            >
+              Design
+            </OutlineIconButton>
+            <OutlineIconButton
+              onClick={() => {
+                configContext.setShowConfig(true);
+                setShowCaseWizard(true);
+              }}
+            >
+              Create / edit case
             </OutlineIconButton>
             <Spacer />
             {configContext.showConfig && (
@@ -619,7 +644,8 @@ const Ergogen = () => {
                   onClick={handleDownloadArchive}
                   disabled={
                     configContext.isGenerating ||
-                    configContext.isJscadConverting
+                    configContext.isJscadConverting ||
+                    configContext.resultsStale
                   }
                   aria-label="Download archive of all generated files"
                   data-testid="mobile-download-outputs-button"
@@ -661,6 +687,17 @@ const Ergogen = () => {
                   <EditorContainer>
                     <StyledConfigEditor data-testid="config-editor" />
                     <ButtonContainer>
+                      <OutlineIconButton
+                        onClick={() => setShowCaseWizard(true)}
+                      >
+                        Create / edit case
+                      </OutlineIconButton>
+                      <OutlineIconButton
+                        onClick={() => setShowDesign(!showDesign)}
+                        aria-label="Open design editor"
+                      >
+                        Design
+                      </OutlineIconButton>
                       <GrowButton
                         onClick={() =>
                           configContext.generateNow(
@@ -697,8 +734,17 @@ const Ergogen = () => {
                   </EditorContainer>
                 </ResizablePanel>
               )}
-              <RightPane $hideOnMobile={configContext.showConfig}>
-                {configContext.showDownloads ? (
+              <RightPane
+                $hideOnMobile={configContext.showConfig && !showDesign}
+              >
+                {configContext.resultsStale && (
+                  <p role="status">
+                    Preview stale: generate a valid design to enable exports.
+                  </p>
+                )}
+                {showDesign ? (
+                  <DesignView />
+                ) : configContext.showDownloads ? (
                   <>
                     <NestedRightPane>
                       <StyledFilePreview
