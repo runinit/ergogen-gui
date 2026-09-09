@@ -13,3 +13,22 @@ No npm publication or version override is required.
 To update: validate and commit the engine, pack that exact checkout, replace
 the archive, record its commit and hash, then refresh the lockfile and build.
 The older 5.0.0 archive records the production baseline.
+
+## Guided mounting follow-up
+
+`ergogen-guided-d8de34fdf6bb.tgz` is the local enclosure-work source snapshot
+for optional component envelopes, requested contact counts and cached analysis.
+It retains the upstream license and attribution.
+
+SHA-256: `d8de34fdf6bb70a1d1c7c45bcf2af4c8f23bb919dc69313d16f2756e10ade6e1`
+
+## CAD workspace snapshot
+
+`ergogen-cad-e2d947209f40.tgz` contains the current dirty `enclosure-work/ergogen`
+source, including the guided mounting work and reusable footprint/model helpers.
+This is a local source snapshot, not a published release.
+
+SHA-256: `e2d947209f4023d15ebeeb1582b6dedce72762b227f202b4f319b29a95b9fdd7`
+
+The GUI dependency and lockfile select this archive. The normal build repackages
+the engine into `public/dependencies/ergogen.js` before Vite builds the GUI.

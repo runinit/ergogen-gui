@@ -1,4 +1,11 @@
-import { isMap, isScalar, isSeq, parseDocument, stringify } from 'yaml';
+import {
+  isAlias,
+  isMap,
+  isScalar,
+  isSeq,
+  parseDocument,
+  stringify,
+} from 'yaml';
 import { cncDefaults, JLC_PRESET, supplierPreset } from './casePresets';
 import { editDesign, SourcePath } from './designSource';
 
@@ -60,7 +67,9 @@ export function createCase(source: string, name: string): string {
         mounting: '',
         construction: 'cover',
         supplier: JLC_PRESET,
-        board: { source: 'layout', name: `${name}_layout`, family: '' },
+        board: Object.keys(doc.toJS()?.pcbs || {}).length
+          ? { source: 'generated', name: Object.keys(doc.toJS().pcbs)[0] }
+          : { source: 'layout', name: `${name}_layout`, family: '' },
         manufacturing: {
           bottom: cncDefaults(13, 'bottom'),
           top: cncDefaults(11, 'top'),
@@ -103,6 +112,17 @@ export function editCase(
 ): string {
   const full = ['designs', 'assemblies', name, ...path];
   const node = parseDocument(source).getIn(full, true);
+  // Materialize only the edited alias; its shared anchor remains unchanged.
+  if (isAlias(node) && node.range) {
+    const rendered = stringify(value, {
+      collectionStyle: 'flow',
+      aliasDuplicateObjects: false,
+      lineWidth: 0,
+    }).trimEnd();
+    return (
+      source.slice(0, node.range[0]) + rendered + source.slice(node.range[1])
+    );
+  }
   if (
     isMap(node) &&
     value &&
@@ -133,6 +153,7 @@ export function editCase(
     }
     const rendered = stringify(value, {
       collectionStyle: 'flow',
+      aliasDuplicateObjects: false,
       lineWidth: 0,
     }).trimEnd();
     return (
@@ -289,6 +310,23 @@ export function editCaseChanges(
   if (JSON.stringify(before) === JSON.stringify(after)) {
     return source;
   }
+  const existing = parseDocument(source).getIn(
+    ['designs', 'assemblies', name, ...path],
+    true
+  );
+  if (isAlias(existing)) {
+    return editCase(source, name, path, after);
+  }
+  if (Array.isArray(after)) {
+    if (
+      !isSeq(existing) ||
+      !Array.isArray(before) ||
+      existing.items.length !== after.length ||
+      before.length !== after.length
+    ) {
+      return editCase(source, name, path, after);
+    }
+  }
   if (
     before &&
     after &&
@@ -311,4 +349,27 @@ export function editCaseChanges(
     return result;
   }
   return editCase(source, name, path, after);
+}
+
+// Serialize only the edited assembly; unrelated source bytes stay untouched.
+export function batchCaseEdit(
+  source: string,
+  name: string,
+  update: (doc: ReturnType<typeof parseDocument>, path: string[]) => void
+): string {
+  const doc = parseDocument(source);
+  const path = ['designs', 'assemblies', name];
+  const node = doc.getIn(path, true);
+  if (!isMap(node) || !node.range) {
+    throw new Error('The case must be a YAML mapping.');
+  }
+  const [start, end] = node.range;
+  const indent = start - source.lastIndexOf('\n', start - 1) - 1;
+  update(doc, path);
+  const rendered = stringify(doc.getIn(path, true), { lineWidth: 0 })
+    .trimEnd()
+    .split('\n')
+    .map((line, index) => (index ? ' '.repeat(indent) + line : line))
+    .join('\n');
+  return source.slice(0, start) + rendered + '\n' + source.slice(end);
 }

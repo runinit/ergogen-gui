@@ -56,26 +56,16 @@ test.describe('GitHub Loading', () => {
     });
     await shoot('config-editor-visible');
 
-    // Open settings to check footprints
-    const settingsButton = page.getByTestId('settings-button');
-    await settingsButton.click();
-    await shoot('settings-opened');
-
-    // Wait for the injections/footprints section to be visible
-    await expect(page.getByTestId('injections-container')).toBeVisible({
-      timeout: 5000,
-    });
-    await shoot('injections-visible');
-
-    // Verify that footprints were loaded
-    // The mr_useful repo should have footprints from the submodule
-    const footprintRows = page.locator(
-      '[data-testid^="injections-container-"]'
-    );
-    const count = await footprintRows.count();
-
-    console.log(`Found ${count} footprint(s)`);
-    expect(count).toBeGreaterThan(0);
+    await page
+      .getByRole('button', { name: 'Footprint library', exact: true })
+      .click();
+    const library = page.getByRole('dialog', { name: 'Case designer' });
+    await expect(
+      library.getByRole('button', {
+        name: 'ceoloide/logo_mr_useful · Project',
+        exact: true,
+      })
+    ).toBeVisible();
     await shoot('footprints-loaded');
   });
 
@@ -181,21 +171,18 @@ test.describe('GitHub Loading', () => {
       timeout: 10000,
     });
 
-    // Open settings and verify first footprint
-    let settingsButton = page.getByTestId('settings-button');
-    await settingsButton.click();
-    await shoot('settings-opened-first');
-
-    await expect(page.getByTestId('injections-container')).toBeVisible({
-      timeout: 5000,
-    });
-
-    // Check for unspecworks/pico_oneside footprint
-    const unspecworksFootprint = page.getByTestId(
-      'injections-container-unspecworks/pico_oneside'
-    );
-    await expect(unspecworksFootprint).toBeVisible();
+    await page
+      .getByRole('button', { name: 'Footprint library', exact: true })
+      .click();
+    const library = page.getByRole('dialog', { name: 'Case designer' });
+    await expect(
+      library.getByRole('button', {
+        name: 'unspecworks/pico_oneside · Project',
+        exact: true,
+      })
+    ).toBeVisible();
     await shoot('unspecworks-footprint-present');
+    await library.getByRole('button', { name: 'Cancel', exact: true }).click();
 
     // Navigate back to welcome page
     const newConfigButton = page.getByTestId('new-config-button');
@@ -211,22 +198,23 @@ test.describe('GitHub Loading', () => {
     await expect(page).toHaveURL(/.*\/$/, { timeout: 10000 });
     await shoot('second-repo-loaded');
 
-    // Open settings and verify both footprints are present
-    settingsButton = page.getByTestId('settings-button');
-    await settingsButton.click();
-    await shoot('settings-opened-second');
-
-    await expect(page.getByTestId('injections-container')).toBeVisible({
-      timeout: 5000,
-    });
-
-    // Both footprints should be present
-    const logoFootprint = page.getByTestId(
-      'injections-container-ceoloide/logo_mr_useful'
-    );
-    await expect(logoFootprint).toBeVisible();
-    await expect(unspecworksFootprint).toBeVisible();
+    await page
+      .getByRole('button', { name: 'Footprint library', exact: true })
+      .click();
+    await expect(
+      library.getByRole('button', {
+        name: 'ceoloide/logo_mr_useful · Project',
+        exact: true,
+      })
+    ).toBeVisible();
+    await expect(
+      library.getByRole('button', {
+        name: 'unspecworks/pico_oneside · Project',
+        exact: true,
+      })
+    ).toBeVisible();
     await shoot('both-footprints-present');
+    await library.getByRole('button', { name: 'Cancel', exact: true }).click();
 
     // Reload an existing footprint to exercise conflict choices and reset.
     await page.route('**/mr_useful_footprints/**/logo_mr_useful.js', (route) =>

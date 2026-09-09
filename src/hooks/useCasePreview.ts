@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFootprintLibrary } from './useFootprintLibrary';
+import { libraryAssets } from '../utils/footprintLibrary';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createErgogenWorker } from '../workers/workerFactory';
 import { Results } from '../types/results';
 
@@ -19,6 +21,14 @@ function useCaseWorker(
   assets: Record<string, string>,
   mode: 'generate' | 'analyze'
 ) {
+  const { entries } = useFootprintLibrary();
+  const mergedAssets = useMemo(
+    () => ({ ...libraryAssets(injections, entries), ...assets }),
+    [injections, entries, assets]
+  );
+  const libraryRevision = JSON.stringify(
+    entries.map((entry) => [entry.id, entry.revision])
+  );
   const [result, setResult] = useState<Results | null>(null);
   const [completed, setCompleted] = useState('');
   const [error, setError] = useState('');
@@ -26,12 +36,27 @@ function useCaseWorker(
   const [pending, setPending] = useState(false);
   const owned = useRef<Worker | null>(null);
   const serial = useRef(0);
-  const revision = JSON.stringify([source, injections, assets]);
+  const settled = useRef(false);
+  const workerInjections = useRef('');
+  const injectionRevision = JSON.stringify(injections);
+  const revision = useMemo(
+    () => JSON.stringify([source, injections, mergedAssets, libraryRevision]),
+    [source, injections, mergedAssets, libraryRevision]
+  );
   const latest = useRef(revision);
   latest.current = revision;
   const generate = useCallback(() => {
-    owned.current?.terminate();
-    const worker = createErgogenWorker();
+    // Reuse initialized analysis modules only after completion and with identical injections.
+    const reusable =
+      mode === 'analyze' &&
+      settled.current &&
+      workerInjections.current === injectionRevision;
+    if (!reusable) {
+      owned.current?.terminate();
+    }
+    const worker = reusable ? owned.current : createErgogenWorker();
+    settled.current = false;
+    workerInjections.current = injectionRevision;
     owned.current = worker;
     setError('');
     setDiagnostics([]);
@@ -49,6 +74,7 @@ function useCaseWorker(
       if (owned.current !== worker) {
         return;
       }
+      settled.current = false;
       setPending(false);
       if (latest.current !== revision) {
         return;
@@ -64,6 +90,7 @@ function useCaseWorker(
       ) {
         return;
       }
+      settled.current = true;
       setPending(false);
       if (latest.current !== revision) {
         return;
@@ -84,9 +111,15 @@ function useCaseWorker(
       injectionInput,
       assets: capturedAssets,
       requestId,
+      revisions: {
+        source: inputConfig,
+        injection: JSON.stringify(injectionInput),
+        library: libraryRevision,
+        asset: JSON.stringify(capturedAssets),
+      },
       options: { debug: true },
     });
-  }, [mode, revision]);
+  }, [mode, revision, injectionRevision, libraryRevision]);
   useEffect(
     () => () => {
       owned.current?.terminate();
@@ -108,6 +141,12 @@ function useCaseWorker(
     pending,
     stale: completed !== revision,
     generate,
+    cancel: () => {
+      owned.current?.terminate();
+      owned.current = null;
+      settled.current = false;
+      setPending(false);
+    },
   };
 }
 export function useCasePreview(

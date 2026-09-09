@@ -1,3 +1,6 @@
+import { loadAssets } from '../utils/caseAssets';
+import { useFootprintLibrary } from '../hooks/useFootprintLibrary';
+import { resolveLibrary, libraryAssets } from '../utils/footprintLibrary';
 import { storageKey } from '../utils/storageKey';
 import React, {
   createContext,
@@ -174,6 +177,8 @@ type ContextProps = {
   resultsStale: boolean;
   resultsVersion: number;
   setResultsVersion: Dispatch<SetStateAction<number>>;
+  cadActive: boolean;
+  setCadActive: Dispatch<SetStateAction<boolean>>;
   showSettings: boolean;
   setShowSettings: Dispatch<SetStateAction<boolean>>;
   isBulkDownloadOpen: boolean;
@@ -565,10 +570,28 @@ const ConfigContextProvider = ({
     }
   }, []);
 
-  const [injectionInput, setInjectionInput] = useLocalStorage<string[][]>(
+  const [storedInjections, setInjectionInput] = useLocalStorage<string[][]>(
     storageKey('ergogen:injection'),
     initialInjectionInput
   );
+  const { entries: libraryEntries } = useFootprintLibrary();
+  const injectionInput = useMemo(
+    () => resolveLibrary(storedInjections, libraryEntries),
+    [storedInjections, libraryEntries]
+  );
+  const linkedAssets = useMemo(
+    () => libraryAssets(injectionInput, libraryEntries),
+    [injectionInput, libraryEntries]
+  );
+  const libraryEntriesRef = useRef(
+    libraryEntries.map((entry) => [entry.id, entry.revision])
+  );
+  libraryEntriesRef.current = libraryEntries.map((entry) => [
+    entry.id,
+    entry.revision,
+  ]);
+  const linkedAssetsRef = useRef(linkedAssets);
+  linkedAssetsRef.current = linkedAssets;
   const [error, setError] = useState<string | null>(null);
   const [deprecationWarning, setDeprecationWarning] = useState<string | null>(
     null
@@ -576,6 +599,15 @@ const ConfigContextProvider = ({
   const [info, setInfo] = useState<string | null>(null);
   const activeRequestRef = useRef<string | null>(null);
   const [resultsStale, setResultsStale] = useState(false);
+  const inputIdentity = JSON.stringify([injectionInput, linkedAssets]);
+  const previousIdentity = useRef(inputIdentity);
+  if (previousIdentity.current !== inputIdentity) {
+    activeRequestRef.current = null;
+    previousIdentity.current = inputIdentity;
+  }
+  useEffect(() => {
+    setResultsStale(true);
+  }, [inputIdentity]);
   const [results, setResults] = useState<Results | null>(null);
   const [resultsVersion, setResultsVersion] = useState<number>(0);
   const [settings, setSettings] = useLocalStorage<AppSettings>(
@@ -678,6 +710,7 @@ const ConfigContextProvider = ({
     initAnalytics();
   }, [sendUsageMetrics]);
 
+  const [cadActive, setCadActive] = useState(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [isBulkDownloadOpen, setIsBulkDownloadOpen] = useState<boolean>(false);
   const [showSideNav, setShowSideNav] = useState<boolean>(false);
@@ -1105,14 +1138,34 @@ const ConfigContextProvider = ({
       const inputConfig =
         preparePreviewConfig(parsedConfig, options.pointsonly) || targetInput;
 
+      const requestId = activeRequestRef.current;
+      const assetsAtRequest = {
+        ...caseAssets.current,
+        ...linkedAssetsRef.current,
+      };
+      const libraryAtRequest = JSON.stringify(libraryEntriesRef.current);
       try {
+        const savedAssets =
+          typeof indexedDB === 'undefined'
+            ? {}
+            : await loadAssets().catch(() => ({}));
+        if (activeRequestRef.current !== requestId) {
+          return;
+        }
+        const capturedAssets = { ...savedAssets, ...assetsAtRequest };
         if (ergogenWorkerRef.current) {
           ergogenWorkerRef.current.postMessage({
             type: 'generate',
+            revisions: {
+              source: targetInput,
+              injection: JSON.stringify(inputInjection),
+              library: libraryAtRequest,
+              asset: JSON.stringify(capturedAssets),
+            },
             inputConfig,
-            assets: caseAssets.current,
+            assets: capturedAssets,
             injectionInput: inputInjection,
-            requestId: activeRequestRef.current,
+            requestId,
             options: {
               debug: debug,
               svg: true,
@@ -1142,6 +1195,12 @@ const ConfigContextProvider = ({
     () => debounce(runGeneration, 300),
     [runGeneration]
   );
+
+  useEffect(() => {
+    if (cadActive) {
+      processInput.cancel();
+    }
+  }, [cadActive, processInput]);
 
   /**
    * An immediate version for the "Generate" button that cancels any pending auto-generations.
@@ -1607,7 +1666,7 @@ const ConfigContextProvider = ({
       storageKey('ergogen:injection'),
       JSON.stringify(injectionInput || [])
     );
-    if (autoGen && !showSettings) {
+    if (autoGen && !showSettings && !cadActive) {
       processInput(configInputState, injectionInput, {
         pointsonly: !autoGen3D,
       });
@@ -1617,6 +1676,7 @@ const ConfigContextProvider = ({
     injectionInput,
     autoGen,
     autoGen3D,
+    cadActive,
     showSettings,
     processInput,
   ]);
@@ -1694,6 +1754,8 @@ const ConfigContextProvider = ({
       resultsStale,
       resultsVersion,
       setResultsVersion,
+      cadActive,
+      setCadActive,
       showSettings,
       setShowSettings,
       isBulkDownloadOpen,
@@ -1757,6 +1819,8 @@ const ConfigContextProvider = ({
       resultsStale,
       resultsVersion,
       setResultsVersion,
+      cadActive,
+      setCadActive,
       showSettings,
       setShowSettings,
       showSideNav,

@@ -1,0 +1,636 @@
+# Mechanical validation fixture; not fabrication approval.
+# Switch envelopes are explicitly placed on the face opposite the reversible footprint.
+regions:
+  case_keys:
+    where: true
+    close: 2
+    outline: bhk
+  case_switches:
+    where: true
+    size: 14
+    corner_relief: 0.5
+boundaries:
+  case_body:
+    from: regions.case_keys
+    clearance: 2
+profiles:
+  case_board:
+    from: boundaries.case_body
+assemblies:
+  case:
+    preset: enclosure
+    profile: profiles.case_board
+    mounting: gasket
+    construction: cover
+    supplier: jlccnc-6061-2026-09
+    board:
+      source: generated
+      name: bhk_pcb
+      components:
+        S1:
+          height:
+            - -13.2
+            - -1.6
+        S2:
+          height:
+            - -13.2
+            - -1.6
+        S3:
+          height:
+            - -13.2
+            - -1.6
+        S4:
+          height:
+            - -13.2
+            - -1.6
+        S5:
+          height:
+            - -13.2
+            - -1.6
+        S6:
+          height:
+            - -13.2
+            - -1.6
+        S7:
+          height:
+            - -13.2
+            - -1.6
+        S8:
+          height:
+            - -13.2
+            - -1.6
+        S9:
+          height:
+            - -13.2
+            - -1.6
+        S10:
+          height:
+            - -13.2
+            - -1.6
+        S11:
+          height:
+            - -13.2
+            - -1.6
+        S12:
+          height:
+            - -13.2
+            - -1.6
+        S13:
+          height:
+            - -13.2
+            - -1.6
+        S14:
+          height:
+            - -13.2
+            - -1.6
+        S15:
+          height:
+            - -13.2
+            - -1.6
+        S16:
+          height:
+            - -13.2
+            - -1.6
+        S17:
+          height:
+            - -13.2
+            - -1.6
+        S18:
+          height:
+            - -13.2
+            - -1.6
+        S19:
+          height:
+            - -13.2
+            - -1.6
+        S20:
+          height:
+            - -13.2
+            - -1.6
+        S21:
+          height:
+            - -13.2
+            - -1.6
+        S22:
+          height:
+            - -13.2
+            - -1.6
+        S23:
+          height:
+            - -13.2
+            - -1.6
+        S24:
+          height:
+            - -13.2
+            - -1.6
+        S25:
+          height:
+            - -13.2
+            - -1.6
+        S26:
+          height:
+            - -13.2
+            - -1.6
+        S27:
+          height:
+            - -13.2
+            - -1.6
+        S28:
+          height:
+            - -13.2
+            - -1.6
+        S29:
+          height:
+            - -13.2
+            - -1.6
+        S30:
+          height:
+            - -13.2
+            - -1.6
+        S31:
+          height:
+            - -13.2
+            - -1.6
+        S32:
+          height:
+            - -13.2
+            - -1.6
+        S33:
+          height:
+            - -13.2
+            - -1.6
+    manufacturing:
+      bottom:
+        process: fdm
+        material: PETG
+        nozzle: 0.4
+        layer: 0.2
+        orientation: interior-up
+        build:
+          - 300
+          - 300
+          - 300
+        supports: allowed
+      top:
+        process: fdm
+        material: PETG
+        nozzle: 0.4
+        layer: 0.2
+        orientation: interior-up
+        build:
+          - 300
+          - 300
+          - 300
+        supports: allowed
+      plate:
+        process: fdm
+        material: PETG
+        nozzle: 0.4
+        layer: 0.2
+        orientation: interior-up
+        build:
+          - 300
+          - 300
+          - 300
+        supports: allowed
+    internal_radius: 0
+    wall: 3
+    floor: 2
+    height: 24
+    plate: 1.5
+    plate_z: 13
+    bezel: 10
+    fit: 0.5
+    cutouts:
+      - regions.case_switches
+    gaskets:
+      gasket_3:
+        anchor:
+          shift:
+            - 190.3469218113794
+            - -159.25
+          rotate: 0
+        size:
+          - 10
+          - 6
+        placement:
+          offset: 2.5
+          owner: automatic
+          edge: '["line",180.88,-156.75,199.82,-156.75,0]'
+      gasket_5:
+        anchor:
+          shift:
+            - 233.34312696498213
+            - -164.28625065048485
+          rotate: 160.11901856794927
+        size:
+          - 10
+          - 6
+        placement:
+          offset: 2.5
+          owner: automatic
+          edge: '["line",244.84,-165.79,223.54,-158.08,0]'
+      gasket_7:
+        anchor:
+          shift:
+            - 294.37255670973525
+            - -164.64835984952512
+          rotate: 60.00000001256651
+        size:
+          - 10
+          - 6
+        placement:
+          offset: 2.5
+          owner: automatic
+          edge: '["line",280.33,-183.97,304.08,-142.83,0]'
+      gasket_8:
+        anchor:
+          shift:
+            - 303.3950397384907
+            - -102.76660481909315
+          rotate: -84.91918521425951
+        size:
+          - 10
+          - 6
+        placement:
+          offset: 2.5
+          owner: automatic
+          edge: '["line",297.47,-64.32,304.34,-141.65,0]'
+      gasket_9:
+        anchor:
+          shift:
+            - 267.67499999999995
+            - -60
+          rotate: 0
+        size:
+          - 10
+          - 6
+        placement:
+          offset: 2.5
+          owner: automatic
+          edge: '["line",239.88,-62.5,295.47,-62.5,0]'
+      gasket_11:
+        anchor:
+          shift:
+            - 209.375
+            - -52.875
+          rotate: 180
+        size:
+          - 10
+          - 6
+        placement:
+          offset: 2.5
+          owner: automatic
+          edge: '["line",218.88,-55.37,199.88,-55.37,0]'
+      gasket_13:
+        anchor:
+          shift:
+            - 158.5
+            - -60
+          rotate: 0
+        size:
+          - 10
+          - 6
+        placement:
+          offset: 2.5
+          owner: automatic
+          edge: '["line",138.13,-62.5,178.88,-62.5,0]'
+      gasket_14:
+        anchor:
+          shift:
+            - 133.625
+            - -102.5
+          rotate: 90
+        size:
+          - 10
+          - 6
+        placement:
+          offset: 2.5
+          owner: automatic
+          edge: '["line",136.13,-140.5,136.13,-64.5,0]'
+    mounts:
+      case_mount_1:
+        anchor:
+          shift:
+            - 138.125
+            - -151.5
+          rotate: 0
+        hole: 1.25
+        post: 4
+        height: 5
+        clearance: 1.7
+        head: 3.1
+        head_depth: 3.3
+        hardware: tapped
+        thread: M3x0.5
+        depth: 6
+        access: bottom
+        min_wall: 1.5
+        screw:
+          diameter: 3
+          head_diameter: 5.5
+          head_height: 3
+        role: case
+        placement:
+          owner: automatic
+          edge: '["line",138.13,-142.5,178.88,-142.5,0]'
+      case_mount_2:
+        anchor:
+          shift:
+            - 171.1878504
+            - -159.9614425
+          rotate: 0
+        hole: 1.25
+        post: 4
+        height: 5
+        clearance: 1.7
+        head: 3.1
+        head_depth: 3.3
+        hardware: tapped
+        thread: M3x0.5
+        depth: 6
+        access: bottom
+        min_wall: 1.5
+        screw:
+          diameter: 3
+          head_diameter: 5.5
+          head_height: 3
+        role: case
+        placement:
+          owner: automatic
+          edge: '["arc",178.88,-154.75,180.88,-156.75,2]'
+      case_mount_3:
+        anchor:
+          shift:
+            - 209.01055494712483
+            - -166.28079103215205
+          rotate: 0
+        hole: 1.25
+        post: 4
+        height: 5
+        clearance: 1.7
+        head: 3.1
+        head_depth: 3.3
+        hardware: tapped
+        thread: M3x0.5
+        depth: 6
+        access: bottom
+        min_wall: 1.5
+        screw:
+          diameter: 3
+          head_diameter: 5.5
+          head_height: 3
+        role: case
+        placement:
+          owner: automatic
+          edge: '["line",223.54,-158.08,199.82,-156.75,0]'
+      case_mount_4:
+        anchor:
+          shift:
+            - 246.86674152486745
+            - -177.34670830489313
+          rotate: 0
+        hole: 1.25
+        post: 4
+        height: 5
+        clearance: 1.7
+        head: 3.1
+        head_depth: 3.3
+        hardware: tapped
+        thread: M3x0.5
+        depth: 6
+        access: bottom
+        min_wall: 1.5
+        screw:
+          diameter: 3
+          head_diameter: 5.5
+          head_height: 3
+        role: case
+        placement:
+          owner: automatic
+          edge: '["line",244.84,-165.79,277.6,-184.7,0]'
+      case_mount_5:
+        anchor:
+          shift:
+            - 282.46494970727895
+            - -193.26527778245992
+          rotate: 0
+        hole: 1.25
+        post: 4
+        height: 5
+        clearance: 1.7
+        head: 3.1
+        head_depth: 3.3
+        hardware: tapped
+        thread: M3x0.5
+        depth: 6
+        access: bottom
+        min_wall: 1.5
+        screw:
+          diameter: 3
+          head_diameter: 5.5
+          head_height: 3
+        role: case
+        placement:
+          owner: automatic
+          edge: '["arc",277.6,-184.7,280.33,-183.97,2]'
+      case_mount_7:
+        anchor:
+          shift:
+            - 311.6958564568908
+            - -122.73256588247935
+          rotate: 0
+        hole: 1.25
+        post: 4
+        height: 5
+        clearance: 1.7
+        head: 3.1
+        head_depth: 3.3
+        hardware: tapped
+        thread: M3x0.5
+        depth: 6
+        access: bottom
+        min_wall: 1.5
+        screw:
+          diameter: 3
+          head_diameter: 5.5
+          head_height: 3
+        role: case
+        placement:
+          owner: automatic
+          edge: '["line",297.47,-64.32,304.34,-141.65,0]'
+      case_mount_8:
+        anchor:
+          shift:
+            - 308.1534255709364
+            - -82.88973486586814
+          rotate: 0
+        hole: 1.25
+        post: 4
+        height: 5
+        clearance: 1.7
+        head: 3.1
+        head_depth: 3.3
+        hardware: tapped
+        thread: M3x0.5
+        depth: 6
+        access: bottom
+        min_wall: 1.5
+        screw:
+          diameter: 3
+          head_diameter: 5.5
+          head_height: 3
+        role: case
+        placement:
+          owner: automatic
+          edge: '["line",297.47,-64.32,304.34,-141.65,0]'
+      case_mount_9:
+        anchor:
+          shift:
+            - 291.2181546500005
+            - -53.5
+          rotate: 0
+        hole: 1.25
+        post: 4
+        height: 5
+        clearance: 1.7
+        head: 3.1
+        head_depth: 3.3
+        hardware: tapped
+        thread: M3x0.5
+        depth: 6
+        access: bottom
+        min_wall: 1.5
+        screw:
+          diameter: 3
+          head_diameter: 5.5
+          head_height: 3
+        role: case
+        placement:
+          owner: automatic
+          edge: '["line",239.88,-62.5,295.47,-62.5,0]'
+      case_mount_10:
+        anchor:
+          shift:
+            - 251.21815465000049
+            - -53.5
+          rotate: 0
+        hole: 1.25
+        post: 4
+        height: 5
+        clearance: 1.7
+        head: 3.1
+        head_depth: 3.3
+        hardware: tapped
+        thread: M3x0.5
+        depth: 6
+        access: bottom
+        min_wall: 1.5
+        screw:
+          diameter: 3
+          head_diameter: 5.5
+          head_height: 3
+        role: case
+        placement:
+          owner: automatic
+          edge: '["line",239.88,-62.5,295.47,-62.5,0]'
+      case_mount_12:
+        anchor:
+          shift:
+            - 174.2364231
+            - -50.9790653
+          rotate: 0
+        hole: 1.25
+        post: 4
+        height: 5
+        clearance: 1.7
+        head: 3.1
+        head_depth: 3.3
+        hardware: tapped
+        thread: M3x0.5
+        depth: 6
+        access: bottom
+        min_wall: 1.5
+        screw:
+          diameter: 3
+          head_diameter: 5.5
+          head_height: 3
+        role: case
+        placement:
+          owner: automatic
+          edge: '["arc",180.88,-57.75,178.88,-59.75,2]'
+      case_mount_13:
+        anchor:
+          shift:
+            - 135.2834042
+            - -53.8733668
+          rotate: 0
+        hole: 1.25
+        post: 4
+        height: 5
+        clearance: 1.7
+        head: 3.1
+        head_depth: 3.3
+        hardware: tapped
+        thread: M3x0.5
+        depth: 6
+        access: bottom
+        min_wall: 1.5
+        screw:
+          diameter: 3
+          head_diameter: 5.5
+          head_height: 3
+        role: case
+        placement:
+          owner: automatic
+          edge: '["line",138.13,-62.5,178.88,-62.5,0]'
+      case_mount_14:
+        anchor:
+          shift:
+            - 127.125
+            - -90.09542940219637
+          rotate: 0
+        hole: 1.25
+        post: 4
+        height: 5
+        clearance: 1.7
+        head: 3.1
+        head_depth: 3.3
+        hardware: tapped
+        thread: M3x0.5
+        depth: 6
+        access: bottom
+        min_wall: 1.5
+        screw:
+          diameter: 3
+          head_diameter: 5.5
+          head_height: 3
+        role: case
+        placement:
+          owner: automatic
+          edge: '["line",136.13,-140.5,136.13,-64.5,0]'
+      case_mount_15:
+        anchor:
+          shift:
+            - 127.125
+            - -130.09542940219637
+          rotate: 0
+        hole: 1.25
+        post: 4
+        height: 5
+        clearance: 1.7
+        head: 3.1
+        head_depth: 3.3
+        hardware: tapped
+        thread: M3x0.5
+        depth: 6
+        access: bottom
+        min_wall: 1.5
+        screw:
+          diameter: 3
+          head_diameter: 5.5
+          head_height: 3
+        role: case
+        placement:
+          owner: automatic
+          edge: '["line",136.13,-140.5,136.13,-64.5,0]'

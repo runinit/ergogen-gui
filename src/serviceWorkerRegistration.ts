@@ -120,14 +120,16 @@ export function register(config?: Config): void {
   if (process.env.NODE_ENV !== 'production') return;
   if (!('serviceWorker' in navigator)) return;
 
-  const publicUrl = new URL(process.env.PUBLIC_URL, window.location.href);
+  // Use one normalized base for origin checks and the worker script path.
+  const publicPath = (process.env.PUBLIC_URL || '').replace(/\/+$/, '');
+  const publicUrl = new URL(publicPath || '/', window.location.href);
   if (publicUrl.origin !== window.location.origin) {
     // Serving from a CDN — service workers won't work cross-origin.
     return;
   }
 
   const start = () => {
-    const swUrl = `${process.env.PUBLIC_URL}/service-worker.js`;
+    const swUrl = `${publicPath}/service-worker.js`;
 
     if (isLocalhost()) {
       // On localhost, verify the SW still exists and is valid before registering.

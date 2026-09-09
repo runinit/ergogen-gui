@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { parse } from 'yaml';
-import { createCase, editCase, removeCaseField } from './enclosureSource';
+import { isNode, parse, parseDocument } from 'yaml';
+import {
+  createCase,
+  editCase,
+  editCaseChanges,
+  removeCaseField,
+} from './enclosureSource';
 
 const source =
   '# Keep my layout\nunits: {pitch: 19}\npoints:\n  zones:\n    keys: {}\n';
@@ -122,3 +127,91 @@ it('preserves a recent dimension edit while analysis still contains the previous
     parse(moved).designs.assemblies.keyboard.gaskets.left.anchor.shift
   ).toEqual([1, 0]);
 });
+
+it('batches placements without changing source outside the assembly', async () => {
+  const { batchCaseEdit } = await import('./enclosureSource');
+  const source =
+    createCase('points:\n  zones:\n    keys: {}\n', 'case') +
+    '\n# Keep my other output\nother_output: {author: test}\n';
+  const changed = batchCaseEdit(source, 'case', (doc, path) => {
+    for (let i = 0; i < 20; i++) {
+      doc.setIn([...path, 'gaskets', `g${i}`], {
+        size: [10, 6],
+        anchor: { shift: [i, 0] },
+      });
+    }
+  });
+  expect(parse(changed).designs.assemblies.case.gaskets.g19.size).toEqual([
+    10, 6,
+  ]);
+  expect(changed.slice(0, changed.indexOf('    case:'))).toBe(
+    source.slice(0, source.indexOf('    case:'))
+  );
+  expect(changed).toContain(
+    '\n# Keep my other output\nother_output: {author: test}\n'
+  );
+});
+
+it('materializes complete inferred vectors before changing one coordinate', () => {
+  const source =
+    'designs:\n  assemblies:\n    case:\n      board: {} # retained\n';
+  const before = { components: { S1: { height: [0, 11.6] } } };
+  const after = { components: { S1: { height: [-13.2, 11.6] } } };
+  const changed = editCaseChanges(source, 'case', ['board'], before, after);
+  expect(readHeight(changed)).toEqual([-13.2, 11.6]);
+  expect(changed).toContain('# retained');
+  const final = editCaseChanges(changed, 'case', ['board'], after, {
+    components: { S1: { height: [-13.2, -1.6] } },
+  });
+  expect(readHeight(final)).toEqual([-13.2, -1.6]);
+});
+
+it('keeps an inherited model unchanged when editing a different placement alias', () => {
+  const source =
+    'designs:\n  assemblies:\n    case:\n      board:\n        models:\n          U1: &shared [{path: chip.step, offset: [0, 0, 1]}] # preserve anchor\n          U2: *shared # instance\n';
+  const before = parse(source).designs.assemblies.case.board.models.U2;
+  const after = [{ ...before[0], offset: [0, 0, 3] }];
+  const changed = editCaseChanges(
+    source,
+    'case',
+    ['board', 'models', 'U2'],
+    before,
+    after
+  );
+  expect(
+    parse(changed).designs.assemblies.case.board.models.U1[0].offset
+  ).toEqual([0, 0, 1]);
+  expect(
+    parse(changed).designs.assemblies.case.board.models.U2[0].offset
+  ).toEqual([0, 0, 3]);
+  expect(changed).toContain(
+    'U1: &shared [{path: chip.step, offset: [0, 0, 1]}] # preserve anchor'
+  );
+  expect(changed).toContain('# instance');
+});
+
+it('writes independent placement bindings without introducing shared YAML anchors', () => {
+  const source = 'designs:\n  assemblies:\n    case:\n      board: {}\n';
+  const models = [{ path: 'chip.step', offset: [0, 0, 1] }];
+  const changed = editCase(source, 'case', ['board', 'models'], {
+    U1: models,
+    U2: models,
+  });
+  expect(changed).not.toMatch(/[&*]a\d/);
+});
+
+function readHeight(source: string) {
+  const height = parseDocument(source).getIn([
+    'designs',
+    'assemblies',
+    'case',
+    'board',
+    'components',
+    'S1',
+    'height',
+  ]);
+  if (!isNode(height)) {
+    throw new Error('Missing height vector');
+  }
+  return height.toJSON();
+}

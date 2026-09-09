@@ -6,6 +6,50 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+it.each([
+  [undefined, '/service-worker.js'],
+  ['', '/service-worker.js'],
+  ['/', '/service-worker.js'],
+  ['/ergogen-gui', '/ergogen-gui/service-worker.js'],
+  ['/ergogen-gui/', '/ergogen-gui/service-worker.js'],
+])('normalizes public URL %s', async (base, expected) => {
+  vi.stubEnv('NODE_ENV', 'production');
+  vi.stubEnv('PUBLIC_URL', base);
+  vi.spyOn(document, 'readyState', 'get').mockReturnValue('complete');
+  const registerWorker = vi
+    .fn()
+    .mockResolvedValue({ addEventListener: vi.fn() });
+  Object.defineProperty(navigator, 'serviceWorker', {
+    configurable: true,
+    value: { register: registerWorker, ready: Promise.resolve({}) },
+  });
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+    status: 200,
+    headers: new Headers({ 'content-type': 'application/javascript' }),
+  } as Response);
+
+  register();
+
+  await vi.waitFor(() => expect(registerWorker).toHaveBeenCalledWith(expected));
+});
+
+it('does not register a cross-origin service worker', () => {
+  vi.stubEnv('NODE_ENV', 'production');
+  vi.stubEnv('PUBLIC_URL', 'https://cdn.example.com/app');
+  vi.spyOn(document, 'readyState', 'get').mockReturnValue('complete');
+  const registerWorker = vi.fn();
+  Object.defineProperty(navigator, 'serviceWorker', {
+    configurable: true,
+    value: { register: registerWorker },
+  });
+  const fetchWorker = vi.spyOn(globalThis, 'fetch');
+
+  register();
+
+  expect(registerWorker).not.toHaveBeenCalled();
+  expect(fetchWorker).not.toHaveBeenCalled();
+});
+
 it('registers when React mounts after the window load event', async () => {
   vi.stubEnv('NODE_ENV', 'production');
   vi.stubEnv('PUBLIC_URL', '/ergogen-gui');

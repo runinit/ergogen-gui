@@ -1,3 +1,9 @@
+import {
+  packageLibrary,
+  libraryAssets,
+  librarySnapshot,
+  resolveLibrary,
+} from './footprintLibrary';
 import { packageAssets, loadAssets, CaseAssets } from './caseAssets';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
@@ -40,7 +46,19 @@ type Results = {
   [key: string]: unknown;
 };
 
+const EXPORT_TIMEOUT = 180000;
+async function exportAssets(
+  injections: string[][] | undefined,
+  assets?: CaseAssets
+) {
+  return {
+    ...libraryAssets(injections, librarySnapshot()),
+    ...(assets || (typeof indexedDB !== 'undefined' ? await loadAssets() : {})),
+  };
+}
+
 const writeInjections = (parentFolder: JSZip, injections: string[][]) => {
+  packageLibrary(parentFolder, injections);
   const folderCache = new Map<string, JSZip>();
   for (const injection of injections) {
     const [type, name, content] = injection;
@@ -83,11 +101,8 @@ export const createZip = async (
   assets?: CaseAssets
 ) => {
   const zip = new JSZip();
-  const projectAssets =
-    assets ||
-    (results.designs?.boards && typeof indexedDB !== 'undefined'
-      ? await loadAssets()
-      : undefined);
+  injections = resolveLibrary(injections, librarySnapshot());
+  const projectAssets = await exportAssets(injections, assets);
   if (projectAssets) {
     packageAssets(zip, projectAssets, Object.keys(results.pcbs || {}));
   }
@@ -198,7 +213,8 @@ export const createZip = async (
 
 const compileConfig = (
   config: string,
-  injections: string[][] | undefined
+  injections: string[][] | undefined,
+  assets: CaseAssets
 ): Promise<Results> => {
   return new Promise((resolve, reject) => {
     const worker = createErgogenWorker();
@@ -210,7 +226,7 @@ const compileConfig = (
     const timeout = setTimeout(() => {
       worker.terminate();
       reject(new Error('Compilation timed out'));
-    }, 15000);
+    }, EXPORT_TIMEOUT);
 
     worker.onmessage = (event) => {
       const response = event.data;
@@ -249,6 +265,7 @@ const compileConfig = (
       options: {
         debug: true,
         svg: true,
+        assets,
       },
     });
   });
@@ -298,16 +315,28 @@ export const exportAllConfigs = async (
   stlPreview: boolean,
   assets?: CaseAssets
 ) => {
+  injections = resolveLibrary(injections, librarySnapshot());
+  assets = await exportAssets(injections, assets);
   const zip = new JSZip();
 
   for (const configRecord of configs) {
     const folderName =
       configRecord.name.replace(/[/\\?%*:|"<>]/g, '_') || 'Untitled';
     const configFolder = zip.folder(folderName);
-    if (!configFolder) continue;
+    if (!configFolder) {
+      continue;
+    }
+    packageAssets(configFolder, assets);
+    if (injections?.length) {
+      writeInjections(configFolder, injections);
+    }
 
     try {
-      const results = await compileConfig(configRecord.config, injections);
+      const results = await compileConfig(
+        configRecord.config,
+        injections,
+        assets
+      );
       let finalResults = results;
       if (
         stlPreview &&
@@ -430,6 +459,8 @@ export const downloadAllConfigs = async (
   injections: string[][] | undefined
 ) => {
   const zip = new JSZip();
+  injections = resolveLibrary(injections, librarySnapshot());
+  packageAssets(zip, await exportAssets(injections));
 
   const usedNames = new Set<string>();
 
@@ -476,10 +507,13 @@ export const exportConfigsProgressively = async (
   isAborted: () => boolean
 ) => {
   const zip = new JSZip();
+  injections = resolveLibrary(injections, librarySnapshot());
+  const assets = await exportAssets(injections);
 
   const usedNames = new Set<string>();
 
   if (onlyConfigs) {
+    packageAssets(zip, assets);
     // 1. Configs only mode
     for (let i = 0; i < configs.length; i++) {
       if (isAborted()) return;
@@ -543,7 +577,7 @@ export const exportConfigsProgressively = async (
           worker.terminate();
           activeWorkers.delete(worker);
           reject(new Error('Compilation timed out'));
-        }, 30000);
+        }, EXPORT_TIMEOUT);
 
         worker.onmessage = (event) => {
           const response = event.data;
@@ -583,6 +617,7 @@ export const exportConfigsProgressively = async (
           inputConfig: parsedConfig,
           injectionInput: injections,
           requestId: `export-compile-${Date.now()}`,
+          options: { assets, debug: true, svg: true },
         });
       });
     };
@@ -677,6 +712,11 @@ export const exportConfigsProgressively = async (
 
         if (isAborted()) return;
 
+        packageAssets(
+          configFolder,
+          assets,
+          Object.keys(finalResults.pcbs || {})
+        );
         configFolder.file('config.yaml', configRecord.config);
 
         const outputsFolder = configFolder.folder('outputs');

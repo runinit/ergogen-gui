@@ -20,12 +20,14 @@ type Props = {
   cases: Record<string, CaseOutput>;
   exploded: boolean;
   selected: string;
+  selectedParts?: string[];
   onSelect: (name: string) => void;
   onPick?: (point: number[]) => void;
   mode?: 'assembly' | 'section' | 'part';
   lateral?: number;
   travel?: number;
   angle?: number;
+  hidden?: string[];
 };
 
 // A missing GPU must leave the design editor and exports usable.
@@ -62,12 +64,14 @@ function AssemblyScene({
   cases,
   exploded,
   selected,
+  selectedParts = [selected],
   onSelect,
   onPick,
   mode = 'assembly',
   travel = 0,
   lateral = 0,
   angle = 0,
+  hidden = [],
 }: Props) {
   const viewport = useRef<HTMLDivElement>(null);
   const meshes = useMemo(() => {
@@ -112,6 +116,7 @@ function AssemblyScene({
   return (
     <Viewport ref={viewport} aria-label="3D assembly preview">
       <Canvas
+        frameloop="demand"
         gl={{ localClippingEnabled: true }}
         camera={{ position: [100, -100, 120], up: [0, 0, 1] }}
       >
@@ -123,7 +128,11 @@ function AssemblyScene({
             {meshes
               .filter(
                 (mesh) =>
-                  mode !== 'part' || mesh.name === (selected || meshes[0].name)
+                  !hidden.includes(mesh.name) &&
+                  (mode !== 'part' ||
+                    (selected
+                      ? selectedParts.includes(mesh.name)
+                      : mesh.name === meshes[0].name))
               )
               .map((mesh) => (
                 <mesh
@@ -134,7 +143,9 @@ function AssemblyScene({
                   }
                   visible={
                     mode !== 'part' ||
-                    mesh.name === (selected || meshes[0].name)
+                    (selected
+                      ? selectedParts.includes(mesh.name)
+                      : mesh.name === meshes[0].name)
                   }
                   position={[
                     mesh.role === 'plate' ||
@@ -165,12 +176,19 @@ function AssemblyScene({
                 >
                   <meshStandardMaterial
                     color={
-                      selected === mesh.name
+                      selectedParts.includes(mesh.name)
                         ? theme.colors.accent
                         : mesh.reference
                           ? theme.colors.infoDark
                           : theme.colors.textDarker
                     }
+                    transparent={
+                      !!selected && !selectedParts.includes(mesh.name)
+                    }
+                    opacity={
+                      selected && !selectedParts.includes(mesh.name) ? 0.24 : 1
+                    }
+                    depthWrite={!selected || selectedParts.includes(mesh.name)}
                     side={DoubleSide}
                     clippingPlanes={
                       mode === 'section'

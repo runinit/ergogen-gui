@@ -6,21 +6,21 @@ import { useConfigContext } from './ConfigContext';
 
 // Mock the worker factory to prevent worker creation in tests
 const mockErgogenWorker = {
-  postMessage: jest.fn(),
-  terminate: jest.fn(),
+  postMessage: vi.fn(),
+  terminate: vi.fn(),
   onmessage: (_e: any) => {},
 };
 
 const mockJscadWorker = {
-  postMessage: jest.fn(),
-  terminate: jest.fn(),
+  postMessage: vi.fn(),
+  terminate: vi.fn(),
   onmessage: (_e: any) => {},
 };
 
 import { isFeatureEnabled } from '../utils/featureFlags';
 
 vi.mock('../utils/featureFlags', () => ({
-  isFeatureEnabled: jest.fn(() => true),
+  isFeatureEnabled: vi.fn(() => true),
 }));
 
 vi.mock('../workers/workerFactory', () => ({
@@ -30,16 +30,16 @@ vi.mock('../workers/workerFactory', () => ({
 
 import { trackEvent } from '../utils/analytics';
 vi.mock('../utils/analytics', () => ({
-  trackEvent: jest.fn(),
-  initAnalytics: jest.fn(),
+  trackEvent: vi.fn(),
+  initAnalytics: vi.fn(),
   getSendUsageMetricsEnabled: () => true,
   checkIsPWA: () => false,
 }));
 
 // Mock ergogen globally
 global.window.ergogen = {
-  process: jest.fn(),
-  inject: jest.fn(),
+  process: vi.fn(),
+  inject: vi.fn(),
 };
 
 import { ConfigContextProvider } from './ConfigContext';
@@ -103,12 +103,12 @@ describe('ConfigContextProvider', () => {
     window.history.replaceState({}, 'Test page', '/');
     mockErgogenWorker.postMessage.mockClear();
     mockJscadWorker.postMessage.mockClear();
-    (isFeatureEnabled as jest.Mock).mockReturnValue(true);
+    vi.mocked(isFeatureEnabled).mockReturnValue(true);
     localStorage.clear();
   });
 
   it('should fetch config from github url parameter and update the config', async () => {
-    const fetchSpy = jest.spyOn(window, 'fetch').mockImplementation((url) => {
+    const fetchSpy = vi.spyOn(window, 'fetch').mockImplementation((url) => {
       if (
         url ===
         'https://raw.githubusercontent.com/ceoloide/corney-island/main/ergogen/config.yaml'
@@ -150,7 +150,7 @@ describe('ConfigContextProvider', () => {
   });
 
   it('should fetch config from github url parameter without protocol and update the config', async () => {
-    const fetchSpy = jest.spyOn(window, 'fetch').mockImplementation((url) => {
+    const fetchSpy = vi.spyOn(window, 'fetch').mockImplementation((url) => {
       if (
         url ===
         'https://raw.githubusercontent.com/ceoloide/corney-island/main/ergogen/config.yaml'
@@ -192,7 +192,7 @@ describe('ConfigContextProvider', () => {
   });
 
   it('should load footprints from github url parameter and merge them', async () => {
-    const fetchSpy = jest.spyOn(window, 'fetch').mockImplementation((url) => {
+    const fetchSpy = vi.spyOn(window, 'fetch').mockImplementation((url) => {
       if (
         url ===
         'https://raw.githubusercontent.com/ceoloide/test-repo/main/config.yaml'
@@ -1071,7 +1071,7 @@ describe('ConfigContextProvider', () => {
       };
 
       // Disable outlines and templates
-      (isFeatureEnabled as jest.Mock).mockImplementation((feature) => {
+      vi.mocked(isFeatureEnabled).mockImplementation((feature) => {
         if (feature === 'outlines' || feature === 'templates') return false;
         return true;
       });
@@ -1107,19 +1107,19 @@ describe('ConfigContextProvider', () => {
 
   describe('GA4 Keyboard Generation Tracking & Debouncing', () => {
     const getKeyboardGeneratedCalls = () => {
-      return (trackEvent as jest.Mock).mock.calls.filter(
-        (call) => call[0] === 'keyboard_generated'
-      );
+      return vi
+        .mocked(trackEvent)
+        .mock.calls.filter((call) => call[0] === 'keyboard_generated');
     };
 
     beforeEach(() => {
-      jest.useFakeTimers();
-      (trackEvent as jest.Mock).mockClear();
+      vi.useFakeTimers();
+      vi.mocked(trackEvent).mockClear();
       mockInitialConfig('points: {}');
     });
 
     afterEach(() => {
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
 
     it('should debounce tracking by 5 seconds and only send the latest event', async () => {
@@ -1152,7 +1152,7 @@ describe('ConfigContextProvider', () => {
 
       // Advance time slightly (e.g., 2 seconds) - event should not be tracked yet
       act(() => {
-        jest.advanceTimersByTime(2000);
+        vi.advanceTimersByTime(2000);
       });
       expect(getKeyboardGeneratedCalls().length).toBe(0);
 
@@ -1173,13 +1173,13 @@ describe('ConfigContextProvider', () => {
 
       // Advance time by 4 seconds - still shouldn't fire because timer reset
       act(() => {
-        jest.advanceTimersByTime(4000);
+        vi.advanceTimersByTime(4000);
       });
       expect(getKeyboardGeneratedCalls().length).toBe(0);
 
       // Advance time by 1 more second to reach 5 seconds of total delay for B
       act(() => {
-        jest.advanceTimersByTime(1000);
+        vi.advanceTimersByTime(1000);
       });
 
       // It should have tracked B, with previous_config_id of undefined (root)
@@ -1222,10 +1222,13 @@ describe('ConfigContextProvider', () => {
 
       // Let debounce run and complete
       act(() => {
-        jest.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(5000);
       });
       expect(getKeyboardGeneratedCalls().length).toBe(1);
       const firstPayload = getKeyboardGeneratedCalls()[0][1];
+      if (!firstPayload) {
+        throw new Error('Missing first analytics payload');
+      }
       const firstConfigId = firstPayload.config_id;
       expect(firstPayload.previous_config_id).toBeUndefined();
 
@@ -1246,10 +1249,13 @@ describe('ConfigContextProvider', () => {
 
       // Let debounce run
       act(() => {
-        jest.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(5000);
       });
       expect(getKeyboardGeneratedCalls().length).toBe(2);
       const secondPayload = getKeyboardGeneratedCalls()[1][1];
+      if (!secondPayload) {
+        throw new Error('Missing second analytics payload');
+      }
       expect(secondPayload.previous_config_id).toBe(firstConfigId);
     });
 
@@ -1283,7 +1289,7 @@ describe('ConfigContextProvider', () => {
 
       // Let debounce run
       act(() => {
-        jest.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(5000);
       });
       expect(getKeyboardGeneratedCalls().length).toBe(1);
 
@@ -1303,7 +1309,7 @@ describe('ConfigContextProvider', () => {
       });
 
       act(() => {
-        jest.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(5000);
       });
       // Should still be called only once!
       expect(getKeyboardGeneratedCalls().length).toBe(1);
@@ -1338,7 +1344,7 @@ describe('ConfigContextProvider', () => {
       });
 
       act(() => {
-        jest.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(5000);
       });
       expect(getKeyboardGeneratedCalls().length).toBe(1);
 
@@ -1363,11 +1369,14 @@ describe('ConfigContextProvider', () => {
       });
 
       act(() => {
-        jest.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(5000);
       });
 
       expect(getKeyboardGeneratedCalls().length).toBe(2);
       const secondPayload = getKeyboardGeneratedCalls()[1][1];
+      if (!secondPayload) {
+        throw new Error('Missing second analytics payload');
+      }
       expect(secondPayload.previous_config_id).toBeUndefined();
     });
 
@@ -1465,6 +1474,47 @@ pcbs:
 });
 
 describe('Design generation revisions', () => {
+  it('keeps library updates from starting a full build while the CAD workspace is open', async () => {
+    vi.useFakeTimers();
+    try {
+      localStorage.clear();
+      mockInitialConfig(mockConfig);
+      let context: ReturnType<typeof useConfigContext>;
+      const Capture = () => {
+        context = useConfigContext();
+        return null;
+      };
+      render(
+        <ConfigContextProvider>
+          <Capture />
+        </ConfigContextProvider>
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(500);
+      });
+      act(() => context!.setCadActive(true));
+      mockErgogenWorker.postMessage.mockClear();
+      act(() =>
+        context!.setInjectionInput([
+          [
+            'footprint',
+            'library/owned',
+            'module.exports = {params:{},body:()=>""}',
+          ],
+        ])
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(500);
+      });
+      expect(mockErgogenWorker.postMessage).not.toHaveBeenCalled();
+      await act(async () => {
+        await context!.generateNow(mockConfig, [], { pointsonly: false });
+      });
+      expect(mockErgogenWorker.postMessage).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('keeps the newest preview when workers finish out of order', async () => {
     localStorage.clear();
     mockInitialConfig(mockConfig);

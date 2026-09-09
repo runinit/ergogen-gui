@@ -1,13 +1,11 @@
 /**
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
 
-/* eslint-disable react/prop-types */
-import '@testing-library/jest-dom';
+import '@testing-library/jest-dom/vitest';
+import type { ComponentProps, PropsWithChildren } from 'react';
+import type { Link } from 'react-router-dom';
 import { vi } from 'vitest';
-
-// Global alias for compatibility with Jest-centric test files
-globalThis.jest = vi as any;
 
 window.URL.createObjectURL = vi.fn();
 
@@ -20,20 +18,24 @@ if (typeof global.TextEncoder === 'undefined') {
 
 // Global mock for react-router-dom
 vi.mock('react-router-dom', () => ({
-  Link: ({ children, to, onClick, ...props }) => {
+  Link: ({ children, to, onClick, ...props }: ComponentProps<typeof Link>) => {
     return (
-      <a href={to} onClick={onClick} {...props}>
+      <a
+        href={typeof to === 'string' ? to : to.pathname}
+        onClick={onClick}
+        {...props}
+      >
         {children}
       </a>
     );
   },
   useNavigate: () => vi.fn(),
   Navigate: () => null,
-  Routes: ({ children }) => children,
+  Routes: ({ children }: PropsWithChildren) => children,
   Route: () => null,
 }));
 
-// Global mock for workers to avoid import.meta syntax issues in Jest
+// Global mock for workers to avoid import.meta syntax issues in tests
 vi.mock('./workers/workerFactory', () => ({
   createErgogenWorker: () => null,
   createJscadWorker: () => null,

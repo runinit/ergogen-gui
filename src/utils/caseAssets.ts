@@ -74,12 +74,22 @@ export async function readAssets(
       },
     };
   }
-  const zip = await JSZip.loadAsync(await file.arrayBuffer()),
-    assets: CaseAssets = {};
+  const zip = await JSZip.loadAsync(await file.arrayBuffer());
+  return readArchiveAssets(zip);
+}
+export async function readArchiveAssets(zip: JSZip) {
+  const assets: CaseAssets = {};
   const config = await zip.file('config.yaml')?.async('string');
   const manifest = zip.file('case-assets.json');
   if (manifest) {
-    for (const name of JSON.parse(await manifest.async('string'))) {
+    const names = JSON.parse(await manifest.async('string'));
+    if (!Array.isArray(names) || names.length > 5000) {
+      throw new Error('Invalid case asset manifest.');
+    }
+    for (const name of names) {
+      if (typeof name !== 'string' || name.split('/').includes('..')) {
+        throw new Error('Invalid case asset path.');
+      }
       const entry = zip.file(`assets/${name}`);
       if (!entry) {
         throw new Error(`Project archive is missing ${name}.`);
@@ -121,6 +131,10 @@ export function packageAssets(
       value.startsWith(BINARY) ? assetBytes(value) : value
     );
     if (/\.(step|stp|wrl|vrml)$/i.test(name)) {
+      zip.file(
+        `models/${name}`,
+        value.startsWith(BINARY) ? assetBytes(value) : value
+      );
       for (const directory of directories) {
         zip.file(
           `outputs/pcbs/${directory}models/${name}`,

@@ -549,3 +549,40 @@ Its board linker resolves mechanical inventory before solids while retaining
 final PCB export after outline publication. Source, injections and asset bytes
 identify a generation revision; Apply adopts that result instead of rebuilding.
 Model assets live outside YAML in IndexedDB and are included in project ZIPs.
+
+### Bundled footprint visibility
+
+Custom Libraries lists the worker's generated footprint catalogue in a
+collapsible section. Bundled footprints are already available for generation;
+opening one creates an editable override through the existing injection editor.
+Saved overrides take precedence and are omitted from the bundled choices.
+
+## CAD workspace and reusable footprints
+
+`CaseWizard` hosts Case, Footprint library and YAML views. `AssemblyTree` derives
+selection targets from declarations and board analysis before solids exist.
+`CaseModelInset` and `FootprintCanvas` share numeric/visual model bindings.
+
+UI calls `footprintService`; its worker delegates inspection, conversion and model
+wrapping to `ergogen.footprints`. Model import reuses `model.worker`. The engine
+parser applies changes after dynamic footprint generation and feeds both native
+assembly export and browser previews.
+
+`footprintLibrary` owns IndexedDB entries, revision conflict checks and local/tab
+notifications. Config and case workers capture source, injection, library and asset
+revisions. Stale replies are rejected; asynchronous component lookups apply edits
+to the current draft. Cached portable bindings remain library-owned.
+
+`zip` and `ergogenBundleLoader` package/restore snapshots and cached models.
+See [CAD-WORKSPACE.md](CAD-WORKSPACE.md) for identity and portability rules.
+
+On Node 26, run unit tests with `NODE_OPTIONS=--no-experimental-webstorage` so
+Vitest uses jsdom storage. `PLAYWRIGHT_PORT=3002` isolates browser validation
+from an existing development server. Repack the engine dependency before a full
+`pnpm run build`; the prebuild step regenerates the served engine bundle.
+
+Run `pnpm run typecheck` to check application code and unit tests together.
+Precommit includes this check, so both CI workflows enforce it. Tests use Vitest
+globals and `vi.mocked` for typed mocks; there is no Jest runtime alias. DOM
+matchers come from `@testing-library/jest-dom/vitest`. The existing ESLint Jest
+rules remain lint-only, configured to recognize Vitest's `vi` API.

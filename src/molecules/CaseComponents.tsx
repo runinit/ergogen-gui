@@ -1,3 +1,6 @@
+import ModelEditor from './ModelEditor';
+import { modelList, modelEnvelope } from '../utils/modelGeometry';
+import type { ModelBinding } from '../types/footprint';
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from 'react';
 import { Box3, Euler, Matrix4, Quaternion, Vector3 } from 'three';
 import { CaseConfig, BoardInventory } from '../types/case';
@@ -6,6 +9,10 @@ import { SourcePath } from '../utils/designSource';
 import Field, { CaseHelp } from './CaseField';
 type Props = {
   board?: BoardInventory;
+  selectedId?: string;
+  activeModel?: number;
+  onModelSelect?: (index: number) => void;
+  onSelect?: (id: string) => void;
   spec: CaseConfig;
   assets: CaseAssets;
   onAssets: Dispatch<SetStateAction<CaseAssets>>;
@@ -22,6 +29,10 @@ type ModelInfo = {
 const INFO_PREFIX = '__model_';
 export default function CaseComponents({
   board,
+  selectedId,
+  activeModel: selectedModel,
+  onModelSelect,
+  onSelect,
   spec,
   assets,
   onAssets,
@@ -35,6 +46,73 @@ export default function CaseComponents({
   const [scale, setScale] = useState(1),
     [offset, setOffset] = useState([0, 0, 0]),
     [rotation, setRotation] = useState([0, 0, 0]);
+  const [shared, setShared] = useState(true);
+  const [localModel, setLocalModel] = useState(0);
+  const activeModel = selectedModel ?? localModel;
+  const setActiveModel = onModelSelect || setLocalModel;
+  const currentComponent = board?.components.find(
+    (component) => component.id === selected
+  );
+  let modelError = '';
+  const resolveAsset = (path: string) => {
+    try {
+      return findAsset(path, assets);
+    } catch (error) {
+      modelError = String(error);
+      return undefined;
+    }
+  };
+  const modelBindings = modelList(
+    spec.board?.models?.[selected] ||
+      (currentComponent?.models.map((model) => ({
+        ...model,
+        asset: resolveAsset(model.path),
+      })) as ModelBinding[] | undefined)
+  );
+  const updateModels = (models: ModelBinding[], nextAssets: CaseAssets) => {
+    onAssets(nextAssets);
+    const envelope = modelEnvelope(models, nextAssets);
+    const ids = targets(selected);
+    onEdit(['board'], {
+      ...spec.board,
+      models: {
+        ...spec.board?.models,
+        ...Object.fromEntries(ids.map((id) => [id, models])),
+      },
+      components: {
+        ...spec.board?.components,
+        ...Object.fromEntries(
+          ids.map((id) => [
+            id,
+            {
+              ...spec.board?.components?.[id],
+              ...(envelope || { size: null, height: null }),
+            },
+          ])
+        ),
+      },
+    });
+  };
+  useEffect(() => {
+    if (selectedId) {
+      setSelected(selectedId);
+    }
+  }, [selectedId]);
+  const targets = (id: string) => {
+    const footprint = board?.components.find((c) => c.id === id)?.footprint;
+    return shared && footprint
+      ? board!.components
+          .filter((c) => c.populated && c.footprint === footprint)
+          .map((c) => c.id)
+      : [id];
+  };
+  const editEnvelope = (id: string, property: string, value: unknown) => {
+    const components = { ...spec.board?.components };
+    for (const target of targets(id)) {
+      components[target] = { ...components[target], [property]: value };
+    }
+    onEdit(['board', 'components'], components);
+  };
   const worker = useRef<Worker | null>(null),
     mounted = useRef(true);
   useEffect(() => {
@@ -99,10 +177,14 @@ export default function CaseComponents({
       }
     }
   };
+  const revision = JSON.stringify([board?.source, spec.board, assets]);
+  const liveRevision = useRef(revision);
+  liveRevision.current = revision;
   const associate = async (
     id = selected,
     name = fileName,
-    transform = { scale: [scale, scale, scale], offset, rotate: rotation }
+    transform = { scale: [scale, scale, scale], offset, rotate: rotation },
+    scope: 'matching' | 'instance' = 'matching'
   ) => {
     if (!id || !name) {
       return;
@@ -111,7 +193,7 @@ export default function CaseComponents({
     setError('');
     try {
       const info = await inspect(name, assets);
-      if (!mounted.current) {
+      if (!mounted.current || liveRevision.current !== revision) {
         return;
       }
       const matrix = new Matrix4().compose(
@@ -147,25 +229,36 @@ export default function CaseComponents({
         [`${INFO_PREFIX}${name}.json`]: JSON.stringify(info),
         ...(/\.stl$/i.test(name) ? { [target]: info.vrml } : {}),
       }));
+      const ids = scope === 'matching' ? targets(id) : [id];
       onEdit(['board'], {
         ...spec.board,
         models: {
           ...spec.board?.models,
-          [id]: {
-            path: '${KIPRJMOD}/models/' + target,
-            ...transform,
-            asset: name,
-          },
+          ...Object.fromEntries(
+            ids.map((id) => [
+              id,
+              {
+                path: '${KIPRJMOD}/models/' + target,
+                ...transform,
+                asset: name,
+              },
+            ])
+          ),
         },
         components: {
           ...spec.board?.components,
-          [id]: {
-            ...spec.board?.components?.[id],
-            size: [size.x, size.y],
-            height: [box.min.z, box.max.z],
-            body_offset: [center.x, center.y],
-            asset: name,
-          },
+          ...Object.fromEntries(
+            ids.map((id) => [
+              id,
+              {
+                ...spec.board?.components?.[id],
+                size: [size.x, size.y],
+                height: [box.min.z, box.max.z],
+                body_offset: [center.x, center.y],
+                asset: name,
+              },
+            ])
+          ),
         },
       });
     } catch (error) {
@@ -185,6 +278,20 @@ export default function CaseComponents({
       return;
     }
     for (const component of board.components) {
+      // Portable library bindings already resolve in the engine; leave them linked.
+      if (
+        component.models.length &&
+        component.models.every((model) => {
+          const path = model.path.replace(/^\$\{KIPRJMOD\}\/models\//, '');
+          return (
+            model.path.startsWith('${KIPRJMOD}/models/') &&
+            assets[path] &&
+            assets[`${INFO_PREFIX}${path}.json`]
+          );
+        })
+      ) {
+        continue;
+      }
       const linked = spec.board?.components?.[component.id]?.asset;
       if (
         linked &&
@@ -194,7 +301,11 @@ export default function CaseComponents({
       ) {
         continue;
       }
-      if (!component.populated) {
+      if (
+        !component.populated ||
+        spec.board?.models?.[component.id] !== undefined ||
+        component.models.length > 1
+      ) {
         continue;
       }
       let match;
@@ -215,28 +326,22 @@ export default function CaseComponents({
         continue;
       }
       automatic.current.add(key);
-      void associateRef.current(component.id, name, model);
+      void associateRef.current(component.id, name, model, 'instance');
       break;
     }
-  }, [busy, board, spec.board?.components, assets]);
+  }, [busy, board, spec.board?.components, spec.board?.models, assets]);
   return (
     <section aria-label="Board components">
-      <h3>PCB and components</h3>
       <label>
-        Import models or project ZIP
         <input
-          type="file"
-          accept=".step,.stp,.stl,.wrl,.vrml,.zip,.kicad_pcb"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) {
-              void importFile(file);
-            }
-          }}
+          type="checkbox"
+          checked={shared}
+          onChange={(event) => setShared(event.target.checked)}
         />
+        Apply dimensions and manual model assignments to matching footprints
       </label>
       {busy && <p role="status">{busy}</p>}
-      {error && <p role="alert">{error}</p>}
+      {(error || modelError) && <p role="alert">{error || modelError}</p>}
       {!board ? (
         <p>
           Select a generated board or import a KiCad PCB in Layout. Models
@@ -244,11 +349,6 @@ export default function CaseComponents({
         </p>
       ) : (
         <>
-          <p>
-            PCB thickness: {board.thickness} mm ·{' '}
-            {board.components.filter((c) => c.populated).length} populated
-            components
-          </p>
           <Field
             label="Component footprint"
             value={selected}
@@ -256,57 +356,105 @@ export default function CaseComponents({
               '',
               ...board.components.filter((c) => c.populated).map((c) => c.id),
             ]}
-            onChange={(value) => setSelected(String(value))}
+            onChange={(value) => {
+              setSelected(String(value));
+              onSelect?.(String(value));
+            }}
           />
           <p>
             {board.components.find((c) => c.id === selected)?.reference}{' '}
             {board.components.find((c) => c.id === selected)?.footprint}
           </p>
-          <Field
-            label="Component model"
-            value={fileName}
-            choices={[
-              '',
-              ...Object.keys(assets).filter((name) =>
-                /\.(step|stp|stl|wrl|vrml)$/i.test(name)
-              ),
-            ]}
-            onChange={(value) => setFileName(String(value))}
-          />
-          <Field
-            label="Model scale (mm per source unit)"
-            value={scale}
-            onChange={(value) => setScale(Number(value))}
-          />
-          {[0, 1, 2].map((axis) => (
-            <div key={axis}>
-              <Field
-                label={`Model ${'XYZ'[axis]} offset (mm)`}
-                value={offset[axis]}
-                onChange={(value) =>
-                  setOffset((previous) =>
-                    previous.map((v, i) => (i === axis ? Number(value) : v))
-                  )
-                }
+          {selected && (
+            <>
+              <ModelEditor
+                key={selected}
+                models={modelBindings}
+                assets={assets}
+                selected={activeModel}
+                onSelect={setActiveModel}
+                onChange={updateModels}
               />
-              <Field
-                label={`Model ${'XYZ'[axis]} rotation (degrees)`}
-                value={rotation[axis]}
-                onChange={(value) =>
-                  setRotation((previous) =>
-                    previous.map((v, i) => (i === axis ? Number(value) : v))
-                  )
-                }
+            </>
+          )}
+          <details>
+            <summary>Import project assets & help</summary>{' '}
+            <label>
+              Import models or project ZIP
+              <input
+                type="file"
+                accept=".step,.stp,.stl,.wrl,.vrml,.zip,.kicad_pcb"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) {
+                    void importFile(file);
+                  }
+                }}
               />
-            </div>
-          ))}
-          <button
-            disabled={!selected || !fileName || !!busy}
-            onClick={() => void associate()}
-          >
-            Associate model and update envelope
-          </button>
-          <CaseHelp label="Component model" />
+            </label>
+            <h3>Footprint and model setup (optional)</h3>
+            <p>
+              Generated PCB footprints and available project models are reused
+              automatically. Import only missing assets. Missing dimensions do
+              not block case generation; their clearance remains unchecked.
+            </p>
+          </details>
+          <details>
+            <summary>Use a cached project model</summary>
+            <Field
+              label="Component model"
+              value={fileName}
+              choices={[
+                '',
+                ...Object.keys(assets).filter((name) =>
+                  /\.(step|stp|stl|wrl|vrml)$/i.test(name)
+                ),
+              ]}
+              onChange={(value) => setFileName(String(value))}
+            />
+            {selected && fileName && (
+              <>
+                <Field
+                  label="Model scale (mm per source unit)"
+                  value={scale}
+                  onChange={(value) => setScale(Number(value))}
+                />
+                {[0, 1, 2].map((axis) => (
+                  <div key={axis}>
+                    <Field
+                      label={`Model ${'XYZ'[axis]} offset (mm)`}
+                      value={offset[axis]}
+                      onChange={(value) =>
+                        setOffset((previous) =>
+                          previous.map((v, i) =>
+                            i === axis ? Number(value) : v
+                          )
+                        )
+                      }
+                    />
+                    <Field
+                      label={`Model ${'XYZ'[axis]} rotation (degrees)`}
+                      value={rotation[axis]}
+                      onChange={(value) =>
+                        setRotation((previous) =>
+                          previous.map((v, i) =>
+                            i === axis ? Number(value) : v
+                          )
+                        )
+                      }
+                    />
+                  </div>
+                ))}
+                <button
+                  disabled={!selected || !fileName || !!busy}
+                  onClick={() => void associate()}
+                >
+                  Associate model and update envelope
+                </button>
+                <CaseHelp label="Component model" />
+              </>
+            )}
+          </details>
           {board.components.some((c) => c.populated && c.family) && (
             <details>
               <summary>Keycap clearance</summary>
@@ -336,32 +484,61 @@ export default function CaseComponents({
             </details>
           )}
           <h3>Resolved and missing envelopes</h3>
-          {board.components
-            .filter((c) => c.populated)
-            .map((component) => {
-              const definition = spec.board?.components?.[component.id] || {},
-                size = definition.size || component.size,
-                height = definition.height || component.height;
-              return (
-                <details key={component.id} open={!size || !height}>
-                  <summary>
+          {Array.from(
+            new Set(
+              board.components
+                .filter((c) => c.populated)
+                .map((c) => c.footprint)
+            )
+          ).map((footprint) => {
+            const members = board.components.filter(
+              (c) => c.populated && c.footprint === footprint
+            );
+            const component =
+              members.find((c) => c.id === selected) || members[0];
+            const definition = spec.board?.components?.[component.id] || {},
+              size = definition.size || component.size,
+              height = definition.height || component.height;
+            const bindings = modelList(
+              spec.board?.models?.[component.id] ||
+                (component.models as ModelBinding[])
+            );
+            const prepared =
+              bindings.length > 0 &&
+              bindings.every((model) => {
+                try {
+                  const asset = model.asset || findAsset(model.path, assets);
+                  return !!asset && !!assets[`__model_${asset}.json`];
+                } catch {
+                  return false;
+                }
+              });
+            return (
+              <details
+                key={footprint}
+                open={members.some((c) => c.id === selected)}
+              >
+                <summary>
+                  {footprint} · {members.length} placements
+                </summary>
+                <p>{members.map((c) => c.reference).join(', ')}</p>
+                <div id={`case-feature-board.components.${component.id}`}>
+                  <p>
                     {component.reference} · {component.footprint} ·{' '}
                     {size && height ? 'envelope available' : 'needs dimensions'}{' '}
                     · {component.side} ·{' '}
-                    {spec.board?.models?.[component.id]?.asset
+                    {prepared
                       ? 'model associated'
                       : component.models.length
                         ? 'model needs import'
                         : 'reference envelope'}
-                  </summary>
-                  {!spec.board?.models?.[component.id]?.asset &&
-                    component.models.length > 0 && (
-                      <p>
-                        Import the referenced model or use the measured
-                        envelope:{' '}
-                        {component.models.map((model) => model.path).join(', ')}
-                      </p>
-                    )}
+                  </p>
+                  {!prepared && component.models.length > 0 && (
+                    <p>
+                      Import the referenced model or use the measured envelope:{' '}
+                      {component.models.map((model) => model.path).join(', ')}
+                    </p>
+                  )}
                   {[0, 1].map((axis) => (
                     <Field
                       key={axis}
@@ -370,10 +547,7 @@ export default function CaseComponents({
                       onChange={(value) => {
                         const next = [...(size || [0, 0])];
                         next[axis] = value;
-                        onEdit(['board', 'components', component.id], {
-                          ...definition,
-                          size: next,
-                        });
+                        editEnvelope(component.id, 'size', next);
                       }}
                     />
                   ))}
@@ -385,14 +559,16 @@ export default function CaseComponents({
                       onChange={(value) => {
                         const next = [...(height || [0, 0])];
                         next[axis] = value;
-                        onEdit(['board', 'components', component.id], {
-                          ...definition,
-                          height: next,
-                        });
+                        editEnvelope(component.id, 'height', next);
                       }}
                     />
                   ))}
-                  <button onClick={() => setSelected(component.id)}>
+                  <button
+                    onClick={() => {
+                      setSelected(component.id);
+                      onSelect?.(component.id);
+                    }}
+                  >
                     Attach model to {component.reference}
                   </button>
                   <label>
@@ -408,9 +584,10 @@ export default function CaseComponents({
                     />
                     Create a linked case opening
                   </label>
-                </details>
-              );
-            })}
+                </div>
+              </details>
+            );
+          })}
         </>
       )}
     </section>

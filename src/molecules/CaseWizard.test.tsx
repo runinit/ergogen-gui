@@ -56,6 +56,15 @@ beforeEach(() => {
 });
 
 describe('Case wizard', () => {
+  it('can inspect a selected part before an assembly is generated', () => {
+    render(<CaseWizard onClose={mocks.close} />);
+    fireEvent.click(screen.getByRole('treeitem', { name: 'Case shell' }));
+    fireEvent.click(screen.getByRole('button', { name: 'assembled' }));
+    expect(
+      screen.getByRole('combobox', { name: 'Inspect part' })
+    ).toBeEnabled();
+  });
+
   it('keeps edits in the draft and cancels without generating the saved design', () => {
     render(<CaseWizard onClose={mocks.close} />);
     fireEvent.click(screen.getByRole('button', { name: 'Enclosure' }));
@@ -148,9 +157,9 @@ it('provides named help for wizard and advanced controls across every step', () 
     'Hardware',
     'Review',
   ]) {
-    fireEvent.click(screen.getByRole('button', { name: step, exact: true }));
-    for (const control of container.querySelectorAll<HTMLElement>(
-      'button,input,select,summary'
+    fireEvent.click(screen.getByRole('button', { name: step }));
+    for (const control of Array.from(
+      container.querySelectorAll<HTMLElement>('button,input,select,summary')
     )) {
       fireEvent.pointerOver(control);
       const description = control.getAttribute('aria-describedby');
@@ -164,4 +173,93 @@ it('provides named help for wizard and advanced controls across every step', () 
       fireEvent.pointerOut(control);
     }
   }
+});
+
+it('keeps repeated component findings out of Layout and groups them in Review', () => {
+  mocks.result = {
+    designs: {
+      assemblies: {},
+      analysis: {
+        case: {
+          parameters: {},
+          placements: [],
+          suggestions: [],
+          edges: [],
+          findings: ['D1', 'D2'].map((id) => ({
+            feature: `designs.assemblies.case.board.components.${id}`,
+            code: 'component-height',
+            severity: 'warning',
+            message: `${id}: missing body size or height.`,
+          })),
+        },
+      },
+    },
+  };
+  render(<CaseWizard onClose={mocks.close} />);
+  expect(screen.queryByText(/D1: missing/)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+  expect(screen.getAllByText(/component-height/)).toHaveLength(1);
+  expect(
+    screen.getByRole('button', { name: 'Set up components' })
+  ).toBeEnabled();
+});
+
+it('offers a mount count beneath the mounting system', () => {
+  render(<CaseWizard onClose={mocks.close} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Mounting' }));
+  expect(screen.getByLabelText('Mount / gasket count')).toBeInTheDocument();
+});
+
+it('clears the requested count to restore spacing-based placement', () => {
+  render(<CaseWizard onClose={mocks.close} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Mounting' }));
+  let field = screen.getByLabelText('Mount / gasket count');
+  fireEvent.change(field, { target: { value: '4' } });
+  fireEvent.blur(field);
+  expect(
+    parse(mocks.draft.mock.lastCall![0]).designs.assemblies.case.mount_count
+  ).toBe(4);
+  field = screen.getByLabelText('Mount / gasket count');
+  fireEvent.change(field, { target: { value: '' } });
+  fireEvent.blur(field);
+  expect(
+    parse(mocks.draft.mock.lastCall![0]).designs.assemblies.case.mount_count
+  ).toBeUndefined();
+});
+
+it('opens manufacturing from an affected finding', () => {
+  mocks.result = {
+    designs: {
+      assemblies: {},
+      analysis: {
+        case: {
+          parameters: {},
+          placements: [],
+          suggestions: [],
+          edges: [],
+          findings: [
+            {
+              feature: 'designs.assemblies.case.manufacturing.bottom.tool',
+              code: 'tool',
+              severity: 'error',
+              message: 'Tool cannot reach the cavity',
+            },
+          ],
+        },
+      },
+    },
+  };
+  render(<CaseWizard onClose={mocks.close} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+  fireEvent.click(screen.getByText('Affected features (1)'));
+  fireEvent.click(screen.getByRole('button', { name: 'tool' }));
+  expect(screen.getByRole('heading', { name: 'Manufacturing' })).toBeVisible();
+});
+
+it('waits for automatic mounting edits before enabling generation', () => {
+  render(<CaseWizard onClose={mocks.close} />);
+  fireEvent.change(screen.getByLabelText('Mounting system'), {
+    target: { value: 'gasket' },
+  });
+  expect(screen.getByRole('button', { name: 'Generate' })).toBeDisabled();
 });

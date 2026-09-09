@@ -36,8 +36,8 @@ importers:
         specifier: 1.2.0
         version: 1.2.0
       ergogen:
-        specifier: file:vendor/ergogen-guided-de034165784e.tgz
-        version: '@runinit/ergogen@file:vendor/ergogen-guided-de034165784e.tgz'
+        specifier: file:vendor/ergogen-cad-e2d947209f40.tgz
+        version: '@runinit/ergogen@file:vendor/ergogen-cad-e2d947209f40.tgz'
       file-saver:
         specifier: ^2.0.5
         version: 2.0.5
@@ -147,6 +147,9 @@ importers:
       '@types/react':
         specifier: ^18.2.0
         version: 18.3.28
+      '@types/react-dom':
+        specifier: ^18.3.7
+        version: 18.3.7(@types/react@18.3.28)
       '@types/styled-components':
         specifier: ^5.1.34
         version: 5.1.36
@@ -1499,8 +1502,8 @@ packages:
   '@rtsao/scc@1.1.0':
     resolution: {integrity: sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g==}
 
-  '@runinit/ergogen@file:vendor/ergogen-guided-de034165784e.tgz':
-    resolution: {integrity: sha512-keXk6JOJP1zYzW70p+ENrimAEVLFR8R2EyZW2Jcm37oP7wy+YI4jojIfXIT3xUzd9hq40X+YBFDWs5aeV41b+g==, tarball: file:vendor/ergogen-guided-de034165784e.tgz}
+  '@runinit/ergogen@file:vendor/ergogen-cad-e2d947209f40.tgz':
+    resolution: {integrity: sha512-9h0VtEJFHfNtMJN7xREkHwxCAKmftMqdnYRmol3Ra0rGr20dgOW18zl0mEYgOQUryM7c5f8Lt9fpQ8NXJmP+LA==, tarball: file:vendor/ergogen-cad-e2d947209f40.tgz}
     version: 5.1.0-develop
     hasBin: true
 
@@ -5702,7 +5705,7 @@ snapshots:
 
   '@rtsao/scc@1.1.0': {}
 
-  '@runinit/ergogen@file:vendor/ergogen-guided-de034165784e.tgz':
+  '@runinit/ergogen@file:vendor/ergogen-cad-e2d947209f40.tgz':
     dependencies:
       '@salusoft89/planegcs': 1.2.0
       fs-extra: 11.3.6

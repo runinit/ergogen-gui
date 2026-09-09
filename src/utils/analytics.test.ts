@@ -17,7 +17,7 @@ describe('Analytics Utility', () => {
 
   beforeEach(() => {
     // Reset window.gtag before each test
-    window.gtag = jest.fn();
+    window.gtag = vi.fn();
     // Reset environment variable before each test
     process.env.REACT_APP_ERGOGEN_VERSION = originalEnv;
     process.env.REACT_APP_GTAG_ID = 'G-TEST12345';
@@ -207,7 +207,7 @@ describe('Analytics Utility', () => {
 
     it('should not call window.gtag when analytics is disabled', () => {
       localStorage.setItem('ergogen:config:sendUsageMetrics', 'false');
-      const mockGtag = jest.fn();
+      const mockGtag = vi.fn();
       window.gtag = mockGtag;
 
       trackEvent('test_event');

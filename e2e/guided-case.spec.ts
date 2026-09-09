@@ -206,6 +206,9 @@ test('imports an STL for a PCB component and packages its KiCad model associatio
     .getByLabel('Mounting system', { exact: true })
     .selectOption('gasket');
   await dialog.getByRole('button', { name: 'Components', exact: true }).click();
+  await dialog
+    .getByText('Custom:Controller · 1 placements', { exact: true })
+    .click();
   await expect(dialog.getByText(/U1.*needs dimensions/)).toBeVisible();
   const { BoxGeometry, Mesh } = await import('three');
   const { STLExporter } = await import('three-stdlib');
@@ -220,6 +223,7 @@ test('imports an STL for a PCB component and packages its KiCad model associatio
     });
   const choices = dialog.getByLabel('Component footprint', { exact: true });
   await choices.selectOption({ index: 1 });
+  await dialog.getByText('Use a cached project model', { exact: true }).click();
   await dialog
     .getByRole('button', { name: 'Associate model and update envelope' })
     .click();
@@ -230,6 +234,14 @@ test('imports an STL for a PCB component and packages its KiCad model associatio
     dialog.getByRole('button', { name: 'Generate', exact: true })
   ).toBeEnabled();
   await dialog.getByRole('button', { name: 'Generate', exact: true }).click();
+  await expect(
+    dialog.getByRole('button', { name: 'Generating…', exact: true })
+  ).not.toBeVisible({ timeout: 90000 });
+  if (await dialog.getByRole('alert').count()) {
+    await dialog.getByRole('button', { name: 'Review', exact: true }).click();
+    console.log(await dialog.getByLabel('Grouped findings').innerText());
+  }
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
   await expect(
     dialog.getByText('Generated current draft', { exact: true })
   ).toBeVisible({ timeout: 90000 });
@@ -259,6 +271,9 @@ test('imports an STL for a PCB component and packages its KiCad model associatio
     .first()
     .click();
   await page.getByRole('button', { name: 'Components', exact: true }).click();
+  await page
+    .getByText('Custom:Controller · 1 placements', { exact: true })
+    .click();
   await expect(page.getByText(/U1.*envelope available/)).toBeVisible();
 });
 
@@ -291,4 +306,82 @@ test('drags a gasket without generating and can undo the move', async ({
   await dialog.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(moved).toHaveAttribute('transform', before!);
   await expect(dialog.getByLabel('3D assembly preview')).toHaveCount(0);
+});
+
+test('redistributes a requested contact count without generating solids', async ({
+  page,
+}) => {
+  const dialog = await open(page);
+  await dialog.getByLabel('Switch family', { exact: true }).selectOption('mx');
+  await dialog
+    .getByLabel('Mounting system', { exact: true })
+    .selectOption('gasket');
+  await expect(
+    dialog.getByRole('button', { name: /^gasket gasket_/ }).first()
+  ).toBeVisible();
+  await dialog.getByRole('button', { name: 'Mounting', exact: true }).click();
+  const count = dialog.getByLabel('Mount / gasket count', { exact: true });
+  await count.fill('2');
+  await count.press('Tab');
+  await expect(
+    dialog.getByRole('button', { name: /^gasket gasket_/ })
+  ).toHaveCount(2);
+  await expect(
+    dialog.getByRole('button', { name: /^mount case_mount_/ }).first()
+  ).toBeVisible();
+  await expect(dialog.getByLabel('3D assembly preview')).toHaveCount(0);
+});
+
+test('generates with optional missing component envelopes and groups review', async ({
+  page,
+}) => {
+  const dialog = await open(page);
+  const pcb =
+    '(kicad_pcb (version 20260206) (general (thickness 1.6)) (gr_rect (start 0 0) (end 60 40) (layer "Edge.Cuts")) ' +
+    ['D1', 'D2']
+      .map(
+        (id, i) =>
+          `(footprint "Diode:Unknown" (layer "F.Cu") (at ${20 + i * 10} 20) (uuid "${id}") (property "Reference" "${id}"))`
+      )
+      .join(' ') +
+    ')';
+  await dialog.getByLabel('Import KiCad PCB', { exact: true }).setInputFiles({
+    name: 'optional.kicad_pcb',
+    mimeType: 'text/plain',
+    buffer: Buffer.from(pcb),
+  });
+  await dialog
+    .getByLabel('Mounting system', { exact: true })
+    .selectOption('gasket');
+  await expect(
+    dialog.getByRole('button', { name: /^mount case_mount_/ }).first()
+  ).toBeVisible();
+  await expect(dialog.getByText(/D1: missing/)).not.toBeVisible();
+  await dialog.getByRole('button', { name: 'Review', exact: true }).click();
+  await expect(
+    dialog.getByRole('heading', {
+      name: 'Incomplete checks · component-height (2)',
+    })
+  ).toBeVisible();
+  await dialog
+    .getByRole('button', { name: 'Set up components', exact: true })
+    .click();
+  await expect(dialog.getByText('Diode:Unknown · 2 placements')).toBeVisible();
+  await expect(
+    dialog.getByRole('button', { name: 'Generate', exact: true })
+  ).toBeEnabled();
+  await dialog.getByRole('button', { name: 'Generate', exact: true }).click();
+  await expect(
+    dialog.getByRole('button', { name: 'Generating…', exact: true })
+  ).not.toBeVisible({ timeout: 90000 });
+  if (await dialog.getByRole('alert').count()) {
+    await dialog.getByRole('button', { name: 'Review', exact: true }).click();
+    console.log(await dialog.getByLabel('Grouped findings').innerText());
+  }
+  expect(await dialog.getByRole('alert').allTextContents()).toEqual([]);
+  await page.screenshot({ path: 'test-results/optional-component-setup.png' });
+  await expect(
+    dialog.getByRole('status').filter({ hasText: 'Generated current draft' })
+  ).toBeVisible({ timeout: 90000 });
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
 });

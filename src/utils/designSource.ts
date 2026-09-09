@@ -29,6 +29,7 @@ export function editDesign(
       source.slice(0, node.range[0]) +
       stringify(value, {
         collectionStyle: 'flow',
+        aliasDuplicateObjects: false,
         flowCollectionPadding: false,
         lineWidth: 0,
       }).trimEnd() +
@@ -57,6 +58,7 @@ export function editDesign(
   if (parent.flow) {
     const rendered = stringify(addition, {
       collectionStyle: 'flow',
+      aliasDuplicateObjects: false,
       lineWidth: 0,
     }).trim();
     const end = source.lastIndexOf('}', parent.range[1]);
@@ -71,7 +73,10 @@ export function editDesign(
   const start =
     isScalar(first) && first.range ? first.range[0] : parent.range[0];
   const indent = start - source.lastIndexOf('\n', start - 1) - 1;
-  const rendered = stringify(addition, { lineWidth: 0 })
+  const rendered = stringify(addition, {
+    lineWidth: 0,
+    aliasDuplicateObjects: false,
+  })
     .trimEnd()
     .split('\n')
     .map((line) => ' '.repeat(indent) + line)

@@ -4,6 +4,12 @@
 
 export type WorkerRequest = {
   type: 'generate' | 'analyze';
+  revisions?: {
+    source: string;
+    injection: string;
+    library: string;
+    asset: string;
+  };
   assets?: Record<string, string>;
   inputConfig: string | object;
   injectionInput?: string[][];

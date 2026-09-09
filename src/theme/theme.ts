@@ -1,4 +1,16 @@
 export const theme = {
+  spacing: { xs: '0.25rem', sm: '0.5rem', md: '1rem', lg: '1.5rem' },
+  cad: {
+    treeWidth: '260px',
+    inspectorWidth: '340px',
+    headerHeight: '64px',
+    insetWidth: '280px',
+    insetHeight: '200px',
+    narrowInsetWidth: '210px',
+    narrowInsetHeight: '180px',
+    drawerLayer: 510,
+    fieldRadius: '5px',
+  },
   caseWizard: {
     gap: '1rem',
     padding: '1.5rem',
@@ -15,7 +27,7 @@ export const theme = {
     hintMargin: 8,
     hintGap: 6,
     hintLayer: 10000,
-    overlay: 500,
+    overlay: 2000,
     smallScreen: '900px',
   },
   colors: {

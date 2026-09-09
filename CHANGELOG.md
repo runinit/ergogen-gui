@@ -1,5 +1,29 @@
 # Changelog
 
+## CAD workspace and reusable footprints
+
+September 8, 2026
+
+![CAD workspace with BHK geometry.](./public/images/changelog/cad-workspace.png)
+
+Case design now uses an assembly tree, central canvas and contextual inspector.
+Case tools, a searchable footprint library and YAML share one workspace.
+
+Import KiCad footprints in batches, map pads to nets and align multiple models.
+Saved library revisions update explicitly linked projects while retaining instance
+parameters and model overrides. Generation stays explicit; failed builds preserve
+the last valid preview. Portable ZIPs retain library snapshots and cached assets.
+
+## Quieter setup and faster mounting edits
+
+September 8, 2026
+
+Repeated component findings now live in grouped Review entries. Optional
+footprint setup applies measured dimensions or models to matching placements;
+missing dimensions warn about unchecked clearance without blocking generation.
+Enter a mount/gasket count to distribute contacts, then tweak individual ones.
+Mount edits reuse resolved outlines and batch YAML updates.
+
 ## Guided mounting and explicit case generation
 
 September 8, 2026

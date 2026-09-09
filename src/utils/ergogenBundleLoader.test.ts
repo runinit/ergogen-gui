@@ -15,12 +15,12 @@ import { isFeatureEnabled } from './featureFlags';
 
 // Mock featureFlags
 vi.mock('./featureFlags', () => ({
-  isFeatureEnabled: jest.fn(),
+  isFeatureEnabled: vi.fn(),
 }));
 
 describe('ergogenBundleLoader', () => {
   beforeEach(() => {
-    (isFeatureEnabled as jest.Mock).mockReturnValue(true);
+    vi.mocked(isFeatureEnabled).mockReturnValue(true);
   });
 
   describe('cleanInjectionName', () => {
@@ -160,7 +160,7 @@ describe('ergogenBundleLoader', () => {
     });
 
     it('should ignore outlines and templates if feature flags are disabled', async () => {
-      (isFeatureEnabled as jest.Mock).mockImplementation((feature) => {
+      vi.mocked(isFeatureEnabled).mockImplementation((feature) => {
         if (feature === 'outlines' || feature === 'templates') return false;
         return true;
       });

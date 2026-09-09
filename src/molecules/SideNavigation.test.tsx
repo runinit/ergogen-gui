@@ -6,10 +6,10 @@ import guiPkg from '../../package.json';
 
 // Mock ConfigContext
 vi.mock('../context/ConfigContext', () => ({
-  useConfigContext: jest.fn(),
+  useConfigContext: vi.fn(),
 }));
 
-const mockNavigate = jest.fn();
+const mockNavigate = vi.fn();
 vi.mock('react-router-dom', () => ({
   Link: ({ children, to, onClick, ...props }: any) => (
     <a href={to} onClick={onClick} {...props}>
@@ -40,27 +40,29 @@ describe('SideNavigation', () => {
   const mockContextValue = {
     configs: mockConfigs,
     activeConfigId: '1',
-    selectConfig: jest.fn(),
-    createNewConfig: jest.fn().mockReturnValue('3'),
-    renameConfig: jest.fn().mockReturnValue(true),
-    duplicateConfig: jest.fn(),
-    deleteConfig: jest.fn(),
-    setIsBulkDownloadOpen: jest.fn(),
+    selectConfig: vi.fn(),
+    createNewConfig: vi.fn().mockReturnValue('3'),
+    renameConfig: vi.fn().mockReturnValue(true),
+    duplicateConfig: vi.fn(),
+    deleteConfig: vi.fn(),
+    setIsBulkDownloadOpen: vi.fn(),
     injectionInput: [],
-    setInjectionInput: jest.fn(),
-    setError: jest.fn(),
+    setInjectionInput: vi.fn(),
+    setError: vi.fn(),
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockContextValue.createNewConfig.mockReturnValue('3');
     mockContextValue.renameConfig.mockReturnValue(true);
-    (useConfigContext as jest.Mock).mockReturnValue(mockContextValue);
-    window.confirm = jest.fn().mockReturnValue(true);
+    vi.mocked(useConfigContext, { partial: true }).mockReturnValue(
+      mockContextValue
+    );
+    window.confirm = vi.fn().mockReturnValue(true);
   });
 
   const renderComponent = () => {
-    return render(<SideNavigation isOpen={true} onClose={jest.fn()} />);
+    return render(<SideNavigation isOpen={true} onClose={vi.fn()} />);
   };
 
   it('renders list of configurations and search input', () => {
@@ -177,7 +179,7 @@ describe('SideNavigation', () => {
       },
     ];
 
-    (useConfigContext as jest.Mock).mockReturnValue({
+    vi.mocked(useConfigContext, { partial: true }).mockReturnValue({
       ...mockContextValue,
       configs: customConfigs,
     });
@@ -195,7 +197,7 @@ describe('SideNavigation', () => {
 
   it('cancels active renaming when the side navigation is closed', () => {
     const { rerender } = render(
-      <SideNavigation isOpen={true} onClose={jest.fn()} />
+      <SideNavigation isOpen={true} onClose={vi.fn()} />
     );
 
     // Start renaming
@@ -205,10 +207,10 @@ describe('SideNavigation', () => {
     expect(screen.getByLabelText('Rename input')).toBeInTheDocument();
 
     // Close side navigation
-    rerender(<SideNavigation isOpen={false} onClose={jest.fn()} />);
+    rerender(<SideNavigation isOpen={false} onClose={vi.fn()} />);
 
     // Re-open side navigation
-    rerender(<SideNavigation isOpen={true} onClose={jest.fn()} />);
+    rerender(<SideNavigation isOpen={true} onClose={vi.fn()} />);
 
     // Renaming input should be gone, showing original static name
     expect(screen.queryByLabelText('Rename input')).not.toBeInTheDocument();

@@ -2348,6 +2348,109 @@
 		return geometry;
 	}
 
+	var enclosureAnalysis = {};
+
+	var mounts = {};
+
+	var overlap;
+	var hasRequiredOverlap;
+
+	function requireOverlap () {
+		if (hasRequiredOverlap) return overlap;
+		hasRequiredOverlap = 1;
+		const m = require$$0;
+		const g = requireGeometry();
+
+		// Scope cached bounds to one analysis: edits can replace or mutate models later.
+		overlap = () => {
+		    const bounds = new WeakMap();
+		    const extent = model => {
+		        if (!bounds.has(model)) { bounds.set(model, m.measure.modelExtents(model)); }
+		        return bounds.get(model)
+		    };
+		    return (left, right) => {
+		        const a = extent(left), b = extent(right);
+		        if (!a || !b || a.high.some((value, axis) => value < b.low[axis] || b.high[axis] < a.low[axis])) { return false }
+		        return !g.empty(g.combine(left, right, 'intersect'))
+		    }
+		};
+		return overlap;
+	}
+
+	var hasRequiredMounts;
+
+	function requireMounts () {
+		if (hasRequiredMounts) return mounts;
+		hasRequiredMounts = 1;
+		const m = require$$0;
+		const a = requireAssert();
+		const g = requireGeometry();
+
+		const DEFAULT_HOLE = 1.2;
+		const DEFAULT_POST_HEIGHT = 5;
+		const DEGREES = 180 / Math.PI;
+		const TANGENT_STEP = 0.0001;
+		const overlap = requireOverlap();
+
+		// Suggestions remain declarations; callers explicitly accept their stable anchors.
+		mounts.suggest = (spec, context) => {
+		    const {base, exterior, units, name, shape, mounts, exclusions, components, gasketModels, height} = context;
+		    const intersects = overlap();
+		    const settings = spec.suggest;
+		    if (!settings) { return [] }
+		    a.unexpected(settings, `${name}.suggest`, ['spacing', 'inset', 'post', 'hole', 'height', 'gaskets']);
+		    const suggestions = [], center = m.measure.modelExtents(base).center;
+		    const forbidden = [...exclusions, ...components.map(component => component.model)];
+		    const anchor = (position, rotate = 0) => ({feature: spec.profile, shift: position.map((value, axis) => value - center[axis]), rotate});
+		    const circle = (position, radius) => ({paths: {circle: new m.paths.Circle(position, radius)}});
+		    const clear = model => g.contains(exterior, model) && !forbidden.some(other => intersects(model, other));
+		    if (settings.spacing !== undefined) {
+		        const dim = (key, fallback) => g.positive(settings[key] ?? fallback, `${name}.suggest.${key}`, units);
+		        const spacing = dim('spacing'), inset = dim('inset'), post = dim('post');
+		        const hole = dim('hole', DEFAULT_HOLE), postHeight = dim('height', Math.min(DEFAULT_POST_HEIGHT, height));
+		        if (hole >= post || postHeight > height) { g.fail(`${name}.suggest`, 'Suggested holes and posts must fit'); }
+		        let serial = 0;
+		        for (const chain of g.chains(g.offset(base, -inset))) {
+		            for (const position of m.chain.toPoints(chain, spacing)) {
+		                const id = `mount_${++serial}`, envelope = circle(position, post);
+		                if (mounts[id] || !clear(envelope)) { continue }
+		                if (Object.values(mounts).some(mount => m.measure.pointDistance(mount.position, position) < post + mount.post)) { continue }
+		                if (suggestions.some(suggestion => m.measure.pointDistance(suggestion.position, position) < spacing / 2)) { continue }
+		                const definition = {anchor: anchor(position), hole, post, height: postHeight};
+		                suggestions.push({id, kind: 'mount', position, ...definition, definition});
+		            }
+		        }
+		    }
+		    if (!settings.gaskets) { return suggestions }
+		    const gasket = settings.gaskets, path = `${name}.suggest.gaskets`;
+		    a.unexpected(gasket, path, ['spacing', 'size']);
+		    const spacing = g.positive(gasket.spacing, `${path}.spacing`, units);
+		    const size = a.wh(gasket.size, `${path}.size`)(units);
+		    size.forEach(value => g.positive(value, `${path}.size`));
+		    const occupied = [...gasketModels, ...Object.values(mounts).map(mount => circle(mount.position, mount.post))];
+		    let serial = 0;
+		    for (const edge of g.paths(base)) {
+		        const length = m.measure.pathLength(edge);
+		        if (length < size[0]) { continue }
+		        const count = Math.max(1, Math.floor(length / Math.max(spacing, size[0])));
+		        for (let index = 0; index < count; index++) {
+		            const id = `gasket_${++serial}`, t = (index + 0.5) / count;
+		            if (spec.gaskets?.[id]) { continue }
+		            const position = m.point.middle(edge, t);
+		            const from = m.point.middle(edge, t - TANGENT_STEP), to = m.point.middle(edge, t + TANGENT_STEP);
+		            const rotate = Math.atan2(to[1] - from[1], to[0] - from[0]) * DEGREES;
+		            const definition = {anchor: anchor(position, rotate), size};
+		            const envelope = shape(definition, path);
+		            if (!clear(envelope) || !intersects(envelope, base) || occupied.some(other => intersects(envelope, other))) { continue }
+		            occupied.push(envelope);
+		            suggestions.push({id, kind: 'gasket', position, definition});
+		        }
+		    }
+		    return suggestions
+		};
+		return mounts;
+	}
+
 	var boardInventory = {};
 
 	var sexpr = {};
@@ -2400,6 +2503,235 @@
 			exports.value = atom => atom.startsWith('"') ? JSON.parse(atom) : atom; 
 		} (sexpr));
 		return sexpr;
+	}
+
+	var footprintTools;
+	var hasRequiredFootprintTools;
+
+	function requireFootprintTools () {
+		if (hasRequiredFootprintTools) return footprintTools;
+		hasRequiredFootprintTools = 1;
+		const sexpr = requireSexpr();
+
+		// This factory also travels with exported modules, keeping CLI and worker output identical.
+		function createTools(parse) {
+		    const children = (node, key) => node.filter(item => Array.isArray(item) && item[0] === key);
+		    const child = (node, key) => children(node, key)[0];
+		    const value = atom => atom?.startsWith('"') ? JSON.parse(atom) : atom;
+		    const print = node => Array.isArray(node) ? `(${node.map(print).join(' ')})` : node;
+		    const quote = atom => JSON.stringify(String(atom));
+		    const vector = (node, fallback) => node ? node.slice(1).map(Number) : fallback;
+		    const footprints = roots => roots.flatMap(node => node[0] === 'kicad_pcb' ? footprints(node.filter(Array.isArray)) : ['footprint','module'].includes(node[0]) ? [node] : []);
+		    const nameOf = node => value(node[1]);
+		    const reference = node => value(children(node,'property').find(p => value(p[1]) === 'Reference')?.[2] || children(node,'fp_text').find(p => p[1] === 'reference')?.[2]);
+		    const known = new Set(['version','generator','generator_version','layer','at','locked','placed','descr','tags','property','path','sheetname','sheetfile','attr','tedit','tstamp','uuid','autoplace_cost90','autoplace_cost180','solder_mask_margin','solder_paste_margin','solder_paste_ratio','clearance','zone_connect','thermal_width','thermal_gap','embedded_fonts','embedded_files','private_layers','net_tie_pad_groups','fp_text','fp_text_box','fp_line','fp_rect','fp_circle','fp_arc','fp_poly','fp_curve','pad','model']);
+		    const unsupported = node => node.filter(Array.isArray).filter(n => n[0] === 'zone' || n[0] === 'group' || /^fp_/.test(n[0]) && !known.has(n[0]));
+
+		    const targetOf = (roots, target = {}) => {
+		        const all = footprints(roots);
+		        if (target.count !== undefined && all.length !== target.count) { throw new Error('The footprint target changed: the generator emits a different number of footprints.') }
+		        const candidates = all.filter((fp,index) => {
+		            if (target.index !== undefined && target.index !== index) { return false }
+		            if (target.reference && reference(fp) !== target.reference) { return false }
+		            if (target.name && nameOf(fp) !== target.name) { return false }
+		            if (target.id && value(child(fp,'uuid')?.[1] || child(fp,'tstamp')?.[1]) !== target.id && reference(fp) !== target.id) { return false }
+		            return true
+		        });
+		        if (candidates.length !== 1) { throw new Error('Choose an unambiguous footprint target (reference, UUID, or unique name).') }
+		        return candidates[0]
+		    };
+		    const modelOf = node => {
+		        const INCH_TO_MM = 25.4;
+		        const offset = child(node,'offset'), legacy = child(node,'at');
+		        return {path:value(node[1]),offset:vector(child(offset || legacy || [],'xyz'),[0,0,0]).map(n => n*(!offset && legacy ? INCH_TO_MM : 1)),
+		            scale:vector(child(child(node,'scale') || [],'xyz'),[1,1,1]), rotate:vector(child(child(node,'rotate') || [],'xyz'),[0,0,0]),
+		            metadata:node.filter(Array.isArray).filter(n => !['offset','at','scale','rotate'].includes(n[0])).map(print)};
+		    };
+		    const normalize = models => (Array.isArray(models) ? models : [models]).map(model => {
+		        if (!model || typeof model.path !== 'string' || !model.path.trim()) { throw new Error('A model needs a file path.') }
+		        const result = { ...model };
+		        for (const key of ['offset','rotate','scale']) {
+		            result[key] = model[key] || (key === 'scale' ? [1,1,1] : [0,0,0]);
+		            if (result[key].length !== 3 || result[key].some(n => !Number.isFinite(n)) || key === 'scale' && result[key].some(n => n <= 0)) {
+		                throw new Error(`Model ${key} must contain three finite ${key === 'scale' ? 'positive ' : ''}numbers.`)
+		            }
+		        }
+		        return result
+		    });
+
+		    const inspect = (source, target) => {
+		        const roots = parse(source,'Footprint inspection');
+		        const targets = footprints(roots);
+		        const identities = targets.map((fp,index) => ({name:nameOf(fp),reference:reference(fp),index,count:targets.length}));
+		        if (targets.length !== 1 && !target) { return {targets:identities, pads:[], nets:[], models:[], graphics:[], diagnostics:[{code:'target',severity:'error',message:'Choose one emitted footprint before editing models.'}]} }
+		        const fp = target ? targetOf(roots,target) : targets[0];
+		        const pads = children(fp,'pad').map((pad,index) => ({index, number:value(pad[1]), type:pad[2], shape:pad[3],
+		            at:vector(child(pad,'at'),[0,0,0]), size:vector(child(pad,'size'),[0,0]), layers:(child(pad,'layers') || []).slice(1).map(value),
+		            drill:child(pad,'drill') ? print(child(pad,'drill')) : undefined,
+		            roundrect:Number(child(pad,'roundrect_rratio')?.[1] || 0),
+		            mechanical:pad[2] === 'np_thru_hole' || !value(pad[1])}));
+		        const numbers = [...new Set(pads.filter(p => !p.mechanical).map(p => p.number))];
+		        const used = new Set();
+		        const nets = numbers.map(number => {
+		            const base = `pad_${number.replace(/[^A-Za-z0-9_]/g,'_') || 'net'}`;
+		            let parameter = base, suffix = 2;
+		            while (used.has(parameter)) { parameter = `${base}_${suffix++}`; }
+		            used.add(parameter);
+		            return {number,parameter,pads:pads.filter(p => !p.mechanical && p.number === number).map(p => p.index)}
+		        });
+		        const diagnostics = fp.filter(Array.isArray).filter(n => !known.has(n[0])).map(n => ({code:unsupported(fp).includes(n) ? 'unsupported-geometry' : 'metadata',
+		            severity:unsupported(fp).includes(n) ? 'warning' : 'info', message:`Preserved ${n[0]}.${unsupported(fp).includes(n) ? ' Placement transforms are unsupported; convert this construct in KiCad first.' : ''}`}));
+		        const graphics = fp.filter(n => Array.isArray(n) && /^fp_(line|rect|circle|arc|poly|curve)$/.test(n[0])).map(n => ({type:n[0].slice(3),layer:value(child(n,'layer')?.[1]),
+		            start:vector(child(n,'start'),[]),end:vector(child(n,'end'),[]),mid:vector(child(n,'mid'),[]),center:vector(child(n,'center'),[]),
+		            points:children(child(n,'pts') || [],'xy').map(p => vector(p,[]))}));
+		        return {name:nameOf(fp), at:vector(child(fp,'at'),[0,0,0]), side:value(child(fp,'layer')?.[1]) === 'B.Cu' ? 'B' : 'F', targets:identities, pads,nets,graphics,models:children(fp,'model').map(modelOf),diagnostics}
+		    };
+
+		    // Replace only model nodes; pads, nets, tracks, comments and unrelated footprints keep their bytes.
+		    const models = (source, bindings, target) => {
+		        const fp = targetOf(parse(source,'Model binding'),target);
+		        const entries = normalize(bindings).map(model => `(model ${quote(model.path)} (offset (xyz ${model.offset.join(' ')})) (scale (xyz ${model.scale.join(' ')})) (rotate (xyz ${model.rotate.join(' ')})) ${(model.metadata || []).join(' ')})`).join('\n');
+		        const previous = children(fp,'model');
+		        const edits = previous.map((node,index) => ({start:node.range[0],end:node.range[1],text:index === 0 ? entries : ''}));
+		        if (!previous.length) { edits.push({start:fp.range[1]-1,end:fp.range[1]-1,text:`\n${entries}\n`}); }
+		        return edits.sort((a,b) => b.start-a.start).reduce((text,edit) => text.slice(0,edit.start)+edit.text+text.slice(edit.end),source)
+		    };
+
+		    // Stable per-placement IDs retain the imported identity in the embedded source.
+		    const placedId = (original, ref) => {
+		        const FNV_PRIME = 16777619, FNV_OFFSET = 2166136261;
+		        const seed = `${original}:${ref}`;
+		        const hex = [0,1,2,3].map(lane => {
+		            let hash = FNV_OFFSET ^ lane;
+		            for (const char of seed) { hash = Math.imul(hash ^ char.charCodeAt(0), FNV_PRIME) >>> 0; }
+		            return hash.toString(16).padStart(8,'0');
+		        }).join('');
+		        return `${hex.slice(0,8)}-${hex.slice(8,12)}-8${hex.slice(13,16)}-a${hex.slice(17,20)}-${hex.slice(20)}`;
+		    };
+		    const place = (source, params, mapping) => {
+		        const fp = targetOf(parse(source,'KiCad conversion'));
+		        const side = params.side || 'F';
+		        if (!['F','B'].includes(side)) { throw new Error('Board side must be F or B.') }
+		        const [x,y,r] = [params.x || 0,params.y || 0,params.r || 0];
+		        if (![x,y,r].every(Number.isFinite)) { throw new Error('Footprint placement must be finite.') }
+		        const sourceSide = value(child(fp,'layer')?.[1]) === 'B.Cu' ? 'B' : 'F';
+		        const flip = sourceSide !== side;
+		        const angle = Number(child(fp,'at')?.[3] || 0);
+		        const unsafe = unsupported(fp);
+		        if (unsafe.length && (x || y || r || flip)) { throw new Error(`Unsupported transformation of ${unsafe.map(n => n[0]).join(', ')}. Convert it in KiCad first.`) }
+		        if (flip && children(fp,'pad').some(p => p[3] === 'trapezoid')) { throw new Error('Unsupported back-side transformation of trapezoid pads. Convert them in KiCad first.') }
+		        const swapLayer = atom => {
+		            const layer = value(atom);
+		            return quote(flip ? layer.replace(/^([FB])\./, (_,side) => `${side === 'F' ? 'B' : 'F'}.`) : layer)
+		        };
+		        const walk = (node, parent) => {
+		            if (!Array.isArray(node)) { return }
+		            const key = node[0];
+		            if (key === 'model') { return }
+		            if (key === 'uuid' || key === 'tstamp') { node[1] = quote(placedId(value(node[1]),params.ref || `${x},${y},${r}`)); return }
+		            if (flip && key === 'angle' && parent === 'fp_arc') { node[1] = String(-Number(node[1])); }
+		            if (['layer','layers'].includes(key)) { node.splice(1,node.length-1,...node.slice(1).map(swapLayer)); return }
+		            if (flip && ['at','start','end','mid','center','xy','offset'].includes(key) && Number.isFinite(Number(node[2]))) { node[2] = String(-Number(node[2])); }
+		            if (key === 'at' && ['pad','fp_text','fp_text_box','property'].includes(parent)) {
+		                const local = Number(node[3] || 0)-angle;
+		                node[3] = String(r+(flip ? -local : local));
+		            }
+		            if (key === 'effects' && flip) {
+		                const justify = child(node,'justify');
+		                if (justify?.includes('mirror')) { justify.splice(justify.indexOf('mirror'),1); }
+		                else if (justify) { justify.push('mirror'); }
+		                else { node.push(['justify','mirror']); }
+		            }
+		            for (const part of node) { if (Array.isArray(part)) { walk(part,key); } }
+		        };
+		        for (const node of fp.filter(Array.isArray)) {
+		            if (node[0] === 'at') { continue }
+		            walk(node,fp[0]);
+		            if (node[0] === 'pad' && node[2] !== 'np_thru_hole' && value(node[1])) {
+		                const parameter = mapping[value(node[1])];
+		                const net = params[parameter];
+		                if (!parameter || !net || !Number.isInteger(net.index) || net.index < 0 || typeof net.name !== 'string') { throw new Error(`Map pad ${value(node[1])} to a net before generating.`) }
+		                for (const old of children(node,'net')) { node.splice(node.indexOf(old),1); }
+		                node.push(['net',String(net.index),quote(net.name)]);
+		            }
+		            if (node[0] === 'property' && value(node[1]) === 'Reference' || node[0] === 'fp_text' && node[1] === 'reference') { node[2] = quote(params.ref || 'REF**'); }
+		        }
+		        const at = child(fp,'at');
+		        if (at) { fp.splice(fp.indexOf(at),1); }
+		        // KiCad applies a late parent placement to children already read, rotating them twice.
+		        fp.splice(2,0,['at',...[x,y,r].map(String)]);
+		        return print(fp)
+		    };
+		    return {inspect,models,place,normalize}
+		}
+
+		const api = createTools(sexpr.parse);
+		const portable = () => `(${createTools.toString()})(${sexpr.parse.toString()})`;
+		const convert = (source, options = {}) => {
+		    const inspected = api.inspect(source);
+		    if (inspected.targets.length !== 1) { throw new Error('Select one .kicad_mod footprint per import.') }
+		    const mapping = Object.fromEntries(inspected.nets.map(net => [net.number, options.mapping?.[net.number] || net.parameter]));
+		    const reserved = new Set(['designator','side','x','y','r','rot','at','ref','ref_hide','local_net','xy','isxy','iaxy','esxy','eaxy','point']);
+		    for (const parameter of Object.values(mapping)) {
+		        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(parameter) || reserved.has(parameter)) { throw new Error(`Invalid net parameter: ${parameter}`) }
+		        reserved.add(parameter);
+		    }
+		    const params = {designator:{type:'string',value:'U'},side:{type:'string',value:'F'},...Object.fromEntries(Object.values(mapping).map(name => [name,{type:'net',value:''}]))};
+		    const module = `// Imported KiCad geometry. Edit net parameters at each placement.\nconst footprint = ${portable()};\nmodule.exports = {\n  params: ${JSON.stringify(params,null,2)},\n  body: p => footprint.place(${JSON.stringify(source)}, p, ${JSON.stringify(mapping)})\n};\n`;
+		    const yaml = `what: ${JSON.stringify(options.name || inspected.name)}\nparams:\n  side: F\n${Object.values(mapping).map(name => `  ${name}: GND`).join('\n')}\n`;
+		    return {...inspected,mapping,source:module,yaml}
+		};
+		const bind = (source, bindings, target) => {
+		    api.normalize(bindings);
+		    // Run the original module unchanged, then transform its emitted S-expression.
+		    return `${source}\n;module.exports = ((original) => {\n  const tools = ${portable()};\n  return {...original, body: p => tools.models(original.body(p), ${JSON.stringify(bindings)}, ${JSON.stringify(target || {})})};\n})(module.exports);\n`
+		};
+		const modelPoint = (point, model) => {
+		    let [x,y,z] = point.map((value,index) => value*model.scale[index]);
+		    const [rx,ry,rz] = model.rotate.map(value => -value*Math.PI/180)
+		    ;[y,z] = [y*Math.cos(rx)-z*Math.sin(rx),y*Math.sin(rx)+z*Math.cos(rx)]
+		    ;[x,z] = [x*Math.cos(ry)+z*Math.sin(ry),-x*Math.sin(ry)+z*Math.cos(ry)]
+		    ;[x,y] = [x*Math.cos(rz)-y*Math.sin(rz),x*Math.sin(rz)+y*Math.cos(rz)];
+		    return [x,y,z].map((value,index) => value+model.offset[index])
+		};
+		const envelope = (models, assets) => {
+		    if (!models?.length) { return null }
+		    const points = [];
+		    for (const model of api.normalize(models)) {
+		        const path = model.asset || model.path.replace(/^\$\{KIPRJMOD\}\/models\//,'');
+		        const raw = assets?.[`__model_${path}.json`];
+		        if (!raw) { return null }
+		        let bounds;
+		        try { bounds = JSON.parse(raw).bounds; } catch { return null }
+		        if (bounds?.length !== 2 || bounds.some(point => point.length !== 3 || point.some(n => !Number.isFinite(n)))) { return null }
+		        for (const x of [bounds[0][0],bounds[1][0]]) {
+		            for (const y of [bounds[0][1],bounds[1][1]]) {
+		                for (const z of [bounds[0][2],bounds[1][2]]) { points.push(modelPoint([x,y,z],model)); }
+		            }
+		        }
+		    }
+		    const low = [0,1,2].map(axis => Math.min(...points.map(point => point[axis])));
+		    const high = [0,1,2].map(axis => Math.max(...points.map(point => point[axis])));
+		    return {size:[high[0]-low[0],high[1]-low[1]],height:[low[2],high[2]],body_offset:[(low[0]+high[0])/2,(low[1]+high[1])/2]}
+		};
+		// Count placement declarations with the same preprocessing and filters as PCB generation.
+		const countUses = (raw, alias) => {
+		    const prepare = requirePrepare();
+		    const config = prepare.parameterize(prepare.inherit(prepare.unnest(requireIo().interpret(raw,()=>{})[0])));
+		    const units = requireUnits().parse(config);
+		    const points = config.points ? requirePoints().parse(config.points,units) : {};
+		    let count = 0;
+		    for (const [board,spec] of Object.entries(config.pcbs || {})) {
+		        for (const [name,fp] of Object.entries(spec.footprints || {})) {
+		            if (fp.what !== alias) { continue; }
+		            const path = `pcbs.${board}.footprints.${name}`;
+		            count += requireFilter().parse(fp.where,`${path}.where`,points,units,requireAssert().asym(fp.asym || 'source',`${path}.asym`)).length;
+		        }
+		    }
+		    return count;
+		};
+		footprintTools = {...api,convert,bind,modelPoint,envelope,countUses};
+		return footprintTools;
 	}
 
 	var hasRequiredBoardInventory;
@@ -2467,8 +2799,7 @@
 			        const courtyards = m.measure.modelExtents(local);
 			        const family = /choc.*v?2/i.test(footprint) ? 'choc-v2' : /choc/i.test(footprint) ? 'choc-v1' : /(?:switch.*mx|sw_mx)/i.test(footprint) ? 'mx' : null;
 			        const size = courtyards ? [courtyards.width,courtyards.height] : family ? [15,15] : null;
-			        const models = children(fp,'model').map(node => ({path:text(node[1]), offset:nums(child(child(node,'offset'),'xyz')).concat([0,0,0]).slice(0,3),
-			            scale: child(node,'scale').length ? nums(child(child(node,'scale'),'xyz')) : [1,1,1], rotate:nums(child(child(node,'rotate'),'xyz')).concat([0,0,0]).slice(0,3)}));
+			        const models = requireFootprintTools().inspect(sexpr.print(fp)).models;
 			        const item = {id, reference, footprint, position:xy(at), rotation:Number(at[3]||0), side, family, size, body_offset:courtyards?.center || [0,0],
 			            height:family === 'mx' ? [0,11.6] : family ? [0,6.5] : null, models,
 			            populated: !child(fp,'attr').includes('dnp') && !child(fp,'dnp').includes('yes')};
@@ -2503,13 +2834,7 @@
 			    return !inventory.holes.some(h => m.measure.pointDistance(h.position,position)<radius+h.diameter/2)
 			};
 			exports.associate = (source, id, model) => {
-			    const root = sexpr.parse(source,'PCB model association')[0];
-			    const fp = [...children(root,'footprint'),...children(root,'module')].find(fp => text(child(fp,'uuid')[1]||child(fp,'tstamp')[1])===id || children(fp,'property').some(p=>text(p[1])==='Reference'&&text(p[2])===id));
-			    if (!fp) { throw new Error(`The footprint ${id} no longer exists.`) }
-			    const entry = `(model ${sexpr.quote(model.path)} (offset (xyz ${model.offset.join(' ')})) (scale (xyz ${model.scale.join(' ')})) (rotate (xyz ${model.rotate.join(' ')})))`;
-			    const existing = child(fp,'model');
-			    const [start,end] = existing.range || [fp.range[1]-1,fp.range[1]-1];
-			    return source.slice(0,start)+entry+source.slice(end)
+			    return requireFootprintTools().models(source, model, {id})
 			};
 			exports.addHole = (source, hole) => {
 			    const inventory = exports.read(source);
@@ -2520,6 +2845,187 @@
 			}; 
 		} (boardInventory));
 		return boardInventory;
+	}
+
+	var hasRequiredEnclosureAnalysis;
+
+	function requireEnclosureAnalysis () {
+		if (hasRequiredEnclosureAnalysis) return enclosureAnalysis;
+		hasRequiredEnclosureAnalysis = 1;
+		const m = require$$0;
+		const g = requireGeometry();
+		const {suggest} = requireMounts();
+		const SPACING = 40;
+		const TAB_ENGAGEMENT = 0.5;
+		const overlap = requireOverlap();
+		const M3 = {post: 4, hole: 1.25, clearance: 1.7, head: 3.1, head_depth: 3.3,
+		    hardware: 'tapped', thread: 'M3x0.5', depth: 6, access: 'bottom', min_wall: 1.5,
+		    screw: {diameter:3,head_diameter:5.5,head_height:3}};
+
+		// Greedily fill the largest gaps, using fixed manual contacts as the starting set.
+		const spread = (items, count, manual, center) => {
+		    const pool = [...items], selected = [], occupied = manual.map(p=>p.position);
+		    while (pool.length && selected.length < count) {
+		        const distance = p => occupied.length ? Math.min(...occupied.map(q=>m.measure.pointDistance(q,p.position))) : m.measure.pointDistance(center,p.position);
+		        pool.sort((a,b)=>distance(b)-distance(a));
+		        const item = pool.shift();
+		        selected.push(item); occupied.push(item.position);
+		    }
+		    return selected
+		};
+
+		// Resolve the editable plan before native CAD; incomplete cases still have a useful outline.
+		enclosureAnalysis.analyze = (config, context) => {
+		    const {resolve, locate, shape, units} = context;
+		    const intersects = overlap();
+		    const output = {};
+		    for (const [id, input] of Object.entries(config.assemblies || {})) {
+		        if (input.preset !== 'enclosure') { continue }
+		        const name = `designs.assemblies.${id}`;
+		        const findings = [], suggestions = [], placements = [], edges = [];
+		        const issue = (path, code, message, action, severity = 'error') => findings.push({feature: `${name}.${path}`, sourcePath:`${name}.${path}`, explanation:message, repairs:[{id:'review',label:action,path:`${name}.${path}`}], code, message, action, severity});
+		        const record = output[id] = {findings, suggestions, placements, edges, parts: {}, parameters: input};
+		        try {
+		            const base = resolve(input.profile).model;
+		            record.model = base;
+		            record.bounds = m.measure.modelExtents(base);
+		            const dim = (key, value) => g.number(input[key] ?? value, `${name}.${key}`, units);
+		            const wall = dim('wall', 3), bezel = dim('bezel', 8), height = dim('height', 24);
+		            const floor = dim('floor', 2), plateZ = dim('plate_z', 13), fit = dim('fit', 0.5);
+		            const exterior = g.offset(base, bezel + wall);
+		            record.exterior = exterior;
+		            // Geometry signatures survive path reordering. A changed edge requires an explicit reattachment.
+		            for (const path of g.paths(base)) {
+		                const length = m.measure.pathLength(path);
+		                const samples = Array.from({length: Math.max(2, Math.ceil(length / 2) + 1)}, (_, i) => i);
+		                const points = samples.map((_, i) => m.point.middle(path, i / (samples.length - 1)));
+		                const key = JSON.stringify([path.type, ...points.filter((_, i) => i === 0 || i === points.length - 1).flat().map(v => Math.round(v * 100) / 100), path.radius || 0]);
+		                edges.push({id: key, points, length});
+		            }
+		            if (g.chains(base).length !== 1) { issue('profile', 'disconnected', 'The case boundary contains separate bodies.', 'Choose an existing outline, exclude helper points, or add a bridge.'); continue }
+		            if (!['tray', 'top', 'bottom', 'gasket'].includes(input.mounting)) { issue('mounting', 'mounting', 'Choose a mounting system.', 'Choose tray, top, bottom or gasket in Layout.'); }
+		            const seam = g.number(input.seam?.z ?? plateZ, `${name}.seam.z`, units);
+		            if (seam <= floor || seam >= height - wall) { issue('seam.z', 'seam', 'The shell split must lie above the floor and below the top wall.', 'Adjust shell split height or shell height.'); }
+		            record.parameters={...input,wall,floor,height,bezel,fit,plate_z:plateZ,pcb_z:dim('pcb_z',6),pcb_thickness:dim('pcb_thickness',1.6),plate:dim('plate',1.5),seam:{...input.seam,z:seam},gasket:{...input.gasket}};
+		            for (const [key,fallback] of Object.entries({travel_up:0.2,travel_down:0.2,travel_side:0.1})) { record.parameters.gasket[key]=g.number(input.gasket?.[key]??fallback,`${name}.gasket.${key}`,units); }
+		            const floating = input.mounting === 'gasket';
+		            if (floating && input.ledge) { issue('ledge', 'mounting-conflict', 'A rigid ledge clamps the floating plate.', 'Remove the ledge in Advanced / Manual.'); }
+		            const movement = floating ? g.number(input.gasket?.travel_side ?? 0.1, name, units) : 0;
+		            const exclusions = (input.cutouts || []).flatMap(ref => { const feature = resolve(ref); return feature.groups || [feature.model] });
+		            const components = (input.components || []).map(ref => ({model: g.offset(resolve(ref).model, movement),low:g.number(config.components[ref.split('.')[1]].height[0],name,units)}));
+		            const mounts = {}, gasketModels = [];
+		            for (const [kind, table] of [['mount', input.mounts || {}], ['gasket', input.gaskets || {}]]) {
+		                for (const [key, definition] of Object.entries(table)) {
+		                    const position = locate(definition.anchor, `${name}.${key}`).p;
+		                    const model = kind === 'gasket' ? shape(definition, name) : {paths: {circle: new m.paths.Circle(position, g.number(definition.post, name, units))}};
+		                    placements.push({id: key, kind, position, definition, model});
+		                    const field = `${kind === 'gasket' ? 'gaskets' : 'mounts'}.${key}`;
+		                    const pcbSupport = kind==='mount' && definition.role==='pcb';
+		                    const blockedComponents=pcbSupport?components.filter(c=>c.low<dim('pcb_z',6)):components;
+		                    if (!g.contains(exterior, model) || (!pcbSupport && exclusions.some(other => intersects(model, other))) || blockedComponents.some(other => intersects(model, other.model))) {
+		                        issue(field, 'clearance', 'This placement overlaps an opening, component, or case boundary.', 'Move it to a clear perimeter span in the 2D editor.');
+		                    }
+		                    if (kind === 'gasket') { gasketModels.push(model); }
+		                    else { mounts[key] = {...definition, post: g.number(definition.post, name, units), position}; }
+		                    if (definition.placement?.edge && !edges.some(edge => edge.id === definition.placement.edge)) {
+		                        issue(`${kind === 'gasket' ? 'gaskets' : 'mounts'}.${key}`, 'edge-reference', 'The attached edge changed.', 'Select a new edge in the 2D editor.');
+		                    }
+		                    if (floating && kind === 'mount' && definition.role !== 'case') { issue(`mounts.${key}`, 'mounting-conflict', 'A rigid support clamps the floating assembly.', 'Remove this support or choose a rigid mounting style.'); }
+		                }
+		            }
+		            const manualMounts = Object.fromEntries(Object.entries(mounts).filter(([,v]) => v.placement?.owner !== 'automatic'));
+		            const manualGaskets = Object.fromEntries(Object.entries(input.gaskets || {}).filter(([,v]) => v.placement?.owner !== 'automatic'));
+		            const suggestionInput = {...input, mounts:manualMounts, gaskets:manualGaskets};
+		            const context2d = {base, exterior: g.offset(exterior, -wall), units, name, shape, mounts:manualMounts, exclusions, components, gasketModels:Object.values(manualGaskets).map(def=>shape(def,name)), height};
+		            const requested = input.mount_count === undefined ? null : dim('mount_count', 0);
+		            if (requested !== null && (!Number.isInteger(requested) || requested < 0 || requested > 200)) { g.fail(`${name}.mount_count`, 'Mount count must be an integer between 0 and 200'); }
+		            const manualContacts = placements.filter(p=>p.definition.placement?.owner!=='automatic' && p.definition.role!=='case');
+		            const spacing = requested ? Math.min(dim('spacing', SPACING), Math.max(12, edges.reduce((sum,e)=>sum+e.length,0)/(requested*2))) : dim('spacing', SPACING);
+		            if (!floating) { record.alternatives = {gaskets:suggest({...suggestionInput,suggest:{gaskets:{spacing,size:[10,6]}}},context2d)}; }
+		            if (floating) {
+		                suggestions.push(...suggest({...suggestionInput, suggest: {gaskets: {spacing, size: [10, 6]}}}, context2d));
+		            } else if (input.mounting === 'top' || input.mounting === 'bottom') {
+		                suggestions.push(...suggest({...suggestionInput, suggest: {spacing, inset: 1, post: 3, hole: 1.1}}, context2d)
+		                    .map(item => ({...item, definition: {...item.definition, role: 'plate', depth: 4, hardware: 'plain', access: input.mounting === 'top' ? 'bottom' : 'top'}})));
+		            }
+		            const acceptedContacts = [];
+		            // Keep each tab attached to the plate; reserve its whole pocket.
+		            for (let index=suggestions.length-1; index>=0; index--) {
+		                const item=suggestions[index];
+		                if (item.kind !== 'gasket') { continue }
+		                if (acceptedContacts.some(position=>m.measure.pointDistance(position,item.position)<spacing)) { suggestions.splice(index,1); continue }
+		                const angle=item.definition.anchor.rotate*Math.PI/180;
+		                let normal=[Math.sin(angle),-Math.cos(angle)];
+		                const probe=item.position.map((v,i)=>v+normal[i]);
+		                if (m.measure.isPointInsideModel(probe,base)) { normal=normal.map(v=>-v); }
+		                const offset=Math.max(0,item.definition.size[1]/2-TAB_ENGAGEMENT);
+		                item.position=item.position.map((v,i)=>v+normal[i]*offset);
+		                item.definition.anchor={shift:item.position,rotate:item.definition.anchor.rotate};
+		                item.definition.placement={offset};
+		                const envelope=g.offset(shape(item.definition,name),Math.max(dim('internal_radius',0),0.2+movement));
+		                if (!g.contains(context2d.exterior,envelope) || components.some(c=>intersects(c.model,envelope)) || exclusions.some(c=>intersects(c,envelope))) { suggestions.splice(index,1); continue }
+		                acceptedContacts.push(item.position);
+		            }
+		            // Spread the requested contacts across eligible spans, retaining manual placements.
+		            if (requested !== null && input.mounting !== 'tray') {
+		                const remaining = Math.max(0, requested - manualContacts.length);
+		                const selected = spread(suggestions.splice(0), remaining, manualContacts, record.bounds.center);
+		                suggestions.push(...selected);
+		                if (selected.length < remaining || manualContacts.length > requested) { issue('mount_count','mount-count',`Requested ${requested} contacts; ${selected.length + manualContacts.length} fit with manual placements retained.`, 'Reduce the count, increase the bezel, or move manual contacts.', 'warning'); }
+		            }
+		            const occupiedGaskets = [...context2d.gasketModels, ...suggestions.filter(s => s.kind === 'gasket').map(s => shape(s.definition, name))];
+		            const closureBase = g.offset(base, bezel + wall - M3.post + 1);
+		            suggestions.push(...suggest({...suggestionInput, suggest: {spacing, inset: 1, post: M3.post, hole: M3.hole}},
+		                {...context2d, base: closureBase, exterior, gasketModels: occupiedGaskets,
+		                    exclusions: [g.offset(base, fit + movement), ...occupiedGaskets.map(model => g.offset(model, Math.max(dim('internal_radius',0),fit + movement)))]})
+		                .map(item => ({...item, id: `case_${item.id}`, definition: {...item.definition, ...M3, role: 'case'}})));
+		            if (input.mounting && !suggestions.length && !placements.length) { issue('mounts', 'placement', 'No valid mounting locations fit this outline.', 'Increase the bezel or edit the boundary.'); }
+		            if (!suggestions.some(s=>s.definition.role==='case') && !Object.values(mounts).some(m=>m.role==='case')) { issue('mounts','case-closures','No case-closing screws fit the available wall material.', 'Increase bezel width or reduce the contact count.',input.board?'error':'warning'); }
+		            const board = context.boards?.[id];
+		            if (input.mounting === 'tray' && !board && !input.pcb_profile) {
+		                issue('board', 'pcb-source', 'PCB supports need the board outline and its mounting holes.', 'Import or select a PCB in Layout; existing designs can declare a PCB profile.', 'warning');
+		            }
+		            if (input.mounting === 'tray' && board) {
+		                for (const hole of board.holes) {
+		                    if (manualContacts.some(p=>m.measure.pointDistance(p.position,hole.position)<g.TOLERANCE)) { continue }
+		                    const definition = {role:'pcb',anchor:{shift:hole.position},hole:hole.diameter/2,post:Math.max(3,hole.diameter/2+1.5),depth:4,hardware:'plain',access:'top'};
+		                    const envelope = {paths:{post:new m.paths.Circle(hole.position,definition.post)}};
+		                    if (components.some(c => c.low<dim('pcb_z',6) && intersects(c.model,envelope))) { issue('board.holes','pcb-hole-clearance',`PCB hole ${hole.id} lacks clearance for its support.`, 'Choose another hole or reduce the support diameter.'); continue }
+		                    suggestions.push({id:`pcb_${hole.id}`,kind:'mount',position:hole.position,definition});
+		                }
+		                {
+		                    const proposals = suggest({...suggestionInput, suggest:{spacing,inset:5,post:3,hole:1.1}}, {...context2d, components});
+		                    record.holeProposals = proposals.filter(p=>requireBoardInventory().holeFits(board,p.position,2.2)).map(p=>({id:`PCB_${p.position.map(v=>Math.round(v*100)).join('_')}`,position:p.position,diameter:2.2})).filter(p=>!(input.board.rejected_holes || []).includes(p.id));
+		                    if (!board.holes.length) { issue('board.holes','pcb-holes','Tray mounting requires PCB support holes.', 'Review the proposed PCB holes in Hardware.'); }
+		                }
+		            }
+		            if (input.mounting === 'tray' && requested !== null) {
+		                const existing = suggestions.filter(s=>s.definition.role==='pcb');
+		                const remaining = Math.max(0, requested-manualContacts.length);
+		                const selected = spread(existing, remaining, manualContacts, record.bounds.center);
+		                const closures = suggestions.filter(s=>s.definition.role!=='pcb');
+		                suggestions.splice(0, suggestions.length, ...closures, ...selected);
+		                if (selected.length < remaining || manualContacts.length > requested) { issue('mount_count','mount-count',`Requested ${requested} supports; ${selected.length+manualContacts.length} existing PCB holes are available with manual placements retained.`, 'Review PCB hole proposals in Hardware or reduce the count.', 'warning'); }
+		            }
+		            const candidates = suggestions.filter(s => s.kind === 'gasket');
+		            if (floating && !candidates.length && !gasketModels.length) { issue('gaskets', 'placement', 'No gasket contacts fit between the switches and walls.', 'Increase the boundary clearance or select another edge.'); }
+		            for (const item of suggestions) {
+		                let nearest = edges[0], distance = Infinity;
+		                for (const edge of edges) {
+		                    const d = Math.min(...edge.points.map(point => m.measure.pointDistance(point,item.position)));
+		                    if (d < distance) { distance = d; nearest = edge; }
+		                }
+		                item.definition.anchor = {shift:item.position, rotate:item.definition.anchor?.rotate || 0};
+		                item.definition.placement = {...item.definition.placement,owner:'automatic',edge:nearest?.id};
+		            }
+		            record.parts = Object.fromEntries(['bottom', 'top', 'plate', ...(input.construction === 'midframe' ? ['middle'] : [])].map(part => [part, {}]));
+		        } catch (error) {
+		            findings.push(...(error.diagnostics || [{feature: name, code: 'analysis', message: error.message}]).map(f => ({...f, severity: 'error'})));
+		        }
+		    }
+		    return output
+		};
+		return enclosureAnalysis;
 	}
 
 	var sketches = {};
@@ -15393,7 +15899,10 @@ ${content}
 		        return net_obj(net, index)
 		    };
 
-		    return fp.body(parsed_params)
+		    const emitted = fp.body(parsed_params);
+		    if (!fp.modelBindings) { return emitted }
+		    const binding = typeof fp.modelBindings === 'function' ? fp.modelBindings(parsed_params) : fp.modelBindings;
+		    return requireFootprintTools().models(emitted, binding.models || binding, binding.target)
 		};
 
 		pcbs.parse = (config, points, outlines, units) => {
@@ -15571,7 +16080,11 @@ ${content}
 		        const unresolved = [];
 		        for (const component of board.components) {
 		            if (!component.populated) { continue }
-		            const override = input.board.components?.[component.id] || {};
+		            // Keep the original asset identity when a portable KiCad path uses another format.
+		            const bindings = input.board.models?.[component.id];
+		            if (bindings !== undefined) { component.models = Array.isArray(bindings) ? bindings : [bindings]; }
+		            const measured = requireFootprintTools().envelope(component.models,context.assets);
+		            const override = {...measured, ...input.board.components?.[component.id]};
 		            const rawSize = override.size || component.size, rawHeight = override.height || component.height;
 		            let size, height;
 		            try {
@@ -15582,7 +16095,7 @@ ${content}
 		                    if (height[1]<=height[0]) { height=null; }
 		                }
 		            } catch { size=null; height=null; }
-		            if (!size || !height) { unresolved.push({feature:`designs.assemblies.${id}.board.components.${component.id}`,code:'component-height',severity:'error',message:`${component.reference}: missing body size or height.`,action:'Import a model or enter the measured envelope in Components.'}); continue }
+		            if (!size || !height) { unresolved.push({feature:`designs.assemblies.${id}.board.components.${component.id}`,code:'component-height',severity:'warning',message:`${component.reference}: missing body size or height; component clearance is not validated.`,action:'Import a model or enter the measured envelope in Components.'}); continue }
 		            const key = `board_${id}_${component.id.replace(/[^A-Za-z0-9_]/g,'_')}`;
 		            const low = component.side === 'top' ? pcbZ+board.thickness+height[0] : pcbZ-height[1];
 		            const high = component.side === 'top' ? pcbZ+board.thickness+height[1] : pcbZ-height[0];
@@ -15618,7 +16131,9 @@ ${content}
 		            unresolved.push({feature:`designs.assemblies.${id}.board.family`,code:'switch-family',severity:'error',message:'Choose the switch family for the layout reference board.',action:'Choose MX, Choc v1, or Choc v2 in Layout.'});
 		        }
 		        for (const [ref,association] of Object.entries(input.board.models || {})) {
-		            if (association.asset && !context.assets?.[association.asset]) { unresolved.push({feature:`designs.assemblies.${id}.board.models.${ref}`,code:'missing-asset',severity:'error',message:`Missing model asset ${association.asset}.`,action:'Import the model or reopen the packaged project.'}); }
+		            for (const model of Array.isArray(association) ? association : [association]) {
+		                if (model.asset && !context.assets?.[model.asset]) { unresolved.push({feature:`designs.assemblies.${id}.board.models.${ref}`,code:'missing-asset',severity:'error',message:`Missing model asset ${model.asset}.`,action:'Import the model or reopen the packaged project.'}); }
+		            }
 		        }
 		        if (board.components.some(c=>c.populated&&c.family) && !input.board.keycaps) {
 		            unresolved.push({feature:`designs.assemblies.${id}.board.keycaps`,code:'keycaps',severity:'warning',message:'Keycap dimensions are unresolved; keycap clearance has not been validated.',action:'Enter the measured keycap envelope in Components.'});
@@ -15632,81 +16147,6 @@ ${content}
 	}
 
 	var assemblies = {};
-
-	var mounts = {};
-
-	var hasRequiredMounts;
-
-	function requireMounts () {
-		if (hasRequiredMounts) return mounts;
-		hasRequiredMounts = 1;
-		const m = require$$0;
-		const a = requireAssert();
-		const g = requireGeometry();
-
-		const DEFAULT_HOLE = 1.2;
-		const DEFAULT_POST_HEIGHT = 5;
-		const DEGREES = 180 / Math.PI;
-		const TANGENT_STEP = 0.0001;
-		const intersects = (left, right) => !g.empty(g.combine(left, right, 'intersect'));
-
-		// Suggestions remain declarations; callers explicitly accept their stable anchors.
-		mounts.suggest = (spec, context) => {
-		    const {base, exterior, units, name, shape, mounts, exclusions, components, gasketModels, height} = context;
-		    const settings = spec.suggest;
-		    if (!settings) { return [] }
-		    a.unexpected(settings, `${name}.suggest`, ['spacing', 'inset', 'post', 'hole', 'height', 'gaskets']);
-		    const suggestions = [], center = m.measure.modelExtents(base).center;
-		    const forbidden = [...exclusions, ...components.map(component => component.model)];
-		    const anchor = (position, rotate = 0) => ({feature: spec.profile, shift: position.map((value, axis) => value - center[axis]), rotate});
-		    const circle = (position, radius) => ({paths: {circle: new m.paths.Circle(position, radius)}});
-		    const clear = model => g.contains(exterior, model) && !forbidden.some(other => intersects(model, other));
-		    if (settings.spacing !== undefined) {
-		        const dim = (key, fallback) => g.positive(settings[key] ?? fallback, `${name}.suggest.${key}`, units);
-		        const spacing = dim('spacing'), inset = dim('inset'), post = dim('post');
-		        const hole = dim('hole', DEFAULT_HOLE), postHeight = dim('height', Math.min(DEFAULT_POST_HEIGHT, height));
-		        if (hole >= post || postHeight > height) { g.fail(`${name}.suggest`, 'Suggested holes and posts must fit'); }
-		        let serial = 0;
-		        for (const chain of g.chains(g.offset(base, -inset))) {
-		            for (const position of m.chain.toPoints(chain, spacing)) {
-		                const id = `mount_${++serial}`, envelope = circle(position, post);
-		                if (mounts[id] || !clear(envelope)) { continue }
-		                if (Object.values(mounts).some(mount => m.measure.pointDistance(mount.position, position) < post + mount.post)) { continue }
-		                if (suggestions.some(suggestion => m.measure.pointDistance(suggestion.position, position) < spacing / 2)) { continue }
-		                const definition = {anchor: anchor(position), hole, post, height: postHeight};
-		                suggestions.push({id, kind: 'mount', position, ...definition, definition});
-		            }
-		        }
-		    }
-		    if (!settings.gaskets) { return suggestions }
-		    const gasket = settings.gaskets, path = `${name}.suggest.gaskets`;
-		    a.unexpected(gasket, path, ['spacing', 'size']);
-		    const spacing = g.positive(gasket.spacing, `${path}.spacing`, units);
-		    const size = a.wh(gasket.size, `${path}.size`)(units);
-		    size.forEach(value => g.positive(value, `${path}.size`));
-		    const occupied = [...gasketModels, ...Object.values(mounts).map(mount => circle(mount.position, mount.post))];
-		    let serial = 0;
-		    for (const edge of g.paths(base)) {
-		        const length = m.measure.pathLength(edge);
-		        if (length < size[0]) { continue }
-		        const count = Math.max(1, Math.floor(length / Math.max(spacing, size[0])));
-		        for (let index = 0; index < count; index++) {
-		            const id = `gasket_${++serial}`, t = (index + 0.5) / count;
-		            if (spec.gaskets?.[id]) { continue }
-		            const position = m.point.middle(edge, t);
-		            const from = m.point.middle(edge, t - TANGENT_STEP), to = m.point.middle(edge, t + TANGENT_STEP);
-		            const rotate = Math.atan2(to[1] - from[1], to[0] - from[0]) * DEGREES;
-		            const definition = {anchor: anchor(position, rotate), size};
-		            const envelope = shape(definition, path);
-		            if (!clear(envelope) || !intersects(envelope, base) || occupied.some(other => intersects(envelope, other))) { continue }
-		            occupied.push(envelope);
-		            suggestions.push({id, kind: 'gasket', position, definition});
-		        }
-		    }
-		    return suggestions
-		};
-		return mounts;
-	}
 
 	var hasRequiredAssemblies;
 
@@ -15841,157 +16281,6 @@ ${content}
 		    }
 		};
 		return assemblies;
-	}
-
-	var enclosureAnalysis = {};
-
-	var hasRequiredEnclosureAnalysis;
-
-	function requireEnclosureAnalysis () {
-		if (hasRequiredEnclosureAnalysis) return enclosureAnalysis;
-		hasRequiredEnclosureAnalysis = 1;
-		const m = require$$0;
-		const g = requireGeometry();
-		const {suggest} = requireMounts();
-		const SPACING = 40;
-		const TAB_ENGAGEMENT = 0.5;
-		const intersects = (a,b) => !g.empty(g.combine(a,b,'intersect'));
-		const M3 = {post: 4, hole: 1.25, clearance: 1.7, head: 3.1, head_depth: 3.3,
-		    hardware: 'tapped', thread: 'M3x0.5', depth: 6, access: 'bottom', min_wall: 1.5,
-		    screw: {diameter:3,head_diameter:5.5,head_height:3}};
-
-		// Resolve the editable plan before native CAD; incomplete cases still have a useful outline.
-		enclosureAnalysis.analyze = (config, context) => {
-		    const {resolve, locate, shape, units} = context;
-		    const output = {};
-		    for (const [id, input] of Object.entries(config.assemblies || {})) {
-		        if (input.preset !== 'enclosure') { continue }
-		        const name = `designs.assemblies.${id}`;
-		        const findings = [], suggestions = [], placements = [], edges = [];
-		        const issue = (path, code, message, action, severity = 'error') => findings.push({feature: `${name}.${path}`, sourcePath:`${name}.${path}`, explanation:message, repairs:[{id:'review',label:action,path:`${name}.${path}`}], code, message, action, severity});
-		        const record = output[id] = {findings, suggestions, placements, edges, parts: {}, parameters: input};
-		        try {
-		            const base = resolve(input.profile).model;
-		            record.model = base;
-		            record.bounds = m.measure.modelExtents(base);
-		            const dim = (key, value) => g.number(input[key] ?? value, `${name}.${key}`, units);
-		            const wall = dim('wall', 3), bezel = dim('bezel', 8), height = dim('height', 24);
-		            const floor = dim('floor', 2), plateZ = dim('plate_z', 13), fit = dim('fit', 0.5);
-		            const exterior = g.offset(base, bezel + wall);
-		            record.exterior = exterior;
-		            // Geometry signatures survive path reordering. A changed edge requires an explicit reattachment.
-		            for (const path of g.paths(base)) {
-		                const length = m.measure.pathLength(path);
-		                const samples = Array.from({length: Math.max(2, Math.ceil(length / 2) + 1)}, (_, i) => i);
-		                const points = samples.map((_, i) => m.point.middle(path, i / (samples.length - 1)));
-		                const key = JSON.stringify([path.type, ...points.filter((_, i) => i === 0 || i === points.length - 1).flat().map(v => Math.round(v * 100) / 100), path.radius || 0]);
-		                edges.push({id: key, points, length});
-		            }
-		            if (g.chains(base).length !== 1) { issue('profile', 'disconnected', 'The case boundary contains separate bodies.', 'Choose an existing outline, exclude helper points, or add a bridge.'); continue }
-		            if (!['tray', 'top', 'bottom', 'gasket'].includes(input.mounting)) { issue('mounting', 'mounting', 'Choose a mounting system.', 'Choose tray, top, bottom or gasket in Layout.'); }
-		            const seam = g.number(input.seam?.z ?? plateZ, `${name}.seam.z`, units);
-		            if (seam <= floor || seam >= height - wall) { issue('seam.z', 'seam', 'The shell split must lie above the floor and below the top wall.', 'Adjust shell split height or shell height.'); }
-		            record.parameters={...input,wall,floor,height,bezel,fit,plate_z:plateZ,pcb_z:dim('pcb_z',6),pcb_thickness:dim('pcb_thickness',1.6),plate:dim('plate',1.5),seam:{...input.seam,z:seam},gasket:{...input.gasket}};
-		            for (const [key,fallback] of Object.entries({travel_up:0.2,travel_down:0.2,travel_side:0.1})) { record.parameters.gasket[key]=g.number(input.gasket?.[key]??fallback,`${name}.gasket.${key}`,units); }
-		            const floating = input.mounting === 'gasket';
-		            if (floating && input.ledge) { issue('ledge', 'mounting-conflict', 'A rigid ledge clamps the floating plate.', 'Remove the ledge in Advanced / Manual.'); }
-		            const movement = floating ? g.number(input.gasket?.travel_side ?? 0.1, name, units) : 0;
-		            const exclusions = (input.cutouts || []).map(ref => resolve(ref).model);
-		            const components = (input.components || []).map(ref => ({model: g.offset(resolve(ref).model, movement),low:g.number(config.components[ref.split('.')[1]].height[0],name,units)}));
-		            const mounts = {}, gasketModels = [];
-		            for (const [kind, table] of [['mount', input.mounts || {}], ['gasket', input.gaskets || {}]]) {
-		                for (const [key, definition] of Object.entries(table)) {
-		                    const position = locate(definition.anchor, `${name}.${key}`).p;
-		                    const model = kind === 'gasket' ? shape(definition, name) : {paths: {circle: new m.paths.Circle(position, g.number(definition.post, name, units))}};
-		                    placements.push({id: key, kind, position, definition, model});
-		                    const field = `${kind === 'gasket' ? 'gaskets' : 'mounts'}.${key}`;
-		                    const pcbSupport = kind==='mount' && definition.role==='pcb';
-		                    const blockedComponents=pcbSupport?components.filter(c=>c.low<dim('pcb_z',6)):components;
-		                    if (!g.contains(exterior, model) || (!pcbSupport && exclusions.some(other => intersects(model, other))) || blockedComponents.some(other => intersects(model, other.model))) {
-		                        issue(field, 'clearance', 'This placement overlaps an opening, component, or case boundary.', 'Move it to a clear perimeter span in the 2D editor.');
-		                    }
-		                    if (kind === 'gasket') { gasketModels.push(model); }
-		                    else { mounts[key] = {...definition, post: g.number(definition.post, name, units), position}; }
-		                    if (definition.placement?.edge && !edges.some(edge => edge.id === definition.placement.edge)) {
-		                        issue(`${kind === 'gasket' ? 'gaskets' : 'mounts'}.${key}`, 'edge-reference', 'The attached edge changed.', 'Select a new edge in the 2D editor.');
-		                    }
-		                    if (floating && kind === 'mount' && definition.role !== 'case') { issue(`mounts.${key}`, 'mounting-conflict', 'A rigid support clamps the floating assembly.', 'Remove this support or choose a rigid mounting style.'); }
-		                }
-		            }
-		            const manualMounts = Object.fromEntries(Object.entries(mounts).filter(([,v]) => v.placement?.owner !== 'automatic'));
-		            const manualGaskets = Object.fromEntries(Object.entries(input.gaskets || {}).filter(([,v]) => v.placement?.owner !== 'automatic'));
-		            const suggestionInput = {...input, mounts:manualMounts, gaskets:manualGaskets};
-		            const context2d = {base, exterior: g.offset(exterior, -wall), units, name, shape, mounts:manualMounts, exclusions, components, gasketModels:Object.values(manualGaskets).map(def=>shape(def,name)), height};
-		            const spacing = dim('spacing', SPACING);
-		            if (!floating) { record.alternatives = {gaskets:suggest({...suggestionInput,suggest:{gaskets:{spacing,size:[10,6]}}},context2d)}; }
-		            if (floating) {
-		                suggestions.push(...suggest({...suggestionInput, suggest: {gaskets: {spacing, size: [10, 6]}}}, context2d));
-		            } else if (input.mounting === 'top' || input.mounting === 'bottom') {
-		                suggestions.push(...suggest({...suggestionInput, suggest: {spacing, inset: 1, post: 3, hole: 1.1}}, context2d)
-		                    .map(item => ({...item, definition: {...item.definition, role: 'plate', depth: 4, hardware: 'plain', access: input.mounting === 'top' ? 'bottom' : 'top'}})));
-		            }
-		            const acceptedContacts = [];
-		            // Keep each tab attached to the plate; reserve its whole pocket.
-		            for (let index=suggestions.length-1; index>=0; index--) {
-		                const item=suggestions[index];
-		                if (item.kind !== 'gasket') { continue }
-		                if (acceptedContacts.some(position=>m.measure.pointDistance(position,item.position)<spacing)) { suggestions.splice(index,1); continue }
-		                const angle=item.definition.anchor.rotate*Math.PI/180;
-		                let normal=[Math.sin(angle),-Math.cos(angle)];
-		                const probe=item.position.map((v,i)=>v+normal[i]);
-		                if (m.measure.isPointInsideModel(probe,base)) { normal=normal.map(v=>-v); }
-		                const offset=Math.max(0,item.definition.size[1]/2-TAB_ENGAGEMENT);
-		                item.position=item.position.map((v,i)=>v+normal[i]*offset);
-		                item.definition.anchor={shift:item.position,rotate:item.definition.anchor.rotate};
-		                item.definition.placement={offset};
-		                const envelope=g.offset(shape(item.definition,name),Math.max(dim('internal_radius',0),0.2+movement));
-		                if (!g.contains(context2d.exterior,envelope) || components.some(c=>intersects(c.model,envelope)) || exclusions.some(c=>intersects(c,envelope))) { suggestions.splice(index,1); continue }
-		                acceptedContacts.push(item.position);
-		            }
-		            const occupiedGaskets = [...context2d.gasketModels, ...suggestions.filter(s => s.kind === 'gasket').map(s => shape(s.definition, name))];
-		            const closureBase = g.offset(base, bezel + wall - M3.post + 1);
-		            suggestions.push(...suggest({...suggestionInput, suggest: {spacing, inset: 1, post: M3.post, hole: M3.hole}},
-		                {...context2d, base: closureBase, exterior, gasketModels: occupiedGaskets,
-		                    exclusions: [g.offset(base, fit + movement), ...occupiedGaskets.map(model => g.offset(model, Math.max(dim('internal_radius',0),fit + movement)))]})
-		                .map(item => ({...item, id: `case_${item.id}`, definition: {...item.definition, ...M3, role: 'case'}})));
-		            if (input.mounting && !suggestions.length && !placements.length) { issue('mounts', 'placement', 'No valid mounting locations fit this outline.', 'Increase the bezel or edit the boundary.'); }
-		            if (!suggestions.some(s=>s.definition.role==='case') && !Object.values(mounts).some(m=>m.role==='case')) { issue('mounts','case-closures','No case-closing screws fit the available wall material.', 'Increase bezel width or reduce the contact count.',input.board?'error':'warning'); }
-		            const board = context.boards?.[id];
-		            if (input.mounting === 'tray' && !board && !input.pcb_profile) {
-		                issue('board', 'pcb-source', 'PCB supports need the board outline and its mounting holes.', 'Import or select a PCB in Layout; existing designs can declare a PCB profile.', 'warning');
-		            }
-		            if (input.mounting === 'tray' && board) {
-		                for (const hole of board.holes) {
-		                    const definition = {role:'pcb',anchor:{shift:hole.position},hole:hole.diameter/2,post:Math.max(3,hole.diameter/2+1.5),depth:4,hardware:'plain',access:'top'};
-		                    const envelope = {paths:{post:new m.paths.Circle(hole.position,definition.post)}};
-		                    if (components.some(c => c.low<dim('pcb_z',6) && intersects(c.model,envelope))) { issue('board.holes','pcb-hole-clearance',`PCB hole ${hole.id} lacks clearance for its support.`, 'Choose another hole or reduce the support diameter.'); continue }
-		                    suggestions.push({id:`pcb_${hole.id}`,kind:'mount',position:hole.position,definition});
-		                }
-		                {
-		                    const proposals = suggest({...suggestionInput, suggest:{spacing,inset:5,post:3,hole:1.1}}, {...context2d, components});
-		                    record.holeProposals = proposals.filter(p=>requireBoardInventory().holeFits(board,p.position,2.2)).map(p=>({id:`PCB_${p.position.map(v=>Math.round(v*100)).join('_')}`,position:p.position,diameter:2.2})).filter(p=>!(input.board.rejected_holes || []).includes(p.id));
-		                    if (!board.holes.length) { issue('board.holes','pcb-holes','Tray mounting requires PCB support holes.', 'Review the proposed PCB holes in Hardware.'); }
-		                }
-		            }
-		            const candidates = suggestions.filter(s => s.kind === 'gasket');
-		            if (floating && !candidates.length && !gasketModels.length) { issue('gaskets', 'placement', 'No gasket contacts fit between the switches and walls.', 'Increase the boundary clearance or select another edge.'); }
-		            for (const item of suggestions) {
-		                let nearest = edges[0], distance = Infinity;
-		                for (const edge of edges) {
-		                    const d = Math.min(...edge.points.map(point => m.measure.pointDistance(point,item.position)));
-		                    if (d < distance) { distance = d; nearest = edge; }
-		                }
-		                item.definition.anchor = {shift:item.position, rotate:item.definition.anchor?.rotate || 0};
-		                item.definition.placement = {...item.definition.placement,owner:'automatic',edge:nearest?.id};
-		            }
-		            record.parts = Object.fromEntries(['bottom', 'top', 'plate', ...(input.construction === 'midframe' ? ['middle'] : [])].map(part => [part, {}]));
-		        } catch (error) {
-		            findings.push(...(error.diagnostics || [{feature: name, code: 'analysis', message: error.message}]).map(f => ({...f, severity: 'error'})));
-		        }
-		    }
-		    return output
-		};
-		return enclosureAnalysis;
 	}
 
 	var enclosures = {};
@@ -16296,6 +16585,7 @@ ${content}
 		    };
 		    return {
 		        extrude,
+		        compound: shapes => shapes.length === 1 ? shapes[0] : keep(r.makeCompound(shapes)),
 		        add: (left, right) => keep(left.fuse(right)),
 		        cut: (left, right) => keep(left.cut(right)),
 		        intersect: (left, right) => keep(left.intersect(right)),
@@ -16352,6 +16642,40 @@ ${content}
 		    }
 		};
 		return solidKernel;
+	}
+
+	var nativeModels = {};
+
+	var hasRequiredNativeModels;
+
+	function requireNativeModels () {
+		if (hasRequiredNativeModels) return nativeModels;
+		hasRequiredNativeModels = 1;
+		const g = requireGeometry();
+
+		// Resolve cached footprint bindings once for native assembly export.
+		nativeModels.place = async (kernel, component, assets, z, feature) => {
+		    const models = component.models || [];
+		    const bindings = models.map(model => ({...model, asset: model.asset || model.path.replace(/^\$\{KIPRJMOD\}\/models\//, '')}));
+		    if (!bindings.length || bindings.some(model => !assets[model.asset])) { return null }
+		    const solids = [];
+		    for (const binding of bindings) {
+		        const source = assets[binding.asset];
+		        let imported;
+		        if (/\.(step|stp)$/i.test(binding.asset)) {
+		            imported = await kernel.import(source);
+		        } else {
+		            const metadata = assets[`__model_${binding.asset}.json`];
+		            const mesh = (metadata && JSON.parse(metadata).stl) || (/\.stl$/i.test(binding.asset) ? source : null);
+		            if (!mesh) { g.fail(feature, 'Import this mesh in Components before generating its STEP reference.', 'missing-asset'); }
+		            const bytes = mesh.startsWith('base64:') ? Uint8Array.from(atob(mesh.slice(7)), char => char.charCodeAt(0)) : new TextEncoder().encode(mesh);
+		            imported = await kernel.importMesh(bytes);
+		        }
+		        solids.push(kernel.placeModel(imported, binding, component, z));
+		    }
+		    return kernel.compound(solids)
+		};
+		return nativeModels;
 	}
 
 	var hasRequiredEnclosures;
@@ -16656,22 +16980,11 @@ ${content}
 		            const board = context.boards?.[id];
 		            for (const component of board?.components || []) {
 		                activeFeature = `${name}.board.models.${component.id}`;
-		                const association=s.board?.models?.[component.id];
-		                if (!association?.asset) { continue }
-		                const source=options.assets?.[association.asset];
-		                if (!source) { g.fail(`${name}.board`, `Missing model asset ${association.asset}`); }
 		                const key=`components_board_${id}_${component.id.replace(/[^A-Za-z0-9_]/g,'_')}`;
 		                if (!extras[key]) { continue }
-		                let imported;
-		                if (/\.(step|stp)$/i.test(association.asset)) { imported=await kernel.import(source); }
-		                else {
-		                    const metadata=options.assets?.[`__model_${association.asset}.json`];
-		                    const mesh=metadata?JSON.parse(metadata).stl:/\.stl$/i.test(association.asset)?source:null;
-		                    if (!mesh) { g.fail(`${name}.board.models.${component.id}`,'Import this mesh in Components before generating its STEP reference.','missing-asset'); }
-		                    const bytes=mesh.startsWith('base64:')?Uint8Array.from(atob(mesh.slice(7)),char=>char.charCodeAt(0)):new TextEncoder().encode(mesh);
-		                    imported=await kernel.importMesh(bytes);
-		                }
-		                extras[key]=kernel.placeModel(imported, association, component, s.pcb_z+(component.side === 'top' ? board.thickness : 0));
+		                const model = await requireNativeModels().place(kernel, component, options.assets || {},
+		                    s.pcb_z + (component.side === 'top' ? board.thickness : 0), activeFeature);
+		                if (model) { extras[key] = model; }
 		            }
 
 		            // Rotate the complete mechanical stack, then trim the bottom to a flat datum.
@@ -16751,10 +17064,26 @@ ${content}
 		const g = requireGeometry();
 
 		const sections = ['regions', 'boundaries', 'sketches', 'profiles', 'components', 'assemblies'];
+		const analysisCache = new WeakMap();
 		const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
 
 		designs.parse = async (config, points, outlines, units, options = {}) => {
 		    a.unexpected(config, 'designs', sections);
+		    const cached = options.analysis && options.analysisCache && analysisCache.get(options.analysisCache);
+		    if (cached && cached.key === options.analysisKey) {
+		        const assemblies = Object.fromEntries(Object.entries(cached.config.assemblies).map(([id, spec]) => {
+		            const next = {...spec};
+		            for (const key of ['mounts', 'gaskets', 'mount_count', 'spacing']) {
+		                delete next[key];
+		                if (own(config.assemblies[id], key)) { next[key] = config.assemblies[id][key]; }
+		            }
+		            return [id, next]
+		        }));
+		        const analysis = requireEnclosureAnalysis().analyze({...cached.config, assemblies}, cached.context);
+		        for (const [id, board] of Object.entries(cached.context.boards)) { analysis[id]?.findings.push(...board.findings); }
+		        return {...cached.result, report:{...cached.result.report, analysis}}
+		    }
+
 		    // Imported outlines also feed the wizard thumbnails before its generated regions resolve.
 		    config = {...config,regions:{...config.regions}};
 		    outlines = {...outlines};
@@ -16952,7 +17281,11 @@ ${content}
 		    report.analysis = requireEnclosureAnalysis().analyze(config, {resolve, locate, shape, units, boards});
 		    for (const [id, board] of Object.entries(boards)) { report.analysis[id]?.findings.push(...board.findings); }
 		    if (options.analysis) {
-		        return {outlines: generated, cases, report, solids: {}}
+		        const result = {outlines: generated, cases, report, solids: {}};
+		        if (options.analysisCache && options.analysisKey) {
+		            analysisCache.set(options.analysisCache, {key:options.analysisKey, config, context:{resolve, locate, shape, units, boards}, result});
+		        }
+		        return result
 		    }
 		    const earlyCodes = ['mounting','mounting-conflict','seam','disconnected','edge-reference','component-height'];
 		    const early = Object.entries(report.analysis).flatMap(([id,plan])=>plan.findings.filter(f=>f.severity==='error'&&(config.assemblies[id].board||earlyCodes.includes(f.code))));
@@ -17042,7 +17375,17 @@ ${content}
 		    const outlines = outlines_lib.parse(config.outlines || {}, points, units);
 		    let caseConfig = config.cases || {};
 		    if (config.designs) {
-		        const design = await designs_lib.parse(config.designs, points, outlines, units, {...options,
+		        // Placement edits can reuse contours; every other input invalidates this worker-local cache.
+		        let analysisKey;
+		        if (options.analysis && options.analysisCache) {
+		            const assemblies = Object.fromEntries(Object.entries(config.designs.assemblies || {}).map(([id, spec]) => {
+		                const stable = {...spec};
+		                if (spec.preset === 'enclosure') { for (const key of ['mounts', 'gaskets', 'mount_count', 'spacing']) { delete stable[key]; } }
+		                return [id, stable]
+		            }));
+		            analysisKey = JSON.stringify([{...config, designs:{...config.designs, assemblies}}, options.assets]);
+		        }
+		        const design = await designs_lib.parse(config.designs, points, outlines, units, {...options, analysisKey,
 		            boardSources: generated => requireBoardLink().sources(config, {...outlines,...generated}, points, units, options.assets)});
 		        Object.assign(outlines, design.outlines);
 		        for (const name of Object.keys(design.cases)) {
@@ -17110,7 +17453,8 @@ ${content}
 		ergogen$1 = {
 		    version,
 		    process,
-		    inject
+		    inject,
+		    footprints: requireFootprintTools()
 		};
 		return ergogen$1;
 	}

@@ -8,7 +8,8 @@ process.env.REACT_APP_DEPLOYMENT_CHANNEL =
   process.env.GITHUB_REPOSITORY === 'runinit/ergogen-gui-preview'
     ? 'preview'
     : 'production';
-const baseURL = `http://127.0.0.1:3000${deploymentPath}`;
+const port = Number(process.env.PLAYWRIGHT_PORT || 3000);
+const baseURL = `http://127.0.0.1:${port}${deploymentPath}`;
 
 export default defineConfig({
   testDir: './e2e',
@@ -27,7 +28,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm exec vite preview --host 127.0.0.1 --port 3000 --strictPort',
+    command: `pnpm exec vite preview --host 127.0.0.1 --port ${port} --strictPort`,
     url: baseURL,
     reuseExistingServer: false,
     timeout: 120 * 1000,

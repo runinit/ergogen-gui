@@ -285,6 +285,13 @@ const FlexContainer = styled.div`
 const Ergogen = () => {
   const [showDesign, setShowDesign] = useState(false);
   const [showCaseWizard, setShowCaseWizard] = useState(false);
+  const [workspaceView, setWorkspaceView] = useState<'case' | 'library'>(
+    'case'
+  );
+  const openLibrary = () => {
+    setWorkspaceView('library');
+    setShowCaseWizard(true);
+  };
   // Calculate initial widths based on viewport
   const getInitialLeftWidth = () => Math.max(200, window.innerWidth * 0.33);
   const getInitialRightWidth = () => Math.max(150, window.innerWidth * 0.15);
@@ -560,7 +567,13 @@ const Ergogen = () => {
   return (
     <>
       {showCaseWizard && (
-        <CaseWizard onClose={() => setShowCaseWizard(false)} />
+        <CaseWizard
+          initialView={workspaceView}
+          onClose={() => {
+            setShowCaseWizard(false);
+            setWorkspaceView('case');
+          }}
+        />
       )}
       {showShareDialog && (
         <ShareDialog
@@ -691,6 +704,9 @@ const Ergogen = () => {
                         onClick={() => setShowCaseWizard(true)}
                       >
                         Create / edit case
+                      </OutlineIconButton>
+                      <OutlineIconButton onClick={openLibrary}>
+                        Footprint library
                       </OutlineIconButton>
                       <OutlineIconButton
                         onClick={() => setShowDesign(!showDesign)}
@@ -867,6 +883,7 @@ const Ergogen = () => {
                     </SettingsCard>
                   </OptionContainer>
                   <Injections
+                    onOpenLibrary={openLibrary}
                     setInjectionToEdit={setInjectionToEdit}
                     deleteInjection={handleDeleteInjection}
                     injectionToEdit={injectionToEdit}

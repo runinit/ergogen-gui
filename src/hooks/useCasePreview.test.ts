@@ -131,3 +131,16 @@ it('ignores a worker error from a previous draft revision', () => {
   expect(hook.result.current.pending).toBe(false);
   hook.unmount();
 });
+
+it('reuses a settled analysis worker when only draft geometry changes', () => {
+  const hook = renderHook(({ source }) => useCaseAnalysis(source, injections), {
+    initialProps: { source: 'one' },
+  });
+  act(() => vi.advanceTimersByTime(200));
+  respond(mocks.workers[0]);
+  hook.rerender({ source: 'two' });
+  act(() => vi.advanceTimersByTime(200));
+  expect(mocks.workers).toHaveLength(1);
+  expect(mocks.workers[0].postMessage).toHaveBeenCalledTimes(2);
+  hook.unmount();
+});

@@ -43,3 +43,19 @@ assembly reference; board model transforms retain their original precision.
 Threads are manufacturing metadata rather than helical STEP geometry.
 Physical fit and manufacturing approval require a fabricated prototype and
 supplier review. Nothing was published or deployed.
+
+## Follow-up: grouped setup and mounting performance
+
+- Engine: 211 tests passed; build passed.
+- GUI: 441 unit tests passed; production build passed.
+- New regressions were observed failing for missing dimensions, count placement,
+  grouped Review, worker reuse, contour reuse, and clearing the count field.
+- A 60-switch local fixture took 3.8 seconds for initial analysis and 1.0 second
+  for a cached contact-count edit. Initial contour construction remains expensive.
+- Unknown body dimensions remain explicit warnings; physical geometry conflicts
+  still block generation. This does not certify unchecked component clearance.
+- Automatic model reuse preserves each footprint transform; explicit group
+  assignment is separate. Affected findings route to the relevant wizard step.
+- Final Chromium suite: 42 passed, one existing GitHub-loading test skipped.
+  Includes BHK boundary repair through Review, explicit generation with missing
+  dimensions, requested contacts, and model export/reopening.

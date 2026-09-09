@@ -6,3 +6,5 @@ declare module 'ergogen/src/point';
 declare module 'ergogen/src/prepare';
 declare module 'ergogen/src/anchor';
 declare module 'ergogen/src/filter';
+
+declare module 'ergogen/src/footprint-tools';

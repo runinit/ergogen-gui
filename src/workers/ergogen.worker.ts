@@ -12,6 +12,7 @@ for (const [name, source] of Object.entries(footprints)) {
   ergogen.inject('footprint', name, createInjectionModule(source));
 }
 
+const analysisCache = {};
 console.log('<-> Ergogen worker module starting...');
 
 /**
@@ -32,7 +33,8 @@ self.onerror = (error) => {
  * Main worker message handler.
  */
 self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
-  const { type, inputConfig, injectionInput, requestId } = event.data || {};
+  const { type, inputConfig, injectionInput, requestId, revisions } =
+    event.data || {};
 
   console.log(`<<< Ergogen worker request: ${type} ${requestId}`);
 
@@ -42,6 +44,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       type: 'error',
       error: `Unknown message type: ${type}`,
       requestId,
+      revisions,
     });
     return;
   }
@@ -63,6 +66,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
               error:
                 (injectionError as Error).message || String(injectionError),
               requestId,
+              revisions,
             });
             return true;
           }
@@ -78,6 +82,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       {
         debug: true,
         analysis: type === 'analyze',
+        analysisCache: type === 'analyze' ? analysisCache : undefined,
         assets,
         svg: true,
         solverWasm,
@@ -98,6 +103,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       results,
       warnings,
       requestId,
+      revisions,
     });
   } catch (error: unknown) {
     console.error('>>> Ergogen encountered an error: ', error);
@@ -108,6 +114,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       error: errorMessage,
       diagnostics: (error as { diagnostics?: unknown }).diagnostics,
       requestId,
+      revisions,
     });
   }
 };

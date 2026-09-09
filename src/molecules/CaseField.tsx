@@ -26,6 +26,22 @@ const HelpWrap = styled.span`
 `;
 const HELP: [RegExp, string][] = [
   [
+    /^mount \/ gasket count/i,
+    'Requested number of assembly contacts, including manual placements. Leave blank to use 40 mm spacing. Automatic contacts spread across clear edges; case-closing screws are counted separately.',
+  ],
+  [
+    /^add gasket/i,
+    'Click a clear board edge to place a gasket contact. Drag it along the edge or edit its offset and dimensions. This does not generate solids.',
+  ],
+  [
+    /^add mount/i,
+    'Click a clear edge to place a mounting post or case screw. Its role follows the mounting system. Drag or edit the placement before generating.',
+  ],
+  [
+    /^set up|^apply dimensions/i,
+    'Optional footprint setup: reuse board model associations, attach available project assets, or enter measured dimensions for matching footprints. Unresolved bodies remain unchecked.',
+  ],
+  [
     /keycap/i,
     'Measured outer keycap envelope, including its skirt. Width and length use millimetres; bottom and top are measured from the top face of the switch plate. No dimensions are assumed. The envelope moves with the switches and is checked against every cover.',
   ],

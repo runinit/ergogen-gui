@@ -15,11 +15,11 @@ vi.mock('../utils/share', async () => {
 
 // Mock the worker factory
 vi.mock('../workers/workerFactory', () => ({
-  createErgogenWorker: jest.fn(),
+  createErgogenWorker: vi.fn(),
 }));
 
 describe('ShareDialog', () => {
-  const mockClose = jest.fn();
+  const mockClose = vi.fn();
   const mockConfig = 'points:\n  key: 1';
   const mockInjections = [
     ['footprint', 'mx', 'module.exports = {}'],
@@ -31,18 +31,16 @@ describe('ShareDialog', () => {
   let mockWorker: any;
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    (createShareableUri as jest.Mock).mockReturnValue(
-      'https://share.link/test'
-    );
+    vi.clearAllMocks();
+    vi.mocked(createShareableUri).mockReturnValue('https://share.link/test');
 
     mockWorker = {
-      postMessage: jest.fn(),
-      terminate: jest.fn(),
+      postMessage: vi.fn(),
+      terminate: vi.fn(),
       onmessage: null,
       onerror: null,
     };
-    (createErgogenWorker as jest.Mock).mockReturnValue(mockWorker);
+    vi.mocked(createErgogenWorker).mockReturnValue(mockWorker);
   });
 
   it('renders Step 1 with Include custom libraries switched ON by default', () => {

@@ -212,6 +212,7 @@ test('repairs a disconnected BHK boundary without losing point selections', asyn
   const original = await saved(page);
   const dialog = await open(page);
   await dialog.getByLabel('Board source', { exact: true }).selectOption('');
+  await dialog.getByRole('button', { name: 'Review', exact: true }).click();
   await expect(
     dialog.getByText('The case boundary contains separate bodies.', {
       exact: true,
@@ -220,6 +221,7 @@ test('repairs a disconnected BHK boundary without losing point selections', asyn
   await expect(
     dialog.getByText('Showing the last valid geometry.')
   ).not.toBeVisible();
+  await dialog.getByRole('button', { name: 'Layout', exact: true }).click();
   await expect(dialog.getByLabel('Board profile', { exact: true })).toHaveValue(
     'profiles.case_board'
   );
@@ -329,7 +331,14 @@ test('inspects BHK in every 3D view and selects a gasket in 3D', async ({
   );
   const canvas = dialog.getByLabel('3D assembly preview').locator('canvas');
   await canvas.click();
+  await expect(dialog.getByLabel('3D assembly preview')).toBeVisible();
   await expect(
-    dialog.getByRole('dialog', { name: /^Edit gasket_/ })
+    dialog.getByRole('heading', { name: 'Mounting', exact: true })
   ).toBeVisible();
+  const id = gasket!
+    .slice(gasket!.indexOf('_gasket_') + '_gasket_'.length)
+    .replace(/_(lower|upper)$/, '');
+  await expect(
+    dialog.getByRole('treeitem', { name: id, exact: true })
+  ).toHaveAttribute('aria-selected', 'true');
 });

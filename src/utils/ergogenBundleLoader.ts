@@ -1,3 +1,5 @@
+import { readArchiveAssets, saveAssets, loadAssets } from './caseAssets';
+import { restoreLibrary } from './footprintLibrary';
 import JSZip from 'jszip';
 import { isFeatureEnabled } from './featureFlags';
 
@@ -111,6 +113,19 @@ export const parseZipArchive = async (
   }
 
   const configFile = validateZipStructure(zip);
+  if (zip.file('case-assets.json')) {
+    const { assets } = await readArchiveAssets(zip);
+    const existing = await loadAssets();
+    for (const [name, value] of Object.entries(assets)) {
+      if (existing[name] !== undefined && existing[name] !== value) {
+        throw new Error(
+          `Asset ${name} conflicts with a cached project. Import it through the footprint library to assign a unique identity.`
+        );
+      }
+    }
+    await saveAssets(assets);
+  }
+  await restoreLibrary(zip);
   const config = await configFile.async('string');
 
   const injections: ErgogenInjection[] = [];

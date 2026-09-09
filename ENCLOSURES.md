@@ -1,20 +1,29 @@
-# Guided case designer
+# Case workspace
 
-Open **Create / edit case** beside the main editor's Generate button. The wizard
+Open **Create / edit case** beside the main editor's Generate button. The workspace
 keeps a separate draft; the main editor retains its generation preference.
+
+See [CAD workspace and footprint library](CAD-WORKSPACE.md) for the tree, canvas,
+inspector, reusable footprints and model alignment. The case tools below remain
+available in the contextual inspector.
 
 1. **Layout:** choose a generated or imported KiCad PCB, or a mechanical board
    reference from the layout. Choose the mounting system, supplier preset and
    construction here. A layout reference requires a switch family; it has no
    electrical routing. Separate split halves into separate cases. The profile
    thumbnails and dimensioned mounting plan work before a valid solid exists.
+   Existing generated PCBs are selected automatically for new cases. The setup
+   shortcut opens optional footprint/model preparation without an import round trip.
 2. **Manufacturing:** new cases use the versioned JLCCNC aluminium 6061 preset.
    Override CNC or FDM settings per shell, plate and optional middle frame.
    The preset separates supplier capability figures from application defaults.
    Cutter reach follows cavity depth. Switch openings use explicit corner relief
    that retains their nominal engagement dimensions.
 3. **Mounting:** selection creates contacts or supports and separate closing
-   screws. Spacing starts at 40 mm. Redistribute changes only automatic entries.
+   screws. Enter a **Mount / gasket count** to spread contacts over eligible
+   edges, including manual contacts in that count. Leave it blank for 40 mm
+   spacing. Unplaceable counts are reported. Redistribute changes only automatic
+   entries; case-closing screws remain separate.
    Click an edge to add, drag a contact along it, or select a feature to edit its
    dimensions and offset. Arrow keys move a focused feature; Delete removes it.
    The popover also offers Duplicate. Undo restores the previous draft change.
@@ -26,7 +35,10 @@ keeps a separate draft; the main editor retains its generation preference.
    part. The switch plate remains separate.
 5. **Components:** inventory honours footprint position, rotation, board side
    and population status. Known switch definitions supply starting envelopes.
-   Unknown component dimensions remain unresolved. Import STEP, STL or KiCad
+   Repeated footprints are grouped; dimensions and manual model assignments can
+   apply to matching footprints or just the selected instance. Unknown component
+   dimensions remain optional warnings: generation is allowed, but their
+   clearance is not validated. Import STEP, STL or KiCad
    VRML individually or in a project ZIP, select the matching footprint, then
    confirm scale, orientation and offsets. A linked opening follows its component.
    Enter measured keycap envelopes to validate skirt clearance; missing keycaps
@@ -93,3 +105,9 @@ The preview deployment path `/ergogen-gui-preview/`, storage and caches remain
 separate from production. Build with `GITHUB_REPOSITORY=runinit/ergogen-gui-preview`
 to check it locally. The CAD binary is cached after first generation for offline
 use. Publication is separate from this local implementation.
+
+Review groups findings by category and exposes affected feature links. Layout
+keeps setup controls visible instead of repeating every component warning.
+Mount-only edits reuse resolved contours in the analysis worker; board, layout,
+component and asset changes invalidate that cache. Solid generation remains
+explicit.
