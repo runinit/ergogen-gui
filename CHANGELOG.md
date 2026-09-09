@@ -1,5 +1,18 @@
 # Changelog
 
+## CNC corners adapt to the cutter
+
+September 09, 2026
+
+![BHK CNC generation reports zero blockers and applied corner relief.](./public/images/changelog/bhk-cnc-relief.png)
+
+Choosing CNC now adds cutter-sized corner relief during case generation. Each
+part uses its own cutter; switch openings keep their required clearance.
+
+Relief is checked against walls, plate webs and mounting posts before cutting.
+Findings identify pockets that need a smaller cutter or more surrounding
+material. Rotated relief arcs no longer produce false sharp-corner warnings.
+
 ## Gasket mounting and direct plan editing
 
 September 09, 2026

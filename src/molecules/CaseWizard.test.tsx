@@ -295,3 +295,13 @@ it('repairs saved gasket conflicts without redistributing contacts', () => {
   expect(spec.gaskets.left.anchor.shift).toEqual([10, 20]);
   expect(screen.getByRole('button', { name: 'Generate' })).toBeEnabled();
 });
+
+it('explains automatic CNC relief and chooses a smaller default plate cutter', () => {
+  render(<CaseWizard onClose={mocks.close} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Manufacturing' }));
+  fireEvent.change(screen.getByLabelText('plate process'), {
+    target: { value: 'cnc' },
+  });
+  expect(screen.getByLabelText('plate cutter diameter (mm)')).toHaveValue('1');
+  expect(screen.getByText(/CNC adds corner relief/i)).toBeVisible();
+});

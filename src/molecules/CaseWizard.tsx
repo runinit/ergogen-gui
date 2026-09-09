@@ -44,7 +44,12 @@ import CaseComponents from './CaseComponents';
 import CaseReview from './CaseReview';
 import CaseControlHelp from './CaseControlHelp';
 import { CaseConfig, CasePlacement } from '../types/case';
-import { applyPreset, JLC_GUIDE, JLC_PRESET } from '../utils/casePresets';
+import {
+  applyPreset,
+  JLC_GUIDE,
+  JLC_PRESET,
+  PLATE_CNC_DEFAULTS,
+} from '../utils/casePresets';
 
 const FINDING_STEPS: [RegExp, string][] = [
   [
@@ -912,7 +917,12 @@ function CaseDraft({ onClose, initialView }: Props) {
         value
       );
       const defaults =
-        value === 'cnc' ? PROCESS_DEFAULTS.cnc : PROCESS_DEFAULTS.fdm;
+        value === 'cnc'
+          ? {
+              ...PROCESS_DEFAULTS.cnc,
+              ...(part === 'plate' ? PLATE_CNC_DEFAULTS : {}),
+            }
+          : PROCESS_DEFAULTS.fdm;
       for (const [key, next] of Object.entries(defaults)) {
         if (
           parseDocument(result).getIn([
@@ -1444,6 +1454,12 @@ function CaseDraft({ onClose, initialView }: Props) {
                     <a href={JLC_GUIDE} target="_blank" rel="noreferrer">
                       JLCCNC design guidance
                     </a>
+                  </p>
+                  <p>
+                    CNC adds corner relief using each part’s cutter diameter
+                    when you generate. Required openings stay clear; walls,
+                    plate webs, and mounting posts are checked before relief is
+                    applied.
                   </p>
                   {[
                     'bottom',

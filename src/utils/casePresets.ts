@@ -2,6 +2,7 @@ import { parseDocument } from 'yaml';
 import preset from './jlccnc-6061-2026-09.json';
 export { default as supplierPreset } from './jlccnc-6061-2026-09.json';
 import { editCase } from './enclosureSource';
+export const PLATE_CNC_DEFAULTS = { cutter: 1, min_wall: 0.8 };
 export const JLC_PRESET = preset.id;
 export const JLC_GUIDE =
   'https://jlccnc.com/help/article/cnc-machining-design-guideline';
@@ -10,12 +11,12 @@ const TOOLS = preset.supplier.tools;
 export function cncDefaults(depth: number, part: string) {
   const [cutter, reach, radius] =
     depth <= 3
-      ? [1, 3, 0.5]
+      ? [PLATE_CNC_DEFAULTS.cutter, 3, PLATE_CNC_DEFAULTS.cutter / 2]
       : TOOLS.find((row) => row[1] >= depth) || TOOLS.at(-1)!;
   return {
     process: 'cnc',
     material: 'Aluminium 6061',
-    min_wall: part === 'plate' ? 0.8 : 2,
+    min_wall: part === 'plate' ? PLATE_CNC_DEFAULTS.min_wall : 2,
     cutter,
     reach,
     internal_radius: radius,

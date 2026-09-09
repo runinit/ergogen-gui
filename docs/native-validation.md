@@ -6,10 +6,10 @@ this file records verification of its implementation.
 
 | Check | Result |
 | --- | --- |
-| Engine: `npm test` | 261 passing; native API, cache regressions, imported solids and retained backend adapters |
-| GUI: `NODE_OPTIONS=--no-experimental-webstorage pnpm run precommit` | 508 tests passing; formatting, lint, types, and dependency checks pass |
+| Engine: `npm test` | 269 passing; final hardware-relief guard also passes 11 focused checks |
+| GUI: `NODE_OPTIONS=--no-experimental-webstorage pnpm run precommit` | 509 tests passing; formatting, lint, types, and dependency checks pass |
 | Packaging: `pnpm run test:release` | 9 passing |
-| Browser: focused BHK, gasket-plan and enclosure specs | 8 passing; includes desktop/phone editing, touch gestures and offline generation |
+| Browser: focused gasket-plan and enclosure specs | 8 passing; includes BHK CNC generation, desktop/phone editing, touch gestures and offline generation |
 | Engine and GUI production builds | Pass |
 | Installed engine source and architecture | Byte-identical to the enclosure checkout |
 
@@ -136,3 +136,11 @@ A rotated-body regression rejects rectangular bounds in place of the actual
 in-plane contour. BHK now receives angled thumb-edge contacts. Browser checks
 cover desktop and phone layouts, dragging, insertion/deletion, undo, wheel/pinch
 zoom and pan without geometry changes or covering the selected contact.
+
+## CNC relief verification
+
+BHK generates all three CNC parts without radius blockers. Browser generation
+confirms zero blockers and applied corner relief; five existing component-envelope
+checks remain incomplete. Engine regressions cover rotated arcs, mixed processes,
+gasket pockets, plate webs, mounting contacts and material around nut pockets.
+The generated plate profile and exported solids use the prepared geometry.

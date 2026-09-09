@@ -14,7 +14,7 @@
     "@react-three/drei": "^9.92.0",
     "@react-three/fiber": "^8.15.0",
     "@salusoft89/planegcs": "1.2.0",
-    "ergogen": "file:vendor/ergogen-native-694ffe289bc0.tgz",
+    "ergogen": "file:vendor/ergogen-native-da8c2e260b62.tgz",
     "file-saver": "^2.0.5",
     "js-yaml": "^4.1.0",
     "jszip": "^3.10.1",

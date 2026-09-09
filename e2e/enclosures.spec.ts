@@ -277,3 +277,42 @@ test('inspects a native gasket case in every 3D view and selects a gasket in 3D'
     dialog.getByRole('treeitem', { name: id, exact: true })
   ).toHaveAttribute('aria-selected', 'true');
 });
+
+test('generates BHK CNC relief from the process controls', async ({
+  page,
+}, testInfo) => {
+  await load(page, BHKLayout.value);
+  const dialog = await open(page);
+  await dialog
+    .getByRole('button', { name: 'Manufacturing', exact: true })
+    .click();
+  await expect(dialog.getByText(/CNC adds corner relief/)).toBeVisible();
+  for (const part of ['bottom', 'top', 'plate']) {
+    await dialog
+      .getByLabel(`${part} process`, { exact: true })
+      .selectOption('cnc');
+  }
+  await expect(
+    dialog.getByLabel('plate cutter diameter (mm)', { exact: true })
+  ).toHaveValue('1');
+  await ready(page);
+  await dialog.getByRole('button', { name: 'Review', exact: true }).click();
+  await expect(dialog.getByText(/Added cutter relief/).first()).toBeVisible();
+  await expect(
+    dialog.getByText(
+      /smaller than the cutter|still cannot fit the cutter|relief would/
+    )
+  ).toHaveCount(0);
+  await expect(
+    dialog.getByRole('button', { name: /Review 0 blockers/ })
+  ).toBeVisible();
+  await dialog.getByText('Generated current draft', { exact: true }).click();
+  await dialog
+    .getByText(/Added cutter relief/)
+    .first()
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: testInfo.outputPath('bhk-cnc-relief.png'),
+    fullPage: true,
+  });
+});

@@ -35,12 +35,12 @@ The normal build repackages the selected engine into
 
 ## Native configuration snapshot
 
-The dependency and lockfile select `ergogen-native-694ffe289bc0.tgz`, built from
-[engine commit b5272f5](https://github.com/runinit/ergogen/commit/b5272f56a893ce319cfc8d69cb0a8a6bfa0dd342). It implements `schema: ergogen/v1`, physical
+The dependency and lockfile select `ergogen-native-da8c2e260b62.tgz`, built from
+[engine commit 4332147](https://github.com/runinit/ergogen/commit/43321473da680266dbcf5736c08b0e25278e6068). It implements `schema: ergogen/v1`, physical
 layers, typed objects, and native PCB inventory. This is an unpublished local
 source snapshot; the historical archives above are inactive.
 
-SHA-256: `694ffe289bc064651cbb472e928acdee915a03b5dfde1e03cda890bfebc785f7`
+SHA-256: `da8c2e260b624ed633b96e79a5c0c794e871656df2f856e08f017419cb39ed30`
 
 Installed engine sources match the enclosure checkout byte for byte. The package
 excludes the historical test harness. Keep the upstream license and attribution.

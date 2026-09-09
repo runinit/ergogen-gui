@@ -617,3 +617,17 @@ spans available for gaskets. The 2D plan owns a separate viewport for wheel/pinc
 Fit restores the boundary view. Dragging keeps the grab offset and commits the
 release position once. The contact editor sits below the canvas. Contextual
 hints dismiss during manipulation and do not appear on touch-down.
+
+### CNC pocket preparation
+
+The generator prepares cutter relief per manufactured part before exporting solids.
+`designs/pocket-plan.js` validates proposed removal against shell walls, plate webs,
+and mounting posts; `tooling.js` owns relief geometry and measured corner radii.
+CNC selection uses the declared cutter diameter automatically. FDM parts retain
+nominal geometry. The plate uses its own smaller cutter and wall defaults.
+
+Shell cavities, cover openings, gasket pockets, ledges, registration recesses,
+hardware pockets and switch cutouts register their depth intervals with the
+compiler. Only additional removal reaches the solid kernel, preserving existing
+supports. Rejected relief retains the nominal pocket and emits a blocker at the
+specific feature. Generated plate outlines include the applied corner relief.
