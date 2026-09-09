@@ -1,5 +1,15 @@
 # Changelog
 
+## Reliable native analysis and imported enclosures
+
+September 09, 2026
+
+![Imported enclosure with its native service opening.](./public/images/changelog/imported-native-opening.png)
+
+Mounting edits retain clearance blockers and standalone PCB downloads.
+Imported-board enclosures include native batteries and service openings.
+Moving an aliased key adds to its existing offset and preserves undo.
+
 ## Simpler transitions and configurable inside corners
 
 September 09, 2026

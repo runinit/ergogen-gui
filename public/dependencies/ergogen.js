@@ -40148,7 +40148,7 @@ ${content}
 		    };
 		    for (const [id,input] of Object.entries(config.assemblies || {})) {
 		        if (input.preset!=='enclosure') { continue }
-		        const spec=next.assemblies[id]={...input,components:[],openings:[],cutouts:[...(input.cutouts || [])],native:true};
+		        let spec=next.assemblies[id]={...input,components:[],openings:[],cutouts:[...(input.cutouts || [])],native:true};
 		        spec.front_height=input.front_height ?? scene.number(input.height ?? 24,'height')*Math.cos(scene.number(input.typing_angle || 0,'typing_angle')*f.RAD);
 		        const board=boards[id];
 		        if (board?.native) {
@@ -40164,8 +40164,8 @@ ${content}
 		            if (!board.native) {
 		                const imported=requireBoardLink().attach({assemblies:{[id]:spec}}, {[id]:board}, context);
 		                Object.assign(next.components,imported.components);
-		                next.assemblies[id]=imported.assemblies[id];
-		                continue
+		                // Append independent case objects to the imported assembly, retaining its PCB components and cutouts.
+		                spec=next.assemblies[id]=imported.assemblies[id];
 		            }
 		        }
 		        for (const item of Object.values(scene.objects)) {
@@ -41145,10 +41145,19 @@ ${content}
 		const anchor = requireAnchor().parse;
 		const Point = requirePoint();
 		const g = requireGeometry$1();
+		const {deepcopy} = requireUtils();
 
 		const sections = ['regions', 'boundaries', 'sketches', 'profiles', 'components', 'assemblies'];
 		const analysisCache = new WeakMap();
 		const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
+
+		// Cache board checks with their geometry, but rebuild layout and mounting findings per request.
+		const appendFindings = (analysis, boards, scene, boardFindings = []) => {
+		    if (scene) { scene.findings.push(...deepcopy(boardFindings)); }
+		    for (const [id, plan] of Object.entries(analysis)) {
+		        plan.findings.push(...deepcopy(boards[id]?.findings || []), ...deepcopy(scene?.findings || []));
+		    }
+		};
 
 		designs.parse = async (config, points, outlines, units, options = {}) => {
 		    a.unexpected(config, 'designs', sections);
@@ -41163,7 +41172,7 @@ ${content}
 		            return [id, next]
 		        }));
 		        const analysis = requireEnclosureAnalysis().analyze({...cached.config, assemblies}, cached.context);
-		        for (const [id, board] of Object.entries(cached.context.boards)) { analysis[id]?.findings.push(...board.findings); }
+		        appendFindings(analysis, cached.context.boards, options.scene, cached.result.boardBundle?.findings);
 		        return {...cached.result, report:{...cached.result.report, analysis}}
 		    }
 
@@ -41388,7 +41397,9 @@ ${content}
 		    for (const section of sections.filter(section => section !== 'assemblies')) {
 		        for (const id of Object.keys(config[section] || {})) { resolve(`${section}.${id}`); }
 		    }
-		    const boards = options.boardSources ? options.boardSources(generated) : {};
+		    const boardSources = options.boardSources ? options.boardSources(generated) : {};
+		    const boardBundle = options.scene ? boardSources : undefined;
+		    const boards = boardBundle ? boardBundle.boards : boardSources;
 		    config = options.scene ? requireBoards().attach(config, boards, {resolved, features, units, shape, scene:options.scene, assets:options.assets}) : requireBoardLink().attach(config, boards, {resolved, features, units, shape, assets:options.assets});
 		    report.boards = boards;
 		    if (Object.keys(config.assemblies || {}).length) {
@@ -41397,10 +41408,9 @@ ${content}
 		        assemblies.compile({...config, assemblies: legacy}, {resolve, locate, shape, publish, units, cases, report, outlines: generated});
 		    }
 		    report.analysis = requireEnclosureAnalysis().analyze(config, {resolve, locate, shape, units, boards});
-		    for (const [id, board] of Object.entries(boards)) { report.analysis[id]?.findings.push(...board.findings); }
-		    for (const plan of Object.values(report.analysis)) { plan.findings.push(...(options.scene?.findings || [])); }
+		    appendFindings(report.analysis, boards, options.scene, boardBundle?.findings);
 		    if (options.analysis) {
-		        const result = {outlines: generated, cases, report, solids: {}};
+		        const result = {outlines: generated, cases, report, solids: {}, boardBundle};
 		        if (options.analysisCache && options.analysisKey) {
 		            analysisCache.set(options.analysisCache, {key:options.analysisKey, config, context:{resolve, locate, shape, units, boards}, result});
 		        }
@@ -41414,7 +41424,7 @@ ${content}
 		        if (errors.length) { const error = new Error(errors.map(f => f.message).join(' ')); error.diagnostics = errors; throw error }
 		    }
 		    const solids = await requireEnclosures().compile(config, {resolve, locate, shape, publish, units, cases, report, boards}, options);
-		    return {outlines: generated, cases, report, solids}
+		    return {outlines: generated, cases, report, solids, boardBundle}
 		};
 		return designs;
 	}
@@ -41551,9 +41561,13 @@ ${content}
 		            scene, region: (spec, path) => geometry.region(scene, spec, path),
 		            shape: (spec,path,point) => geometry.project({matrix:requireFrames().local([point.x,point.y,0],point.r),sourcePath:path},scene.envelope(spec,path)),
 		            boardSources: generated => {
-		                nativeBoards = requirePcbs().compile(config, scene, {...outlines,...generated}, points);
-		                return requireBoards().sources(config, nativeBoards, options.assets || {})
+		                const previousFindings = scene.findings.length;
+		                const generatedBoards = requirePcbs().compile(config, scene, {...outlines,...generated}, points);
+		                const findings = scene.findings.splice(previousFindings);
+		                const boards = requireBoards().sources(config, generatedBoards, options.assets || {});
+		                return {boards, generatedBoards, findings}
 		            }});
+		        nativeBoards = design.boardBundle?.generatedBoards || {};
 		        Object.assign(outlines, design.outlines);
 		        for (const name of Object.keys(design.cases)) {
 		            if (Object.prototype.hasOwnProperty.call(caseConfig, name)) {

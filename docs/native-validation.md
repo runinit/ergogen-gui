@@ -6,10 +6,10 @@ this file records verification of its implementation.
 
 | Check | Result |
 | --- | --- |
-| Engine: `npm test` | 234 passing; native API and retained backend adapters |
-| GUI: `NODE_OPTIONS=--no-experimental-webstorage pnpm run precommit` | 500 tests passing; formatting, lint, types, and dependency checks pass |
-| Packaging: `pnpm run test:release` | 8 passing |
-| Browser: `PLAYWRIGHT_PORT=4397 pnpm exec playwright test --workers=2` | 44 passing; one pre-existing skipped URL-loading test |
+| Engine: `npm test` | 259 passing; native API, cache regressions, imported solids and retained backend adapters |
+| GUI: `NODE_OPTIONS=--no-experimental-webstorage pnpm run precommit` | 502 tests passing; formatting, lint, types, and dependency checks pass |
+| Packaging: `pnpm run test:release` | 9 passing |
+| Browser: focused BHK, native layout and regression specs | 7 passing across focused runs; includes offline BHK, alias undo and imported ZIP export |
 | Engine and GUI production builds | Pass |
 | Installed engine source and architecture | Byte-identical to the enclosure checkout |
 
@@ -108,3 +108,18 @@ every board feature remains outside this implementation's editor scope.
 Build output retains upstream CAD/geometry dependency warnings about bundle size,
 externalized Node modules, and dynamic evaluation. The generated engine bundle also
 contains upstream trailing whitespace; authored files pass `git diff --check`.
+
+## Review regressions
+
+Cache tests retain native case-height and PCB-pad blockers exactly once across
+mount-count edits, reuse geometry, and invalidate on outline or asset changes.
+Standalone and mixed-assembly PCB exports remain byte-identical on cache hits.
+Imported enclosures include native batteries in the declared mounting frame and
+subtract service openings from the shell; imported PCB bytes remain unchanged.
+Alias movement preserves existing offsets, formulas, siblings, comments and locks.
+
+Browser checks confirm cached height blockers remain visible and exports remain
+blocked after a mounting edit. Imported projects render the battery, export its
+STL, and retain the service opening in the shell. A separate solid-volume check
+verifies material was removed by the opening. These are software geometry checks,
+not physical-fit or fabrication approval.

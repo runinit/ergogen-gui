@@ -54,3 +54,48 @@ it('materializes only the moved alias instance', () => {
     2, 0, 0,
   ]);
 });
+
+it('adds movement to an aliased override without changing its source or siblings', () => {
+  const input = `schema: ergogen/v1
+layout:
+  objects:
+    left: &key {kind: key, placement: {override: {at: [10, 0, 0]}}}
+    right: *key # keep
+    sibling: *key
+`;
+  const changed = moveLayout(input, 'objects', 'right', [2, 0, 0]);
+  expect(parse(changed).layout.objects.right.placement.override.at).toEqual([
+    12, 0, 0,
+  ]);
+  expect(parse(changed).layout.objects.left).toEqual(
+    parse(input).layout.objects.left
+  );
+  expect(changed).toContain('sibling: *key');
+  expect(changed).toContain('# keep');
+  expect(
+    parse(moveLayout(changed, 'objects', 'right', [0, 3, 0], frame)).layout
+      .objects.right.placement.override.at
+  ).toEqual([15, 0, 0]);
+});
+
+it('retains formulas and locks inherited through an alias', () => {
+  const input = `schema: ergogen/v1
+units: {pitch: 19}
+layout:
+  objects:
+    left: &key {kind: key, placement: {override: {at: [pitch, 0, 0]}}}
+    right: *key
+`;
+  const changed = moveLayout(input, 'objects', 'right', [2, 0, 0]);
+  expect(parse(changed).layout.objects.right.placement.override.at[0]).toBe(
+    '(pitch) + 2'
+  );
+  expect(() =>
+    moveLayout(
+      input.replace('kind: key', 'kind: key, locked: true'),
+      'objects',
+      'right',
+      [2, 0, 0]
+    )
+  ).toThrow(/locked/);
+});

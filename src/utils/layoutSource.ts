@@ -111,8 +111,9 @@ export function moveLayout(
         ) * PRECISION
       ) / PRECISION
   );
-  const { root } = target(source, section, id);
-  const current = parseDocument(source).getIn([
+  const { root, generated } = target(source, section, id);
+  const materialized = generated ? source : instance(source, root);
+  const current = parseDocument(materialized).getIn([
     ...root,
     'placement',
     'override',
@@ -124,5 +125,11 @@ export function moveLayout(
       ? value + local[index]
       : `(${value}) + ${local[index]}`
   );
-  return setLayout(source, section, id, ['placement', 'override', 'at'], next);
+  return setLayout(
+    materialized,
+    section,
+    id,
+    ['placement', 'override', 'at'],
+    next
+  );
 }

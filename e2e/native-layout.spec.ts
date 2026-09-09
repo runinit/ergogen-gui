@@ -229,3 +229,41 @@ test('preserves a legacy source while rejecting generation', async ({
     page.getByTestId('downloads-container-main-kicad_pcb-download')
   ).toHaveCount(0);
 });
+
+test('moves an alias from its existing offset and restores the alias with undo', async ({
+  page,
+}) => {
+  const original = `schema: ergogen/v1
+layout:
+  objects:
+    original: &key {kind: key, envelopes: {pcb: {size: [18, 18]}}, placement: {override: {at: [10, 0, 0]}}}
+    copy: *key # preserve alias
+`;
+  await load(page, original);
+  await openLayout(page);
+  await page.getByLabel('Layout object').selectOption('copy');
+  await expect(page.getByLabel('Layout X', { exact: true })).toHaveValue('10');
+  await page.getByLabel('Layout X', { exact: true }).fill('12');
+  await page.getByLabel('Layout X', { exact: true }).press('Tab');
+  await expect
+    .poll(
+      async () =>
+        parse(await source(page)).layout.objects.copy.placement.override.at[0]
+    )
+    .toBe(12);
+  await expect(page.getByLabel('Layout X', { exact: true })).toHaveValue('12');
+  await expect(page.getByLabel('Layout X', { exact: true })).toBeEnabled();
+  expect(
+    parse(await source(page)).layout.objects.original.placement.override.at[0]
+  ).toBe(10);
+  await page.evaluate(() =>
+    (
+      window as unknown as {
+        monaco: { editor: { getModels(): { undo(): void }[] } };
+      }
+    ).monaco.editor
+      .getModels()[0]
+      .undo()
+  );
+  await expect.poll(() => source(page)).toBe(original);
+});

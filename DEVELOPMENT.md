@@ -562,6 +562,12 @@ final PCB export after outline publication. Source, injections and asset bytes
 identify a generation revision; Apply adopts that result instead of rebuilding.
 Model assets live outside YAML in IndexedDB and are included in project ZIPs.
 
+Analysis caches retain generated PCB outputs and PCB findings. Mounting edits
+recalculate the plan and merge current native clearance findings once, preserving
+height blockers. Imported-board assemblies append native bodies and service
+openings after linking their board inventory. Layout movement materializes an
+alias before adding to its inherited override; undo restores the original alias.
+
 ### Bundled footprint visibility
 
 Custom Libraries lists the worker's generated footprint catalogue in a
