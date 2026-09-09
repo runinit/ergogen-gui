@@ -39,6 +39,14 @@ export function createCase(source: string, name: string): string {
   if (doc.errors.length) {
     throw new Error(doc.errors[0].message);
   }
+  const data = doc.toJS();
+  if (data?.schema !== 'ergogen/v1') {
+    throw new Error(
+      'Case creation requires a native schema: ergogen/v1 document. The original source is preserved.'
+    );
+  }
+  const boardId = Object.keys(data.pcbs || {})[0];
+  const boardProfile = data.pcbs?.[boardId]?.profile;
   for (const path of [
     ['designs', 'assemblies', name],
     ['designs', 'profiles', `${name}_board`],
@@ -49,10 +57,13 @@ export function createCase(source: string, name: string): string {
     }
   }
   const definitions: [SourcePath, unknown][] = [
-    [['regions', `${name}_keys`], { where: true, close: 2 }],
+    [
+      ['regions', `${name}_keys`],
+      { select: { kind: 'key' }, envelope: 'pcb', close: 2 },
+    ],
     [
       ['regions', `${name}_switches`],
-      { where: true, size: 14, corner_relief: 0.5 },
+      { select: { kind: 'key' }, envelope: 'plate' },
     ],
     [
       ['boundaries', `${name}_body`],
@@ -63,13 +74,11 @@ export function createCase(source: string, name: string): string {
       ['assemblies', name],
       {
         preset: 'enclosure',
-        profile: `profiles.${name}_board`,
+        profile: boardProfile || `profiles.${name}_board`,
         mounting: '',
         construction: 'cover',
         supplier: JLC_PRESET,
-        board: Object.keys(doc.toJS()?.pcbs || {}).length
-          ? { source: 'generated', name: Object.keys(doc.toJS().pcbs)[0] }
-          : { source: 'layout', name: `${name}_layout`, family: '' },
+        ...(boardId ? { board: { source: 'generated', name: boardId } } : {}),
         manufacturing: {
           bottom: cncDefaults(13, 'bottom'),
           top: cncDefaults(11, 'top'),
@@ -89,6 +98,12 @@ export function createCase(source: string, name: string): string {
   ];
   let result = source;
   for (const [path, value] of definitions) {
+    if (boardProfile && path[0] !== 'assemblies') {
+      continue;
+    }
+    if (boardProfile && path[0] === 'assemblies') {
+      (value as { cutouts: string[] }).cutouts = [];
+    }
     result = editDesign(result, ['designs', ...path], value);
   }
   const boards = Object.keys(doc.toJS()?.pcbs || {});
@@ -163,7 +178,7 @@ export function editCase(
   return editDesign(source, full, value);
 }
 
-export function appendDesignRef(
+function appendDesignRef(
   source: string,
   path: SourcePath,
   ref: string

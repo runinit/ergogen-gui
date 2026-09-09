@@ -24,11 +24,23 @@ SHA-256: `d8de34fdf6bb70a1d1c7c45bcf2af4c8f23bb919dc69313d16f2756e10ade6e1`
 
 ## CAD workspace snapshot
 
-`ergogen-cad-e2d947209f40.tgz` contains the current dirty `enclosure-work/ergogen`
+`ergogen-cad-e2d947209f40.tgz` contains the earlier `enclosure-work/ergogen`
 source, including the guided mounting work and reusable footprint/model helpers.
 This is a local source snapshot, not a published release.
 
 SHA-256: `e2d947209f4023d15ebeeb1582b6dedce72762b227f202b4f319b29a95b9fdd7`
 
-The GUI dependency and lockfile select this archive. The normal build repackages
-the engine into `public/dependencies/ergogen.js` before Vite builds the GUI.
+The normal build repackages the selected engine into
+`public/dependencies/ergogen.js` before Vite builds the GUI.
+
+## Native configuration snapshot
+
+The dependency and lockfile select `ergogen-native-ae679f335814.tgz`, built from
+the enclosure engine checkout. It implements `schema: ergogen/v1`, physical
+layers, typed objects, and native PCB inventory. This is an unpublished local
+source snapshot; the historical archives above are inactive.
+
+SHA-256: `ae679f3358141c76a7fb1df228079a5f663edb0f0a4a7f26bb4ccf6009829bfc`
+
+Installed engine sources match the enclosure checkout byte for byte. The package
+excludes the historical test harness. Keep the upstream license and attribution.

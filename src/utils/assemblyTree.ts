@@ -1,4 +1,5 @@
 import type { BoardInventory, CaseConfig } from '../types/case';
+import type { LayoutReport } from 'ergogen/src/native';
 
 export type AssemblyNode = {
   id: string;
@@ -17,7 +18,8 @@ function componentPart(name: string, id: string) {
 export function assemblyNodes(
   name: string,
   spec: CaseConfig,
-  board?: BoardInventory
+  board?: BoardInventory,
+  layout?: LayoutReport
 ): AssemblyNode[] {
   const groups = new Map<string, AssemblyNode[]>();
   for (const component of board?.components || []) {
@@ -26,7 +28,9 @@ export function assemblyNodes(
     }
     const placements = groups.get(component.footprint) || [];
     placements.push({
-      id: componentPart(name, component.id),
+      id: board?.native
+        ? `${name}_components_native_${component.id}`
+        : componentPart(name, component.id),
       label: component.reference,
       tool: 4,
       component: component.id,
@@ -34,10 +38,37 @@ export function assemblyNodes(
       diagnostics: [
         `components.board_${name}_${component.id.replace(/[^A-Za-z0-9_]/g, '_')}`,
         `board.models.${component.id}`,
+        `layout.objects.${component.id}`,
       ],
     });
     groups.set(component.footprint, placements);
   }
+  // Case-mounted bodies remain selectable without an electrical PCB binding.
+  for (const item of Object.values(layout?.objects || {})) {
+    if (
+      item.kind === 'anchor' ||
+      !item.envelopes.body ||
+      board?.components.some((component) => component.id === item.id)
+    ) {
+      continue;
+    }
+    if (item.assembly !== name && item.pcb !== spec.board?.name) {
+      continue;
+    }
+    const group = item.part || item.kind;
+    const placements = groups.get(group) || [];
+    placements.push({
+      id: `${name}_components_native_${item.id}`,
+      label: item.label || item.id,
+      tool: 4,
+      feature: item.sourcePath,
+    });
+    groups.set(group, placements);
+  }
+  const count = Array.from(groups.values()).reduce(
+    (total, items) => total + items.length,
+    0
+  );
   const nodes: AssemblyNode[] = [
     { id: `${name}_bottom`, label: 'Case shell', tool: 3 },
     { id: `${name}_top`, label: 'Top frame', tool: 3 },
@@ -45,8 +76,8 @@ export function assemblyNodes(
     { id: `${name}_pcb`, label: 'PCB', tool: 0 },
     {
       id: 'components',
-      count: board?.components.filter((c) => c.populated).length || 0,
-      label: `Components (${board?.components.filter((c) => c.populated).length || 0})`,
+      count,
+      label: `Components (${count})`,
       tool: 4,
       children: Array.from(groups, ([footprint, children]) => ({
         id: `footprint:${footprint}`,

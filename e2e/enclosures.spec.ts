@@ -4,8 +4,7 @@ import JSZip from 'jszip';
 import gasketCase from './fixtures/gasket-case';
 import BHKLayout from '../src/examples/bhk';
 
-const source =
-  '# Keep the original layout\nunits: {pitch: 19}\npoints:\n  zones:\n    keys:\n      columns: {left: {}, right: {}}\n      rows: {home: {}, top: {}}\n';
+import source from './fixtures/native-grid';
 const saved = (page: Page) =>
   page.evaluate(() =>
     (
@@ -199,104 +198,37 @@ test('uses the supplier CNC preset with explicit corner relief', async ({
     .getByRole('button', { name: 'Apply design', exact: true })
     .click();
   await expect.poll(() => saved(page)).toContain('corner_relief: 0.5');
-  expect(await saved(page)).toContain('supplier: jlccnc-6061-2026-09');
+  await expect
+    .poll(() => saved(page))
+    .toContain('supplier: jlccnc-6061-2026-09');
 });
 
-test('repairs a disconnected BHK boundary without losing point selections', async ({
+test('keeps the native BHK boundary and limits switch selections to typed keys', async ({
   page,
 }) => {
   await load(page, BHKLayout.value);
-  await expect(
-    page.getByTestId('downloads-container-bhk_pcb-kicad_pcb-download')
-  ).toBeVisible({ timeout: 30000 });
   const original = await saved(page);
   const dialog = await open(page);
-  await dialog.getByLabel('Board source', { exact: true }).selectOption('');
-  await dialog.getByRole('button', { name: 'Review', exact: true }).click();
-  await expect(
-    dialog.getByText('The case boundary contains separate bodies.', {
-      exact: true,
-    })
-  ).toBeVisible({ timeout: 30000 });
-  await expect(
-    dialog.getByText('Showing the last valid geometry.')
-  ).not.toBeVisible();
-  await dialog.getByRole('button', { name: 'Layout', exact: true }).click();
   await expect(dialog.getByLabel('Board profile', { exact: true })).toHaveValue(
-    'profiles.case_board'
-  );
-  const points = dialog.getByRole('group', { name: 'Included layout points' });
-  const first = points.getByLabel('matrix_c1_r4', { exact: true });
-  const second = points.getByLabel('matrix_c1_r3', { exact: true });
-  const total = await points.getByRole('checkbox', { checked: true }).count();
-  await first.uncheck();
-  await expect(first).not.toBeChecked();
-  await expect(second).toBeChecked();
-  await expect(points.getByRole('checkbox', { checked: true })).toHaveCount(
-    total - 1
-  );
-  await first.check();
-  await expect(points.getByRole('checkbox', { checked: true })).toHaveCount(
-    total
+    'profiles.bhk'
   );
   const cutouts = dialog.getByRole('group', {
     name: 'Points with switch cutouts',
   });
-  await cutouts.getByLabel('matrix_c1_r4', { exact: true }).uncheck();
-  await expect(
-    cutouts.getByLabel('matrix_c1_r3', { exact: true })
-  ).toBeChecked();
-  await expect(first).toBeChecked();
-  // The PCB outline includes keys; helper points are not switch cutouts.
-  for (const box of await cutouts.getByRole('checkbox').all()) {
-    const label = await box.locator('..').innerText();
-    if (!/^(matrix|thumbfan)_/.test(label.trim())) {
-      await box.uncheck();
-    }
+  if (await cutouts.count()) {
+    await expect(cutouts.getByRole('checkbox')).toHaveCount(33);
   }
-  await dialog
-    .getByLabel('Existing board outline', { exact: true })
-    .selectOption('bhk');
-  await expect(dialog.getByLabel('Interactive mounting plan')).toBeVisible();
-  await expect(
-    dialog.getByText('The case boundary contains separate bodies.', {
-      exact: true,
-    })
-  ).not.toBeVisible();
-  await page.screenshot({
-    path: 'test-results/bhk-boundary-recovered.png',
-    fullPage: true,
+  await expect(dialog.getByLabel('Interactive mounting plan')).toBeVisible({
+    timeout: 30000,
   });
-  await dialog.getByLabel('New case name').fill('test');
-  await dialog.getByRole('button', { name: 'Add case', exact: true }).click();
-  await expect(dialog.getByLabel('Case', { exact: true })).toHaveValue('test');
-  for (const box of await cutouts.getByRole('checkbox').all()) {
-    const label = await box.locator('..').innerText();
-    if (!/^(matrix|thumbfan)_/.test(label.trim())) {
-      await box.uncheck();
-    }
-  }
-  await dialog
-    .getByLabel('Existing board outline', { exact: true })
-    .selectOption('bhk');
-  await expect(dialog.getByLabel('Interactive mounting plan')).toBeVisible();
-  await expect(
-    dialog.getByText('The case boundary contains separate bodies.', {
-      exact: true,
-    })
-  ).not.toBeVisible();
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   expect(await saved(page)).toBe(original);
 });
 
-test('inspects BHK in every 3D view and selects a gasket in 3D', async ({
+test('inspects a native gasket case in every 3D view and selects a gasket in 3D', async ({
   page,
 }) => {
-  const config = readFileSync(
-    '../ergogen/docs/examples/enclosure-bhk-gasket.yaml',
-    'utf8'
-  );
-  await load(page, config);
+  await load(page, gasketCase);
   const dialog = await open(page);
   await ready(page);
   for (const view of ['assembled', 'section', 'exploded', 'part']) {

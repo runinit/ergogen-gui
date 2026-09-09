@@ -1,6 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-const source =
-  'points:\n  zones:\n    keys:\n      columns: {left: {}, right: {}, far: {}}\n      rows: {home: {}, top: {}}\n';
+import source from './fixtures/native-grid';
 const open = async (page: Page) => {
   await page.addInitScript(
     (source) =>
@@ -34,7 +33,6 @@ test('plans gasket mounting before solids and only generates explicitly', async 
     dialog.getByLabel('Board profile 2D preview', { exact: true })
   ).toBeVisible();
   await expect(dialog.getByLabel('3D assembly preview')).toHaveCount(0);
-  await dialog.getByLabel('Switch family', { exact: true }).selectOption('mx');
   await dialog
     .getByLabel('Mounting system', { exact: true })
     .selectOption('gasket');
@@ -102,7 +100,6 @@ test('edits contacts with the keyboard and preserves manual ownership during red
   page,
 }) => {
   const dialog = await open(page);
-  await dialog.getByLabel('Switch family', { exact: true }).selectOption('mx');
   await dialog
     .getByLabel('Mounting system', { exact: true })
     .selectOption('gasket');
@@ -154,7 +151,6 @@ test('exports a middle frame and rejects an outdated result', async ({
   page,
 }) => {
   const dialog = await open(page);
-  await dialog.getByLabel('Switch family', { exact: true }).selectOption('mx');
   await dialog
     .getByLabel('Enclosure construction', { exact: true })
     .selectOption('midframe');
@@ -281,7 +277,6 @@ test('drags a gasket without generating and can undo the move', async ({
   page,
 }) => {
   const dialog = await open(page);
-  await dialog.getByLabel('Switch family', { exact: true }).selectOption('mx');
   await dialog
     .getByLabel('Mounting system', { exact: true })
     .selectOption('gasket');
@@ -312,7 +307,6 @@ test('redistributes a requested contact count without generating solids', async 
   page,
 }) => {
   const dialog = await open(page);
-  await dialog.getByLabel('Switch family', { exact: true }).selectOption('mx');
   await dialog
     .getByLabel('Mounting system', { exact: true })
     .selectOption('gasket');

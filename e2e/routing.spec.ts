@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { makeShooter } from './utils/screenshots';
-import Absolem from '../src/examples/absolem';
+import Absolem from '../src/examples/starter';
 import { CONFIG_LOCAL_STORAGE_KEY } from '../src/context/constants';
 
 test.describe('Routing and Welcome Page', () => {
@@ -68,12 +68,12 @@ test.describe('Routing and Welcome Page', () => {
     await shoot('after-url-new-and-welcome');
   });
 
-  test('clicking "Empty Configuration" creates an empty config and navigates to /', async ({
+  test('clicking "New native design" creates a native starter and navigates to /', async ({
     page,
   }) => {
     const shoot = makeShooter(page, test.info());
     await page.goto('./new');
-    await page.getByRole('button', { name: 'Empty Configuration' }).click();
+    await page.getByRole('button', { name: 'New native design' }).click();
     await shoot('before-empty-config-url-and-editor');
     await expect(page).toHaveURL(/.*\/$/);
     await expect(page.getByTestId('config-editor')).toBeVisible();
@@ -81,7 +81,7 @@ test.describe('Routing and Welcome Page', () => {
 
     await expect(async () => {
       const editorContent = await page.locator('.monaco-editor').textContent();
-      expect(editorContent).toContain('points:');
+      expect(editorContent).toContain('schema:');
     }).toPass();
   });
 
@@ -100,6 +100,6 @@ test.describe('Routing and Welcome Page', () => {
     // which renders whitespace differently and is flaky to assert on.
     await page.reload();
     await expect(page.getByTestId('config-editor')).toContainText('meta:');
-    await expect(page.getByTestId('config-editor')).toContainText('points:');
+    await expect(page.getByTestId('config-editor')).toContainText('schema:');
   });
 });

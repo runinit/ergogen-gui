@@ -1,7 +1,7 @@
 import { modelList, modelMatrix } from './modelGeometry';
 import { CaseConfig } from '../types/case';
 import { STLLoader, STLExporter } from 'three-stdlib';
-import { Group, Mesh, MeshBasicMaterial } from 'three';
+import { Group, Mesh, MeshBasicMaterial, Matrix4 } from 'three';
 import { Results } from '../types/results';
 import { assetBytes, CaseAssets, findAsset } from './caseAssets';
 // Mesh references use the same PCB and assembly transforms as the native geometry.
@@ -17,10 +17,12 @@ export function attachModelMeshes(results: Results, assets: CaseAssets) {
         spec.board?.models?.[component.id] ||
           component.models.map((model) => ({
             ...model,
-            asset: findAsset(model.path, assets),
+            asset: model.asset || findAsset(model.path, assets),
           }))
       );
-      const key = `${id}_components_board_${id}_${component.id.replace(/[^A-Za-z0-9_]/g, '_')}`;
+      const key = board.native
+        ? `${id}_components_native_${component.id}`
+        : `${id}_components_board_${id}_${component.id.replace(/[^A-Za-z0-9_]/g, '_')}`;
       if (!results.solids?.[key]) {
         continue;
       }
@@ -39,13 +41,19 @@ export function attachModelMeshes(results: Results, assets: CaseAssets) {
           if (component.side === 'bottom') {
             geometry.rotateX(Math.PI);
           }
-          geometry.rotateZ((component.rotation * Math.PI) / 180);
-          geometry.translate(
-            component.position[0],
-            component.position[1],
-            Number(spec.pcb_z) +
-              (component.side === 'top' ? board.thickness : 0)
-          );
+          if (component.native) {
+            geometry.applyMatrix4(
+              new Matrix4().fromArray(component.native.matrix).transpose()
+            );
+          } else {
+            geometry.rotateZ((component.rotation * Math.PI) / 180);
+            geometry.translate(
+              component.position[0],
+              component.position[1],
+              Number(spec.pcb_z) +
+                (component.side === 'top' ? board.thickness : 0)
+            );
+          }
           const placement = assembly.placement!;
           geometry.translate(
             -placement.origin[0],

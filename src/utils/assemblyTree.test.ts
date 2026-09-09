@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assemblyNodes } from './assemblyTree';
+import { assemblyNodes, treeParts } from './assemblyTree';
 import type { BoardInventory } from '../types/case';
 
 describe('Assembly tree', () => {
@@ -86,4 +86,39 @@ it('links generated gasket and screw bodies to their declared repair controls', 
     'case_gasket_edge_lower',
     'case_gasket_edge_upper',
   ]);
+});
+
+it('selects native component solids by their stable object identity', () => {
+  const board = {
+    native: true,
+    components: [
+      {
+        id: 'screen',
+        reference: 'Display',
+        footprint: 'display',
+        populated: true,
+      },
+    ],
+  } as unknown as import('../types/case').BoardInventory;
+  const nodes = assemblyNodes('keyboard', {}, board);
+  expect(treeParts(nodes, 'components')).toEqual([
+    'keyboard_components_native_screen',
+  ]);
+});
+
+it('includes a floor-mounted body in the assembly tree without requiring PCB membership', () => {
+  const layout = {
+    objects: {
+      battery: {
+        id: 'battery',
+        kind: 'component',
+        label: 'Battery',
+        assembly: 'keyboard',
+        envelopes: { body: { size: [20, 30], height: [0, 4] } },
+      },
+    },
+  } as unknown as import('ergogen/src/native').LayoutReport;
+  expect(
+    treeParts(assemblyNodes('keyboard', {}, undefined, layout), 'components')
+  ).toEqual(['keyboard_components_native_battery']);
 });

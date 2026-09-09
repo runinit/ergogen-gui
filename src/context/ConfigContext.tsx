@@ -1136,7 +1136,10 @@ const ConfigContextProvider = ({
       }
 
       const inputConfig =
-        preparePreviewConfig(parsedConfig, options.pointsonly) || targetInput;
+        (parsedConfig as { schema?: string })?.schema === 'ergogen/v1'
+          ? targetInput
+          : preparePreviewConfig(parsedConfig, options.pointsonly) ||
+            targetInput;
 
       const requestId = activeRequestRef.current;
       const assetsAtRequest = {
@@ -1155,7 +1158,7 @@ const ConfigContextProvider = ({
         const capturedAssets = { ...savedAssets, ...assetsAtRequest };
         if (ergogenWorkerRef.current) {
           ergogenWorkerRef.current.postMessage({
-            type: 'generate',
+            type: options.pointsonly ? 'analyze' : 'generate',
             revisions: {
               source: targetInput,
               injection: JSON.stringify(inputInjection),

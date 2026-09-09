@@ -1,15 +1,10 @@
-// A synthetic layout keeps offline CAD coverage independent of user designs.
-export default `points:
-  zones:
-    keys:
-      columns: {left: {}, right: {}}
-      rows: {home: {}, top: {}}
-outlines:
-  source: [{what: rectangle, size: [60, 60]}]
+import grid from './native-grid';
+
+export default `${grid}
 designs:
   regions:
-    board: {outline: source}
-    switches: {where: true, size: 14}
+    board: {shape: {size: [80, 60], at: [19, 0, 0]}}
+    switches: {select: {kind: key}, envelope: plate}
   profiles:
     board: {from: regions.board}
   assemblies:
@@ -27,6 +22,6 @@ designs:
       cutouts: [regions.switches]
       gaskets:
         left:
-          anchor: {shift: [-30, 0]}
+          anchor: {shift: [-21, 0]}
           size: [6, 10]
 `;

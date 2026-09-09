@@ -1,5 +1,17 @@
 # Ergogen Web UI - Developer Documentation & Knowledge Base
 
+Native configuration and physical-layer architecture: [living reference](../ergogen/docs/architecture.md).
+
+Key outlines follow exposed key edges with local gap closing. Keep the default
+tight wrapping when authoring key regions; hull wrapping is an explicit choice
+that can replace angled edges with diagonal shortcuts. BHK's acceptance test
+checks both thumb angles, a closed perimeter and component pad containment.
+Boundary `simplify` joins short jogs by intersecting retained edges; `corners`
+selects inside fillets or chamfers on all corners. Chamfer mode retains no
+perimeter arcs. Shallow steps merge into one clearance-preserving diagonal.
+BHK uses 8 mm simplification and 3 mm fillets.
+Both run in the generator before PCB and enclosure exports.
+
 This document serves as a knowledge base and architectural guide for the project, tracking implementation details, design decisions, and future tasks.
 
 ## Ergogen CLI

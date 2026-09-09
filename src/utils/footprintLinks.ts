@@ -7,34 +7,50 @@ export function footprintUses(source: string): FootprintUse[] {
     return [];
   }
   const uses: FootprintUse[] = [];
-  const pcbs = doc.get('pcbs');
-  if (!isMap(pcbs)) {
-    return uses;
+  const tables: string[][] = [['parts'], ['layout', 'objects']];
+  const clusters = doc.getIn(['layout', 'clusters']);
+  if (isMap(clusters)) {
+    for (const entry of clusters.items) {
+      if (isScalar(entry.key)) {
+        tables.push([
+          'layout',
+          'clusters',
+          String(entry.key.value),
+          'overrides',
+        ]);
+      }
+    }
   }
-  for (const board of pcbs.items) {
-    if (!isScalar(board.key) || !isMap(board.value)) {
+  for (const path of tables) {
+    const table = doc.getIn(path);
+    if (!isMap(table)) {
       continue;
     }
-    const footprints = board.value.get('footprints');
-    if (!isMap(footprints)) {
-      continue;
-    }
-    for (const footprint of footprints.items) {
-      if (!isScalar(footprint.key) || !isMap(footprint.value)) {
+    for (const item of table.items) {
+      if (!isScalar(item.key) || !isMap(item.value)) {
         continue;
       }
-      const what = footprint.value.get('what');
-      if (typeof what === 'string') {
-        uses.push({
-          path: [
-            'pcbs',
-            String(board.key.value),
-            'footprints',
-            String(footprint.key.value),
-            'what',
-          ],
-          what,
-        });
+      const footprints = item.value.get('footprints');
+      if (!isMap(footprints)) {
+        continue;
+      }
+      for (const entry of footprints.items) {
+        if (!isScalar(entry.key) || !isMap(entry.value)) {
+          continue;
+        }
+        const what = entry.value.get('what');
+        if (typeof what === 'string') {
+          uses.push({
+            path: [
+              ...path,
+              String(item.key.value),
+              'footprints',
+              String(entry.key.value),
+              'what',
+            ],
+            what,
+          });
+        }
       }
     }
   }

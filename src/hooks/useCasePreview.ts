@@ -19,7 +19,7 @@ function useCaseWorker(
   source: string,
   injections: string[][] | undefined,
   assets: Record<string, string>,
-  mode: 'generate' | 'analyze'
+  mode: 'generate' | 'analyze' | 'layout'
 ) {
   const { entries } = useFootprintLibrary();
   const mergedAssets = useMemo(
@@ -48,7 +48,7 @@ function useCaseWorker(
   const generate = useCallback(() => {
     // Reuse initialized analysis modules only after completion and with identical injections.
     const reusable =
-      mode === 'analyze' &&
+      mode !== 'generate' &&
       settled.current &&
       workerInjections.current === injectionRevision;
     if (!reusable) {
@@ -128,7 +128,7 @@ function useCaseWorker(
     []
   );
   useEffect(() => {
-    if (mode !== 'analyze') {
+    if (mode === 'generate') {
       return;
     }
     const timer = window.setTimeout(generate, ANALYSIS_DELAY_MS);
@@ -162,4 +162,11 @@ export function useCaseAnalysis(
   assets = EMPTY_ASSETS
 ) {
   return useCaseWorker(source, injections, assets, 'analyze');
+}
+
+export function useLayoutAnalysis(
+  source: string,
+  injections: string[][] | undefined
+) {
+  return useCaseWorker(source, injections, EMPTY_ASSETS, 'layout');
 }

@@ -1092,7 +1092,11 @@ describe('ConfigContextProvider', () => {
       ];
 
       await act(async () => {
-        await capturedContext.generateNow('points: {}', testInjections);
+        await capturedContext.generateNow(
+          'schema: ergogen/v1\nlayout: {}',
+          testInjections,
+          { pointsonly: false }
+        );
       });
 
       // It should trigger postMessage, but only with footprint injection

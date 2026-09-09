@@ -15,7 +15,7 @@ import InjectionEditor from './molecules/InjectionEditor';
 import Downloads from './molecules/Downloads';
 import Injections from './molecules/Injections';
 import FilePreview from './molecules/FilePreview';
-import DesignView from './molecules/DesignView';
+import DesignWorkspace from './molecules/DesignWorkspace';
 import CaseWizard from './molecules/CaseWizard';
 import ResizablePanel from './molecules/ResizablePanel';
 import { Preview } from './atoms/DownloadRow';
@@ -759,7 +759,7 @@ const Ergogen = () => {
                   </p>
                 )}
                 {showDesign ? (
-                  <DesignView />
+                  <DesignWorkspace />
                 ) : configContext.showDownloads ? (
                   <>
                     <NestedRightPane>

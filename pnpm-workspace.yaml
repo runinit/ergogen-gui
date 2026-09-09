@@ -5,4 +5,4 @@ allowBuilds:
 
 # This pinned source archive is local and has no npm publication date.
 minimumReleaseAgeExclude:
-  - '@runinit/ergogen@5.1.0-develop'
+  - '@runinit/ergogen@6.0.0-develop'

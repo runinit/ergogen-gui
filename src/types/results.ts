@@ -30,6 +30,7 @@ export interface SolidOutput {
 }
 
 export interface Results {
+  layout?: import('ergogen/src/native').LayoutReport;
   solids?: Record<string, SolidOutput>;
   designs?: import('./design').DesignReport;
   canonical?: unknown;

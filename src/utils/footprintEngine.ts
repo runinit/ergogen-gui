@@ -50,14 +50,23 @@ export async function prepareEntry(
   };
   const results = await ergogen.process(
     {
-      points: { zones: { origin: {} } },
-      pcbs: {
-        preview: {
-          footprints: {
-            part: { what: PREVIEW_NAME, where: true, params: previewParams },
+      schema: 'ergogen/v1',
+      layout: {
+        objects: {
+          preview: {
+            kind: 'component',
+            pcb: 'preview',
+            footprints: {
+              part: { what: PREVIEW_NAME, params: previewParams },
+            },
           },
         },
       },
+      designs: {
+        regions: { preview: { shape: { size: [20, 20] } } },
+        profiles: { preview: { from: 'regions.preview' } },
+      },
+      pcbs: { preview: { profile: 'profiles.preview' } },
     },
     { debug: true }
   );

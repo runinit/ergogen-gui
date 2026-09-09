@@ -1,3 +1,5 @@
+import { stringify } from 'yaml';
+import { footprintUses } from './footprintLinks';
 import {
   compressToEncodedURIComponent,
   decompressFromEncodedURIComponent,
@@ -329,6 +331,12 @@ export const extractUsedInjectionsFromCanonical = (
     return { footprints, templates, outlines };
   }
 
+  if ('schema' in canonical && canonical.schema === 'ergogen/v1') {
+    for (const use of footprintUses(stringify(canonical))) {
+      footprints.add(use.what);
+    }
+    return { footprints, templates, outlines };
+  }
   const canonicalOutput = canonical as CanonicalOutput;
 
   // --- Footprints and templates from pcbs section ---

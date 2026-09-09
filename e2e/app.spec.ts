@@ -4,7 +4,7 @@ import { makeShooter } from './utils/screenshots';
 test('renders editor and preview', async ({ page }) => {
   const shoot = makeShooter(page, test.info());
   await page.goto('./new');
-  await page.getByRole('button', { name: 'Empty Configuration' }).click();
+  await page.getByRole('button', { name: 'New native design' }).click();
 
   const editor = page.getByTestId('config-editor');
   await shoot('before-editor-visible');

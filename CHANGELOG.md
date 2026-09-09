@@ -1,5 +1,86 @@
 # Changelog
 
+## Simpler transitions and configurable inside corners
+
+September 09, 2026
+
+![Simplified BHK thumb transitions and inside fillets.](./public/images/changelog/bhk-fillet-corners.png)
+
+BHK now extends the neighboring thumb edges to meet, removing the short jogs.
+Inside corners use 3 mm fillets, including the shallow column steps.
+
+Set `simplify: 8` to bound local edge simplification. Choose
+`corners: {fillet: 3}` or `corners: {chamfer: 3}` for corner relief.
+Chamfer mode converts both inside and outside corners to straight segments.
+Shallow column steps now use one clean diagonal instead of several small facets.
+[Chamfer preview](./public/images/changelog/bhk-chamfer-corners.png).
+Required key/component support and pad containment remain checked.
+
+Reload the BHK example to apply these settings to an existing workspace.
+
+## BHK follows the outside key edges
+
+September 09, 2026
+
+![BHK perimeter follows the two thumb-key angles.](./public/images/changelog/bhk-key-edges.png)
+
+The BHK outline now follows the exposed key edges, including the change in thumb
+angle. Default tight wrapping closes local key gaps; the inward bottom bridge
+fills the enclosed sliver. Component support and pad containment remain checked.
+
+Reload the BHK example to use the updated outline.
+
+## Straight outline transitions and control support
+
+September 09, 2026
+
+![Straight BHK transitions with power and reset controls included.](./public/images/changelog/bhk-straight-transitions.png)
+
+BHK now includes its power switch and reset button as independent components.
+Their board-support areas contribute to the electronics boundary, preserving
+all existing electrical placements. A pad-area check reports off-board pads
+with their footprint reference and source binding.
+
+Choose tight, hull or box wrapping per cluster. BHK uses key-cluster hulls, a
+rectangular electronics bay and bridges aligned to shared top, bottom and right
+edges. These remove the remaining notches and follow later layout changes.
+
+Reload the BHK example to apply the new source to an existing workspace.
+
+## BHK outline and configuration repair
+
+September 09, 2026
+
+![Repaired BHK perimeter and keycap shapes.](./public/images/changelog/bhk-outline-repair.png)
+
+BHK now wraps each cluster and uses flat bridge ends, removing the accidental
+interior sliver and round electronics lobes. Its 1.5u keycaps are tall, while
+switch openings and electrical placements retain their original geometry.
+
+Shared part bindings reduce the example from 4,317 to 1,044 lines. Keys carry
+placement, wiring and reference overrides. Reload the BHK example to use the
+repair; existing saved YAML retains its authored boundaries.
+
+## Native layout and physical layers
+
+September 09, 2026
+
+![Native side view with the display above its controller and a separate floor-mounted battery.](./public/images/changelog/native-layout.png)
+
+Native designs use `schema: ergogen/v1`. Keys, components, mounts, and reference
+anchors have distinct roles. Automatic boundaries consume named physical
+envelopes and explicit cluster bridges.
+
+**What changed:**
+
+- Layout editing with top/side views, local overrides, mounting layers, and locks.
+- Physical stacking: displays can sit above controllers while batteries follow
+  the case floor. Clearance findings retain missing measurements.
+- Native examples, including BHK with preserved footprint/pad placement and a
+  new automatic perimeter.
+- Legacy saved sources remain readable and downloadable; generation requires
+  the native schema.
+
 ## CAD workspace and reusable footprints
 
 September 8, 2026

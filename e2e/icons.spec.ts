@@ -61,7 +61,7 @@ test('renders menu icons with external fonts blocked', async ({ page }) => {
     path: test.info().outputPath('welcome.png'),
     animations: 'disabled',
   });
-  await page.getByText('Empty Configuration', { exact: true }).click();
+  await page.getByText('New native design', { exact: true }).click();
   await expect(page.getByTestId('config-editor')).toBeVisible();
   await navigation.click();
   const icons = page.locator('.material-symbols-outlined:visible');

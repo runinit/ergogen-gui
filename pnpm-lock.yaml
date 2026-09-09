@@ -36,8 +36,8 @@ importers:
         specifier: 1.2.0
         version: 1.2.0
       ergogen:
-        specifier: file:vendor/ergogen-cad-e2d947209f40.tgz
-        version: '@runinit/ergogen@file:vendor/ergogen-cad-e2d947209f40.tgz'
+        specifier: file:vendor/ergogen-native-ae679f335814.tgz
+        version: '@runinit/ergogen@file:vendor/ergogen-native-ae679f335814.tgz'
       file-saver:
         specifier: ^2.0.5
         version: 2.0.5
@@ -1502,9 +1502,9 @@ packages:
   '@rtsao/scc@1.1.0':
     resolution: {integrity: sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g==}
 
-  '@runinit/ergogen@file:vendor/ergogen-cad-e2d947209f40.tgz':
-    resolution: {integrity: sha512-9h0VtEJFHfNtMJN7xREkHwxCAKmftMqdnYRmol3Ra0rGr20dgOW18zl0mEYgOQUryM7c5f8Lt9fpQ8NXJmP+LA==, tarball: file:vendor/ergogen-cad-e2d947209f40.tgz}
-    version: 5.1.0-develop
+  '@runinit/ergogen@file:vendor/ergogen-native-ae679f335814.tgz':
+    resolution: {integrity: sha512-AghS/BE/YF1Fj9TgfM3HNbFvQztY+b6IjQvvBlN+IwRhfnCDueBbTURy6ibx1DkGHHLZ2Lz0OkgqV0fP8SqZhw==, tarball: file:vendor/ergogen-native-ae679f335814.tgz}
+    version: 6.0.0-develop
     hasBin: true
 
   '@salusoft89/planegcs@1.2.0':
@@ -5705,9 +5705,10 @@ snapshots:
 
   '@rtsao/scc@1.1.0': {}
 
-  '@runinit/ergogen@file:vendor/ergogen-cad-e2d947209f40.tgz':
+  '@runinit/ergogen@file:vendor/ergogen-native-ae679f335814.tgz':
     dependencies:
       '@salusoft89/planegcs': 1.2.0
+      ajv: 8.17.1
       fs-extra: 11.3.6
       hull: hull.js@https://codeload.github.com/andriiheonia/hull/tar.gz/5847b0a4fa23f8e5aa3c37a8e6d7b8cf58f24082
       js-yaml: 3.15.0
@@ -5717,6 +5718,7 @@ snapshots:
       mathjs: 15.2.0
       replicad: 1.1.0
       replicad-opencascadejs: 1.1.0
+      yaml: 2.8.2
       yargs: 17.7.3
 
   '@salusoft89/planegcs@1.2.0': {}

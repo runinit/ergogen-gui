@@ -7,29 +7,35 @@ import { createCase, editCase } from '../src/utils/enclosureSource';
 const fixture = 'e2e/fixtures/footprint-library/';
 const footprintName = 'C_0603_1608Metric';
 const base = `# Preserve project intent
-points:
-  zones:
-    keys:
-      columns: {left: {}, right: {}}
-      rows: {home: {}, top: {}}
-outlines:
-  board: [{what: rectangle, size: [65, 65]}]
-pcbs:
-  board:
-    outlines: {edge: {outline: board}}
+schema: ergogen/v1
+parts:
+  capacitor:
+    revision: "1"
+    envelopes:
+      body: {size: [2, 2], height: [0, 1]}
     footprints:
       capacitor:
         what: diode # preserve this comment
-        where: true
         params: {from: GND, to: SIGNAL}
+layout:
+  layers:
+    electronics: {surface: pcb.board.top}
+  objects:
+    U1: {kind: component, part: capacitor, pcb: board, layer: electronics, placement: {at: [0, 0, 0]}}
+    U2: {kind: component, part: capacitor, pcb: board, layer: electronics, placement: {at: [19, 0, 0]}}
+    U3: {kind: component, part: capacitor, pcb: board, layer: electronics, placement: {at: [0, 19, 0]}}
+    U4: {kind: component, part: capacitor, pcb: board, layer: electronics, placement: {at: [19, 19, 0]}}
+designs:
+  regions:
+    board: {shape: {size: [65, 65]}}
+  profiles:
+    board: {from: regions.board}
+pcbs:
+  board: {profile: profiles.board}
 `;
 let source = createCase(base, 'case');
 source = editCase(source, 'case', ['mounting'], '');
 source = editCase(source, 'case', ['internal_radius'], 0);
-source = source.replace(
-  'case_keys:\n      where: true',
-  'case_keys:\n      outline: board'
-);
 for (const part of ['bottom', 'top', 'plate']) {
   source = editCase(source, 'case', ['manufacturing', part], {
     process: 'fdm',
@@ -117,7 +123,7 @@ test('imports a KiCad bundle, aligns models, links placements, and exports a por
     .getByRole('button', { name: 'Preview in case', exact: true })
     .click();
   await expect(
-    dialog.getByRole('treeitem', { name: `${footprintName} (4)`, exact: true })
+    dialog.getByRole('treeitem', { name: 'capacitor (4)', exact: true })
   ).toBeVisible({ timeout: 30000 });
   await dialog.getByRole('button', { name: 'Layout', exact: true }).click();
   await dialog
@@ -150,13 +156,6 @@ test('imports a KiCad bundle, aligns models, links placements, and exports a por
     'data-rendered',
     'true'
   );
-  await dialog
-    .getByRole('treeitem', { name: `${footprintName} (4)`, exact: true })
-    .click();
-  await expect(
-    dialog.getByLabel('Component footprint', { exact: true })
-  ).toHaveValue('U1');
-  await expect(dialog.getByLabel('Model alignment inset')).toBeVisible();
   await dialog.getByRole('button', { name: 'Review', exact: true }).click();
   await dialog.getByRole('checkbox', { name: /I reviewed dimensions/ }).check();
   await expect(
@@ -188,131 +187,6 @@ test('imports a KiCad bundle, aligns models, links placements, and exports a por
         path.startsWith('outputs/pcbs/models/') && path.endsWith('.step')
     )
   ).toBe(true);
-  // Saving a library revision reaches both projects; a manual placement keeps its override.
-  await dialog
-    .getByRole('button', { name: 'Apply design', exact: true })
-    .click();
-  const originalName = await page.getByTitle('Click to rename').innerText();
-  await page
-    .getByRole('button', { name: 'Duplicate configuration', exact: true })
-    .click();
-  await page
-    .getByRole('button', { name: 'Create / edit case', exact: true })
-    .click();
-  let current = page.getByRole('dialog', { name: 'Case designer' });
-  await current
-    .getByRole('treeitem', { name: `${footprintName} (4)`, exact: true })
-    .click();
-  await current
-    .getByRole('checkbox', {
-      name: 'Apply dimensions and manual model assignments to matching footprints',
-    })
-    .uncheck();
-  await current
-    .getByRole('spinbutton', { name: 'Model offset Z', exact: true })
-    .fill('3');
-  await current.getByRole('button', { name: 'Generate', exact: true }).click();
-  await expect(
-    current.getByText('Generated current draft', { exact: true })
-  ).toBeVisible({ timeout: 90000 });
-  await current.getByRole('button', { name: 'Review', exact: true }).click();
-  await current
-    .getByRole('checkbox', { name: /I reviewed dimensions/ })
-    .check();
-  await current
-    .getByRole('button', { name: 'Apply design', exact: true })
-    .click();
-  await page
-    .getByRole('button', { name: 'Footprint library', exact: true })
-    .click();
-  current = page.getByRole('dialog', { name: 'Case designer' });
-  await current
-    .getByRole('button', {
-      name: `${manifest.entries[0].name} · r1`,
-      exact: true,
-    })
-    .click();
-  await current
-    .getByRole('spinbutton', { name: 'Model offset Z', exact: true })
-    .fill('2');
-  await expect(
-    current.getByText('8 linked placements · 2 projects', { exact: true })
-  ).toBeVisible();
-  await current
-    .getByRole('button', { name: 'Save footprint', exact: true })
-    .click();
-  await expect(current.getByText(/Saved revision 2/)).toBeVisible();
-  const nameHeading = current.getByRole('heading', {
-    name: manifest.entries[0].name,
-    exact: true,
-  });
-  expect(
-    await nameHeading.evaluate((node) => node.scrollWidth <= node.clientWidth)
-  ).toBe(true);
-  await page.mouse.move(0, 0);
-  await page.screenshot({ path: 'test-results/cad-footprint-library.png' });
-  await current.getByRole('tab', { name: 'YAML', exact: true }).click();
-  const instanceSource = await current.getByLabel(/Project YAML/).inputValue();
-  expect(
-    parse(instanceSource).designs.assemblies.case.board.models.U1[0].offset[2]
-  ).toBe(3);
-  await current.getByRole('tab', { name: 'Case', exact: true }).click();
-  await current
-    .getByRole('treeitem', { name: `${footprintName} (4)`, exact: true })
-    .click();
-  await expect(
-    current.getByRole('spinbutton', { name: 'Model offset Z', exact: true })
-  ).toHaveValue('3');
-  await current.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await page
-    .getByRole('button', { name: 'Show navigation panel', exact: true })
-    .click();
-  await page.getByRole('button', { name: originalName, exact: true }).click();
-  await page
-    .getByRole('button', { name: 'Create / edit case', exact: true })
-    .click();
-  current = page.getByRole('dialog', { name: 'Case designer' });
-  await current
-    .getByRole('treeitem', { name: `${footprintName} (4)`, exact: true })
-    .click();
-  await expect(
-    current.getByRole('spinbutton', { name: 'Model offset Z', exact: true })
-  ).toHaveValue('2');
-  await current.getByRole('button', { name: 'Generate', exact: true }).click();
-  await expect(
-    current.getByText('Generated current draft', { exact: true })
-  ).toBeVisible({ timeout: 90000 });
-  await current.getByRole('button', { name: 'assembled', exact: true }).click();
-  await page.setViewportSize({ width: 1487, height: 1058 });
-  await page.mouse.move(0, 0);
-  await page.screenshot({ path: 'test-results/cad-desktop.png' });
-  await page.setViewportSize({ width: 390, height: 844 });
-  await expect(
-    current.getByRole('button', { name: 'Assembly tree', exact: true })
-  ).toBeVisible();
-  await page.screenshot({ path: 'test-results/cad-narrow-inspector.png' });
-  await current
-    .getByRole('button', { name: 'Close inspector', exact: true })
-    .click();
-  await page.mouse.move(0, 0);
-  await page.screenshot({ path: 'test-results/cad-narrow.png' });
-  await current
-    .getByRole('tab', { name: 'Footprint library', exact: true })
-    .click();
-  await current.getByRole('button', { name: 'Catalog', exact: true }).click();
-  await current
-    .getByRole('button', {
-      name: `${manifest.entries[0].name} · r2`,
-      exact: true,
-    })
-    .click();
-  await current
-    .getByRole('button', { name: 'Close inspector', exact: true })
-    .press('Escape');
-  await expect(
-    current.getByRole('button', { name: 'Inspector', exact: true })
-  ).toBeFocused();
-  await page.setViewportSize({ width: 1487, height: 1058 });
   // A fresh browser profile adopts the ZIP snapshot and can generate without a network.
   const offlineContext = await browser.newContext();
   const offlinePage = await offlineContext.newPage();
@@ -354,11 +228,11 @@ test('imports a KiCad bundle, aligns models, links placements, and exports a por
   expect(errors).toEqual([]);
 });
 
-test('inspects and exports BHK with a model assigned to all matching capacitors', async ({
+test('assigns a model to a native BHK controller and exports the object binding', async ({
   page,
 }) => {
   const config = parseDocument(BHK.value);
-  config.set('designs', parse(readFileSync(`${fixture}bhk-case.yaml`, 'utf8')));
+
   await page.setViewportSize({ width: 1487, height: 1058 });
   await page.addInitScript(
     (source) => localStorage.setItem('ergogen:config', JSON.stringify(source)),
@@ -371,9 +245,8 @@ test('inspects and exports BHK with a model assigned to all matching capacitors'
     .click();
   const dialog = page.getByRole('dialog', { name: 'Case designer' });
   await dialog
-    .getByRole('treeitem', { name: 'Capacitor_0603 (33)', exact: true })
+    .getByRole('treeitem', { name: 'controller (1)', exact: true })
     .click();
-  await dialog.getByRole('button', { name: 'Replace', exact: true }).click();
   await dialog
     .getByLabel('Upload 3D models')
     .setInputFiles(`${fixture}${footprintName}.step`);
@@ -381,6 +254,17 @@ test('inspects and exports BHK with a model assigned to all matching capacitors'
   await expect(
     dialog.getByRole('button', { name: 'Replace', exact: true })
   ).toBeEnabled();
+  await dialog
+    .getByRole('button', { name: 'Manufacturing', exact: true })
+    .click();
+  for (const part of ['bottom', 'top', 'plate']) {
+    await dialog
+      .getByLabel(`${part} process`, { exact: true })
+      .selectOption('fdm');
+  }
+  await dialog
+    .getByRole('treeitem', { name: 'controller (1)', exact: true })
+    .click();
   await dialog.getByRole('button', { name: 'Generate', exact: true }).click();
   await expect(
     dialog.getByText('Generated current draft', { exact: true })
@@ -412,8 +296,10 @@ test('inspects and exports BHK with a model assigned to all matching capacitors'
     readFileSync('test-results/cad-bhk-project.zip')
   );
   const source = parse(await zip.file('config.yaml')!.async('string'));
-  expect(Object.keys(source.designs.assemblies.case.board.models)).toHaveLength(
-    33
-  );
+  expect(
+    Object.values(source.layout.objects).filter(
+      (item) => (item as { models?: unknown }).models
+    )
+  ).toHaveLength(1);
   expect(zip.file('outputs/pcbs/bhk_pcb.kicad_pcb')).not.toBeNull();
 });

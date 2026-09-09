@@ -1,3 +1,4 @@
+import grid from './fixtures/native-grid';
 import { test as base, expect, Page, Browser } from '@playwright/test';
 
 type EditorWindow = Window & {
@@ -44,16 +45,10 @@ const test = process.env.WORKSPACE_CDP_ENDPOINT
     })
   : base;
 
-const source = `# Preserve this comment
-units: {pitch: 19}
-points:
-  zones:
-    keys:
-      columns: {left: {}, right: {}}
-      rows: {home: {}, top: {}}
+const source = `${grid}
 designs:
   regions:
-    keys: {where: true, close: 2}
+    keys: {select: {kind: key}, envelope: pcb, close: 2}
   boundaries:
     body: {from: regions.keys, clearance: 3} # keep
   profiles:
@@ -106,6 +101,7 @@ test.beforeEach(async ({ page, baseURL }) => {
   await expect(page.getByTestId('config-editor')).toBeVisible();
   await generate(page);
   await page.getByRole('button', { name: 'Open design editor' }).click();
+  await page.getByRole('button', { name: 'Sketches', exact: true }).click();
   await expect(
     page
       .getByLabel('Design feature')

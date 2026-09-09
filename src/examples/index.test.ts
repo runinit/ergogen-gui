@@ -1,25 +1,33 @@
 import { expect, it } from 'vitest';
-import { createHash } from 'node:crypto';
 import { parse } from 'yaml';
 import { exampleOptions } from './index';
 import BHK from './bhk';
 
-// Source from the published pre-enclosure revision 3c30c6b.
-const ORIGINAL_BHK_SHA256 =
-  'aa2ef4bdaefe90d23c4abb7a75576f17a0ac231a9d8d4878cf63089a7166baa4';
-
-it('offers the original BHK design without a migrated replacement', () => {
+it('offers only native configurations with stable BHK object identities', () => {
   const examples = exampleOptions.flatMap((group) => group.options);
-  expect(examples.filter((example) => /bhk/i.test(example.label))).toEqual([
-    BHK,
-  ]);
-  expect(createHash('sha256').update(BHK.value).digest('hex')).toBe(
-    ORIGINAL_BHK_SHA256
-  );
+  for (const example of examples) {
+    expect(parse(example.value).schema).toBe('ergogen/v1');
+  }
   const config = parse(BHK.value);
-  expect(config.designs).toBeUndefined();
-  expect(Object.keys(config.outlines)).toEqual(
-    expect.arrayContaining(['bhk', 'bhk_plate', 'bhk_auto', 'preview'])
-  );
-  expect(config.pcbs.bhk_pcb.outlines.board.outline).toBe('bhk');
+  expect(
+    (Object.values(config.layout.objects) as { kind: string }[]).filter(
+      (item: { kind: string }) => item.kind === 'key'
+    )
+  ).toHaveLength(33);
+  expect(config.pcbs.bhk_pcb.profile).toBe('profiles.bhk');
+  for (const name of ['matrix', 'thumbs']) {
+    expect(config.designs.regions[name].wrap ?? 'tight').toBe('tight');
+    expect(config.designs.regions[name].close).toBe(2);
+  }
+  expect(config.designs.boundaries.board.bridges.bottom.align).toBe('bottom');
+  expect(config.designs.boundaries.board.simplify).toBe(8);
+  expect(config.designs.boundaries.board.corners).toEqual({ fillet: 3 });
+  expect(config.designs.regions.electronics.wrap).toBe('box');
+  expect(config.layout.objects.power_switch.kind).toBe('component');
+  expect(config.layout.objects.reset_button.kind).toBe('component');
+  expect(config.parts.key.footprints.switches.what).toBe('ceoloide/switch_mx');
+  expect(config.layout.objects.matrix_c1_r4.footprints.switches).toBe('S1');
+  expect(config.layout.objects.thumbfan_c2_r1.envelopes.keycap.size).toEqual([
+    18, 27,
+  ]);
 });

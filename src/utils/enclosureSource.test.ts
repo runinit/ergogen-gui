@@ -8,7 +8,7 @@ import {
 } from './enclosureSource';
 
 const source =
-  '# Keep my layout\nunits: {pitch: 19}\npoints:\n  zones:\n    keys: {}\n';
+  '# Keep my layout\nschema: ergogen/v1\nunits: {pitch: 19}\nlayout:\n  objects:\n    key: {kind: key, envelopes: {pcb: {size: [18, 18]}, plate: {size: [14, 14]}}}\n';
 
 describe('Enclosure source transactions', () => {
   it('creates a case without changing the original layout bytes', () => {
@@ -80,8 +80,8 @@ it('allows adding hardware after removing the final mount', () => {
 });
 
 it('requires mounting selection and stores a versioned CNC preset for new cases', () => {
-  const source = createCase('points: {zones: {keys: {}}}\n', 'case');
-  const spec = parse(source).designs.assemblies.case;
+  const created = createCase(source, 'case');
+  const spec = parse(created).designs.assemblies.case;
   expect(spec.mounting).toBe('');
   expect(spec.fit).toBe(0.5);
   expect(spec.manufacturing.bottom.material).toBe('Aluminium 6061');
@@ -131,7 +131,7 @@ it('preserves a recent dimension edit while analysis still contains the previous
 it('batches placements without changing source outside the assembly', async () => {
   const { batchCaseEdit } = await import('./enclosureSource');
   const source =
-    createCase('points:\n  zones:\n    keys: {}\n', 'case') +
+    createCase('schema: ergogen/v1\nlayout: {objects: {}}\n', 'case') +
     '\n# Keep my other output\nother_output: {author: test}\n';
   const changed = batchCaseEdit(source, 'case', (doc, path) => {
     for (let i = 0; i < 20; i++) {
@@ -215,3 +215,12 @@ function readHeight(source: string) {
   }
   return height.toJSON();
 }
+
+it('selects typed support and rejects legacy case creation', () => {
+  const data = parse(createCase(source, 'native'));
+  expect(data.designs.regions.native_keys).toMatchObject({
+    select: { kind: 'key' },
+    envelope: 'pcb',
+  });
+  expect(() => createCase('points: {}', 'case')).toThrow(/native/);
+});

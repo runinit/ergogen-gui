@@ -10,7 +10,8 @@ const mocks = vi.hoisted(() => ({
   error: '',
   result: null as Record<string, unknown> | null,
   close: vi.fn(),
-  source: 'points:\n  zones:\n    keys: {}\n',
+  source:
+    'schema: ergogen/v1\nlayout: {objects: {keys: {kind: key, envelopes: {pcb: {size: [18,18]}, plate: {size: [14,14]}}}}}\n',
 }));
 vi.mock('../context/ConfigContext', () => ({
   useConfigContext: () => ({
@@ -49,7 +50,8 @@ vi.mock('./AssemblyPreview', () => ({
 }));
 
 beforeEach(() => {
-  mocks.source = 'points:\n  zones:\n    keys: {}\n';
+  mocks.source =
+    'schema: ergogen/v1\nlayout: {objects: {keys: {kind: key, envelopes: {pcb: {size: [18,18]}, plate: {size: [14,14]}}}}}\n';
   mocks.result = null;
   mocks.error = '';
   vi.clearAllMocks();
@@ -109,9 +111,8 @@ it('uses resolved dimensions for the preview when a field contains a formula', (
 });
 
 it('unchecks only the clicked layout point and permits selecting it again', () => {
-  mocks.result = {
-    points: { matrix_c1_r4: {}, matrix_c1_r3: {}, matrix_c1_r2: {} },
-  };
+  mocks.source =
+    'schema: ergogen/v1\nlayout: {objects: {matrix_c1_r4: {kind: key}, matrix_c1_r3: {kind: key}, matrix_c1_r2: {kind: key}}}\n';
   render(<CaseWizard onClose={mocks.close} />);
   const group = screen.getByRole('group', { name: 'Included layout points' });
   const boxes = Array.from(group.querySelectorAll('input'));
@@ -126,7 +127,8 @@ it('unchecks only the clicked layout point and permits selecting it again', () =
 });
 
 it('keeps layout controls usable before a disconnected case has a preview', () => {
-  mocks.source += 'outlines:\n  board: [{what: rectangle, size: [60, 40]}]\n';
+  mocks.source +=
+    'designs:\n  profiles:\n    board: {from: regions.board}\n  regions:\n    board: {shape: {size: [60,40]}}\n';
   mocks.error =
     'DesignError: designs.assemblies.case.profile: Expected one connected region; found 2';
   render(<CaseWizard onClose={mocks.close} />);
@@ -136,14 +138,13 @@ it('keeps layout controls usable before a disconnected case has a preview', () =
   expect(
     screen.queryByText('Showing the last valid geometry.')
   ).not.toBeInTheDocument();
-  fireEvent.change(
-    screen.getByRole('combobox', { name: 'Existing board outline' }),
-    { target: { value: 'board' } }
-  );
+  fireEvent.change(screen.getByRole('combobox', { name: 'Board profile' }), {
+    target: { value: 'profiles.board' },
+  });
   expect(
-    parse(mocks.draft.mock.lastCall![0]).designs.regions.case_keys.outline
-  ).toBe('board');
-  expect(screen.getByText(/Exclude helper points/)).toBeVisible();
+    parse(mocks.draft.mock.lastCall![0]).designs.assemblies.case.profile
+  ).toBe('profiles.board');
+  expect(screen.getByText(/Choose keys for each cluster/)).toBeVisible();
 });
 
 it('provides named help for wizard and advanced controls across every step', () => {

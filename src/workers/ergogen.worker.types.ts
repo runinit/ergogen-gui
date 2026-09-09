@@ -3,7 +3,7 @@
  */
 
 export type WorkerRequest = {
-  type: 'generate' | 'analyze';
+  type: 'generate' | 'analyze' | 'layout';
   revisions?: {
     source: string;
     injection: string;

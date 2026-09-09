@@ -38,7 +38,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 
   console.log(`<<< Ergogen worker request: ${type} ${requestId}`);
 
-  if (type !== 'generate' && type !== 'analyze') {
+  if (type !== 'generate' && type !== 'analyze' && type !== 'layout') {
     console.log('>>> Unknown message type:', type);
     self.postMessage({
       type: 'error',
@@ -81,7 +81,8 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       inputConfig,
       {
         debug: true,
-        analysis: type === 'analyze',
+        analysis: type !== 'generate',
+        layoutOnly: type === 'layout',
         analysisCache: type === 'analyze' ? analysisCache : undefined,
         assets,
         svg: true,

@@ -24,6 +24,7 @@ export type CaseAnalysis = {
   parameters: CaseConfig;
 };
 export type BoardComponent = {
+  native?: { matrix: number[] };
   id: string;
   reference: string;
   footprint: string;
@@ -34,6 +35,7 @@ export type BoardComponent = {
   size: number[] | null;
   height: number[] | null;
   models: {
+    asset?: string;
     path: string;
     offset: number[];
     rotate: number[];
@@ -42,6 +44,7 @@ export type BoardComponent = {
   populated: boolean;
 };
 export type BoardInventory = {
+  native?: boolean;
   name: string;
   source: string;
   model: IModel;

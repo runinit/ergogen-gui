@@ -1,3 +1,5 @@
+import NativeCaseObjects from './NativeCaseObjects';
+import { editNativeBoard } from '../utils/nativeBoardSource';
 import CaseModelInset from './CaseModelInset';
 import { previewModels } from '../utils/modelPreview';
 import { libraryAssets } from '../utils/footprintLibrary';
@@ -18,7 +20,6 @@ import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';
 import { useCasePreview, useCaseAnalysis } from '../hooks/useCasePreview';
 import {
-  appendDesignRef,
   CASE_STEPS,
   batchCaseEdit,
   caseNames,
@@ -439,8 +440,8 @@ function CaseDraft({ onClose, initialView }: Props) {
   const board = analysis.result?.designs?.boards?.[name];
   const assembly = preview.result?.designs?.assemblies[name];
   const tree = useMemo(
-    () => assemblyNodes(name, spec, board),
-    [name, spec, board]
+    () => assemblyNodes(name, spec, board, analysis.result?.layout),
+    [name, spec, board, analysis.result?.layout]
   );
   const chooseNode = (node: AssemblyNode) => {
     setActiveModel(0);
@@ -497,12 +498,9 @@ function CaseDraft({ onClose, initialView }: Props) {
     string,
     number
   >;
-  const points = Object.keys(
-    (analysis.result?.points ||
-      preview.result?.points ||
-      context?.results?.points ||
-      {}) as object
-  );
+  const points = Object.entries(data.layout?.objects || {})
+    .filter(([, item]) => (item as { kind: string }).kind === 'key')
+    .map(([id]) => id);
   const features = analysis.result?.designs?.features || {};
   // Keep declared references available when native generation cannot complete.
   const refs = Array.from(
@@ -570,6 +568,12 @@ function CaseDraft({ onClose, initialView }: Props) {
   };
   const edit = (path: SourcePath, value: unknown) =>
     change((source) => {
+      if (board?.native) {
+        const next = editNativeBoard(source, path, value);
+        if (next !== null) {
+          return next;
+        }
+      }
       const axis = path.at(-1),
         key = path.at(-2);
       if (
@@ -644,13 +648,14 @@ function CaseDraft({ onClose, initialView }: Props) {
   };
   const selection = (path: SourcePath, label: string, choices: string[]) => {
     const chosen = doc.toJS()?.designs;
-    const value = path.reduce<unknown>(
+    const selectedValue = path.reduce<unknown>(
       (node, key) =>
         node && typeof node === 'object'
           ? (node as Record<string, unknown>)[key]
           : undefined,
       { designs: chosen }
     );
+    const value = selectedValue ?? (path.at(-1) === 'ids' ? true : undefined);
     return (
       <Card aria-label={label}>
         <legend>
@@ -704,27 +709,6 @@ function CaseDraft({ onClose, initialView }: Props) {
       [suggestion.kind === 'gasket' ? 'gaskets' : 'mounts', suggestion.id],
       suggestion.definition
     );
-  };
-  const addComponent = (kind: 'component' | 'opening') => {
-    const id = `${name}_${kind}_${Object.keys(data.designs.components || {}).length + 1}`;
-    change((source) => {
-      const withComponent = editDesign(source, ['designs', 'components', id], {
-        anchor: { ref: points[0], shift: [0, 0] },
-        size: [18, 10],
-        height: [3, 8],
-        motion: 'fixed',
-      });
-      return appendDesignRef(
-        withComponent,
-        [
-          'designs',
-          'assemblies',
-          name,
-          kind === 'opening' ? 'openings' : 'components',
-        ],
-        `components.${id}`
-      );
-    });
   };
   const apply = async () => {
     if (blocked || !confirmed || !context) {
@@ -1228,7 +1212,6 @@ function CaseDraft({ onClose, initialView }: Props) {
                     }
                     choices={[
                       '',
-                      `layout:${name}_layout`,
                       ...Object.keys(data.pcbs || {}).map(
                         (key) => `generated:${key}`
                       ),
@@ -1247,21 +1230,6 @@ function CaseDraft({ onClose, initialView }: Props) {
                       edit(['board'], { source, name: parts.join(':') });
                     }}
                   />
-                  {spec.board?.source === 'layout' && (
-                    <>
-                      <Field
-                        label="Switch family"
-                        value={spec.board.family || ''}
-                        choices={['', 'mx', 'choc-v1', 'choc-v2']}
-                        onChange={(value) => edit(['board', 'family'], value)}
-                      />
-                      <p>
-                        Layout board is a mechanical reference. Choose a switch
-                        family to resolve the stack. Import your routed PCB
-                        before manufacturing it.
-                      </p>
-                    </>
-                  )}
                   <label>
                     Import KiCad PCB
                     <input
@@ -1333,57 +1301,31 @@ function CaseDraft({ onClose, initialView }: Props) {
                   />
                   {data.designs.regions?.[`${name}_keys`] && (
                     <>
-                      {globalField(
-                        ['designs', 'regions', `${name}_keys`, 'outline'],
-                        'Existing board outline',
-                        '',
-                        ['', ...Object.keys(data.outlines || {})]
-                      )}
-                      <ProfilePreview
-                        label="Existing board outline"
-                        model={features[`regions.${name}_keys`]?.model}
-                      />
-                      <p>
-                        Choose an existing outline for the case boundary, or
-                        leave it empty to build from selected layout points.
-                      </p>
-                      {!data.designs.regions[`${name}_keys`].outline && (
-                        <>
-                          {selection(
-                            ['designs', 'regions', `${name}_keys`, 'where'],
-                            'Included layout points',
-                            points
-                          )}
-                          {globalField(
-                            ['designs', 'regions', `${name}_keys`, 'close'],
-                            'Gap closing radius (mm)',
-                            2
-                          )}
-                        </>
+                      {selection(
+                        ['designs', 'regions', `${name}_keys`, 'select', 'ids'],
+                        'Included layout points',
+                        points
                       )}
                       {globalField(
-                        ['designs', 'regions', `${name}_switches`, 'size'],
-                        'Switch cutout size (mm)',
-                        14
+                        ['designs', 'regions', `${name}_keys`, 'close'],
+                        'Gap closing radius (mm)',
+                        2
                       )}
-                      {globalField(
+                      {selection(
                         [
                           'designs',
                           'regions',
                           `${name}_switches`,
-                          'corner_relief',
+                          'select',
+                          'ids',
                         ],
-                        'Switch corner relief radius (mm)',
-                        0
-                      )}
-                      {selection(
-                        ['designs', 'regions', `${name}_switches`, 'where'],
                         'Points with switch cutouts',
                         points
                       )}
                       <p>
-                        Keep controller and mounting points out of the switch
-                        selection.
+                        PCB support and plate openings use the selected keys’
+                        named envelopes. Edit their dimensions in Layout or
+                        YAML.
                       </p>
                       <button
                         onClick={() => {
@@ -1838,7 +1780,11 @@ function CaseDraft({ onClose, initialView }: Props) {
                   spec={spec}
                   assets={assets}
                   onAssets={setAssets}
-                  onEdit={(path, value) =>
+                  onEdit={(path, value) => {
+                    if (board?.native) {
+                      edit(path, value);
+                      return;
+                    }
                     change((source) =>
                       editCaseChanges(
                         source,
@@ -1847,115 +1793,20 @@ function CaseDraft({ onClose, initialView }: Props) {
                         path.reduce((item, key) => item?.[key], spec),
                         value
                       )
-                    )
-                  }
+                    );
+                  }}
                   onConfig={(source) => change(() => source)}
                 />
               </div>
               {step === 4 && (
-                <>
-                  <p>
-                    Enter measured envelopes. Moving components share the
-                    plate’s clearance envelope; openings cut the shells.
-                  </p>
-                  <Controls>
-                    <button onClick={() => addComponent('component')}>
-                      Add component
-                    </button>
-                    <button onClick={() => addComponent('opening')}>
-                      Add opening
-                    </button>
-                  </Controls>
-                  {[...(spec.components || []), ...(spec.openings || [])].map(
-                    (ref: string) => {
-                      const id = ref.split('.')[1],
-                        path = ['designs', 'components', id];
-                      return (
-                        <Card key={ref} id={`case-feature-${ref}`}>
-                          <legend>{id}</legend>
-                          {globalField(
-                            [...path, 'anchor', 'ref'],
-                            `${id} anchor`,
-                            '',
-                            points
-                          )}
-                          {globalField(
-                            [...path, 'anchor', 'shift', 0],
-                            `${id} X offset (mm)`,
-                            0
-                          )}
-                          {globalField(
-                            [...path, 'anchor', 'shift', 1],
-                            `${id} Y offset (mm)`,
-                            0
-                          )}
-                          {globalField(
-                            [...path, 'anchor', 'rotate'],
-                            `${id} rotation`,
-                            0
-                          )}
-                          {globalField(
-                            [...path, 'size', 0],
-                            `${id} width (mm)`,
-                            18
-                          )}
-                          {globalField(
-                            [...path, 'size', 1],
-                            `${id} length (mm)`,
-                            10
-                          )}
-                          {globalField(
-                            [...path, 'corner_radius'],
-                            `${id} corner radius (mm)`,
-                            0
-                          )}
-                          {globalField(
-                            [...path, 'radius'],
-                            `${id} optional circular radius (mm)`,
-                            ''
-                          )}
-                          {globalField(
-                            [...path, 'height', 0],
-                            `${id} bottom (mm)`,
-                            3
-                          )}
-                          {globalField(
-                            [...path, 'height', 1],
-                            `${id} top (mm)`,
-                            8
-                          )}
-                          {globalField(
-                            [...path, 'motion'],
-                            `${id} attachment`,
-                            'fixed',
-                            ['fixed', 'floating']
-                          )}
-                          <button
-                            onClick={() =>
-                              change((source) =>
-                                toggleDesignRef(
-                                  source,
-                                  [
-                                    'designs',
-                                    'assemblies',
-                                    name,
-                                    (spec.openings || []).includes(ref)
-                                      ? 'openings'
-                                      : 'components',
-                                  ],
-                                  ref
-                                )
-                              )
-                            }
-                          >
-                            Remove {id} from case
-                          </button>
-                        </Card>
-                      );
-                    }
-                  )}
-                </>
+                <NativeCaseObjects
+                  source={draft}
+                  assembly={name}
+                  layout={analysis.result?.layout}
+                  onChange={change}
+                />
               )}
+
               {step === 5 && (
                 <>
                   <p>
@@ -2248,9 +2099,9 @@ function CaseDraft({ onClose, initialView }: Props) {
               )}
               {disconnected && (
                 <Status>
-                  The boundary contains separate regions. Exclude helper points,
-                  choose an existing board outline, or add a bridge. Use
-                  separate cases for separate keyboard halves.
+                  The boundary contains separate regions. Choose keys for each
+                  cluster, choose an existing board outline, or add a bridge.
+                  Use separate cases for separate keyboard halves.
                 </Status>
               )}
               {(error || preview.error || preview.stale) && assembly && (
@@ -2421,8 +2272,8 @@ function CaseDraft({ onClose, initialView }: Props) {
                 : preview.stale
                   ? 'Case needs regeneration'
                   : 'Current geometry'}{' '}
-              · {board?.components.length || 0} components{' '}
-              {board ? `· PCB ${board.thickness} mm` : ''}
+              · {tree.find((node) => node.id === 'components')?.count || 0}{' '}
+              components {board ? `· PCB ${board.thickness} mm` : ''}
             </span>
             <button
               onClick={() => {
