@@ -106,7 +106,8 @@ selection, boundary repair, manufacturing presets and offline reopening.
 Its regression tests reproduce and fix pre-generation part selection crashes
 and missing/trailing-slash service-worker base URLs. Cleanup logs are saved as
 `/tmp/cad-types-*.log`.
-Existing unused test-variable lint warnings and Knip configuration hints remain.
+Unused declarations and obsolete Knip exclusions have been removed; lint and
+Knip now complete without warnings or configuration hints.
 No installed desktop KiCad GUI or fabrication/DRC approval is claimed.
 
 Custom/trapezoid pads use simplified lightweight outlines, with a visible notice;

@@ -1123,9 +1123,8 @@ describe('ConfigContextProvider', () => {
     });
 
     it('should debounce tracking by 5 seconds and only send the latest event', async () => {
-      let capturedContext: any = null;
       const TestComponent = () => {
-        capturedContext = useConfigContext();
+        useConfigContext();
         return null;
       };
 
@@ -1193,9 +1192,8 @@ describe('ConfigContextProvider', () => {
     });
 
     it('should correctly chain lineages across multiple distinct generations', async () => {
-      let capturedContext: any = null;
       const TestComponent = () => {
-        capturedContext = useConfigContext();
+        useConfigContext();
         return null;
       };
 
@@ -1260,9 +1258,8 @@ describe('ConfigContextProvider', () => {
     });
 
     it('should ignore duplicate compilation results with identical layout geometries', async () => {
-      let capturedContext: any = null;
       const TestComponent = () => {
-        capturedContext = useConfigContext();
+        useConfigContext();
         return null;
       };
 

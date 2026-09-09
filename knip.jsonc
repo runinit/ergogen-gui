@@ -8,12 +8,8 @@
   "project": [
     "src/**/*.{ts,tsx}"
   ],
-  "ignore": [
-    "src/ergogen.d.ts"
-  ],
   "ignoreDependencies": [
     "@jscad/csg",
-    "replicad",
     "@jscad/stl-serializer",
     "@testing-library/user-event",
     "@types/styled-components",
