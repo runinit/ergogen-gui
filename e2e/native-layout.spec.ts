@@ -1,3 +1,8 @@
+import {
+  CONFIG_LOCAL_STORAGE_KEY,
+  MULTI_CONFIG_STORAGE_KEY,
+} from '../src/context/constants';
+import { storageKey } from '../src/utils/storageKey';
 import { expect, test, Page } from '@playwright/test';
 import Stack from '../src/examples/physical-stack';
 import Columns from '../src/examples/columns';
@@ -16,38 +21,46 @@ const source = (page: Page) =>
       .getValue()
   );
 const load = async (page: Page, config: string) => {
-  await page.addInitScript((config) => {
-    localStorage.setItem('ergogen:config', JSON.stringify(config));
-    if (config.startsWith('schema: ergogen/v1')) {
-      const id = 'native-test';
-      const timestamp = new Date().toISOString();
+  await page.addInitScript(
+    ({ config, configKey, multiKey, settingsKey }) => {
+      localStorage.setItem(configKey, JSON.stringify(config));
+      if (config.startsWith('schema: ergogen/v1')) {
+        const id = 'native-test';
+        const timestamp = new Date().toISOString();
+        localStorage.setItem(
+          multiKey,
+          JSON.stringify({
+            version: 2,
+            activeConfigId: id,
+            configs: [
+              {
+                id,
+                name: 'Native layout',
+                config,
+                createdAt: timestamp,
+                updatedAt: timestamp,
+              },
+            ],
+          })
+        );
+      }
       localStorage.setItem(
-        'ergogen:multi-config',
+        settingsKey,
         JSON.stringify({
-          version: 2,
-          activeConfigId: id,
-          configs: [
-            {
-              id,
-              name: 'Native layout',
-              config,
-              createdAt: timestamp,
-              updatedAt: timestamp,
-            },
-          ],
+          autoGen: false,
+          autoGen3D: false,
+          debug: true,
+          sendUsageMetrics: false,
         })
       );
+    },
+    {
+      config,
+      configKey: CONFIG_LOCAL_STORAGE_KEY,
+      multiKey: MULTI_CONFIG_STORAGE_KEY,
+      settingsKey: storageKey('ergogen:settings'),
     }
-    localStorage.setItem(
-      'ergogen:settings',
-      JSON.stringify({
-        autoGen: false,
-        autoGen3D: false,
-        debug: true,
-        sendUsageMetrics: false,
-      })
-    );
-  }, config);
+  );
   await page.goto('./');
   await expect(page.getByTestId('config-editor')).toBeVisible();
   await page.waitForFunction(

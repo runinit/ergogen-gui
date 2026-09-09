@@ -1,3 +1,4 @@
+import { CONFIG_LOCAL_STORAGE_KEY } from '../src/context/constants';
 import { test, expect, Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import JSZip from 'jszip';
@@ -50,8 +51,8 @@ for (const part of ['bottom', 'top', 'plate']) {
 const open = async (page: Page) => {
   await page.setViewportSize({ width: 1487, height: 1058 });
   await page.addInitScript(
-    (source) => localStorage.setItem('ergogen:config', JSON.stringify(source)),
-    source
+    ({ source, key }) => localStorage.setItem(key, JSON.stringify(source)),
+    { source, key: CONFIG_LOCAL_STORAGE_KEY }
   );
   await page.goto('./');
   await expect(page.getByTestId('config-editor')).toBeVisible();
@@ -235,8 +236,8 @@ test('assigns a model to a native BHK controller and exports the object binding'
 
   await page.setViewportSize({ width: 1487, height: 1058 });
   await page.addInitScript(
-    (source) => localStorage.setItem('ergogen:config', JSON.stringify(source)),
-    config.toString()
+    ({ source, key }) => localStorage.setItem(key, JSON.stringify(source)),
+    { source: config.toString(), key: CONFIG_LOCAL_STORAGE_KEY }
   );
   await page.goto('./');
   await expect(page.getByTestId('config-editor')).toBeVisible();
