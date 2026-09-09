@@ -48,3 +48,9 @@ test('browser tests serve the production artifact without reusing a server', () 
   assert.equal(config.webServer.reuseExistingServer, false);
   assert.equal(config.webServer.url, config.use.baseURL);
 });
+
+test('Pages verifies the pinned generator version', () => {
+  const workflow = read('.github/workflows/deploy.yaml');
+  const version = require('ergogen/package.json').version;
+  assert.ok(workflow.includes(`assert.equal(pkg.version, '${version}')`));
+});

@@ -33,7 +33,7 @@ jobs:
           const assert = require('node:assert/strict');
           const pkg = require('ergogen/package.json');
           assert.equal(pkg.name, '@runinit/ergogen');
-          assert.equal(pkg.version, '5.1.0-develop');
+          assert.equal(pkg.version, '6.0.0-develop');
           JS
       - run: pnpm run test:release
       - run: pnpm run precommit
