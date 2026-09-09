@@ -36,8 +36,8 @@ importers:
         specifier: 1.2.0
         version: 1.2.0
       ergogen:
-        specifier: file:vendor/ergogen-native-43894e4216ca.tgz
-        version: '@runinit/ergogen@file:vendor/ergogen-native-43894e4216ca.tgz'
+        specifier: file:vendor/ergogen-native-694ffe289bc0.tgz
+        version: '@runinit/ergogen@file:vendor/ergogen-native-694ffe289bc0.tgz'
       file-saver:
         specifier: ^2.0.5
         version: 2.0.5
@@ -1502,8 +1502,8 @@ packages:
   '@rtsao/scc@1.1.0':
     resolution: {integrity: sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g==}
 
-  '@runinit/ergogen@file:vendor/ergogen-native-43894e4216ca.tgz':
-    resolution: {integrity: sha512-hLN4pGftR0LoDClSULxLO+g8j4oOoFTQoNiuBN5OEDlKAZAUd67nKczdYNf10BrvKQPP9xqKHS+vPcKUwdqNgw==, tarball: file:vendor/ergogen-native-43894e4216ca.tgz}
+  '@runinit/ergogen@file:vendor/ergogen-native-694ffe289bc0.tgz':
+    resolution: {integrity: sha512-ErEe38N6TBfUerbhbHhBIQj1fYhTR+ykd+wpo53mL24tPl0+0Gg+0uyg6/J1U3b0bUdHdFkcUR6i0jmIqX4rXA==, tarball: file:vendor/ergogen-native-694ffe289bc0.tgz}
     version: 6.0.0-develop
     hasBin: true
 
@@ -5705,7 +5705,7 @@ snapshots:
 
   '@rtsao/scc@1.1.0': {}
 
-  '@runinit/ergogen@file:vendor/ergogen-native-43894e4216ca.tgz':
+  '@runinit/ergogen@file:vendor/ergogen-native-694ffe289bc0.tgz':
     dependencies:
       '@salusoft89/planegcs': 1.2.0
       ajv: 8.17.1

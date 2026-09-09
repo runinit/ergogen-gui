@@ -523,8 +523,8 @@ publication. `vendor/README.md` records the source commit and archive hash.
 
 ## BHK example
 
-The BHK example uses the original KiCad 8 configuration with an Ergogen 5
-engine requirement. Its two custom footprints are bundled through the existing
+The BHK example uses the native Ergogen 6 configuration. Legacy gasket
+anchors and Corne screw-hole objects are removed; enclosure hardware is native. Its two custom footprints are bundled through the existing
 footprint staging flow; provenance is in `vendor/bhk/README.md`. Gallery
 thumbnails generate only points and outlines, without requiring PCB footprints.
 
@@ -552,9 +552,9 @@ Scalar-to-selection edits use inline YAML collections to retain surrounding
 source. Form edits are parsed before replacing the draft; declared profile
 choices remain available when native generation fails.
 
-The shipped BHK example retains its original source, outlines and PCB.
-Offline CAD tests use a synthetic gasket fixture; BHK browser tests cover
-the original preview and lightweight case-boundary analysis.
+The native BHK example retains electrical placements and wiring. Offline CAD
+tests use a synthetic gasket fixture; BHK browser tests cover the repaired
+boundary, native mounting editor and offline generation.
 
 The case designer separates automatic 2D analysis from explicit CAD generation.
 Its board linker resolves mechanical inventory before solids while retaining
@@ -604,3 +604,16 @@ Precommit includes this check, so both CI workflows enforce it. Tests use Vitest
 globals and `vi.mocked` for typed mocks; there is no Jest runtime alias. DOM
 matchers come from `@testing-library/jest-dom/vitest`. The existing ESLint Jest
 rules remain lint-only, configured to recognize Vitest's `vi` API.
+
+## Gasket plan editing
+
+Changing to gasket mounting removes rigid ledges and assembly supports in one
+undoable edit while retaining case-closing screws. Saved incompatible gasket
+configs offer Remove rigid supports without redistributing their contacts. Inline YAML assembly mappings
+remain inline during batch updates. Redistribution preserves manual contacts.
+
+Clearance analysis preserves rotated body contours, leaving usable thumb-edge
+spans available for gaskets. The 2D plan owns a separate viewport for wheel/pinch zoom and pointer panning;
+Fit restores the boundary view. Dragging keeps the grab offset and commits the
+release position once. The contact editor sits below the canvas. Contextual
+hints dismiss during manipulation and do not appear on touch-down.

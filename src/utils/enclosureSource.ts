@@ -386,5 +386,10 @@ export function batchCaseEdit(
     .split('\n')
     .map((line, index) => (index ? ' '.repeat(indent) + line : line))
     .join('\n');
-  return source.slice(0, start) + rendered + '\n' + source.slice(end);
+  return (
+    source.slice(0, start) +
+    rendered +
+    (node.flow ? '' : '\n') +
+    source.slice(end)
+  );
 }

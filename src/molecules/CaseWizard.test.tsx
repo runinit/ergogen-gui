@@ -264,3 +264,34 @@ it('waits for automatic mounting edits before enabling generation', () => {
   });
   expect(screen.getByRole('button', { name: 'Generate' })).toBeDisabled();
 });
+
+it('removes rigid supports in one undoable gasket switch', () => {
+  mocks.source +=
+    'designs: {assemblies: {case: {preset: enclosure, profile: profiles.board, mounting: bottom, ledge: {width: 2, thickness: 2}, mounts: {plate: {role: plate, post: 3}, closure: {role: case, post: 4}}}}}\n';
+  render(<CaseWizard onClose={mocks.close} />);
+  fireEvent.change(screen.getByLabelText('Mounting system'), {
+    target: { value: 'gasket' },
+  });
+  const spec = parse(mocks.draft.mock.lastCall![0]).designs.assemblies.case;
+  expect(spec.ledge).toBeUndefined();
+  expect(spec.mounts.plate).toBeUndefined();
+  expect(spec.mounts.closure.post).toBe(4);
+  fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+  expect(
+    parse(mocks.draft.mock.lastCall![0]).designs.assemblies.case.ledge.width
+  ).toBe(2);
+});
+
+it('repairs saved gasket conflicts without redistributing contacts', () => {
+  mocks.source +=
+    'designs: {assemblies: {case: {preset: enclosure, profile: profiles.board, mounting: gasket, ledge: {width: 2, thickness: 2}, gaskets: {left: {size: [10,6], anchor: {shift: [10,20]}}}}}}\n';
+  render(<CaseWizard onClose={mocks.close} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Mounting' }));
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Remove rigid supports' })
+  );
+  const spec = parse(mocks.draft.mock.lastCall![0]).designs.assemblies.case;
+  expect(spec.ledge).toBeUndefined();
+  expect(spec.gaskets.left.anchor.shift).toEqual([10, 20]);
+  expect(screen.getByRole('button', { name: 'Generate' })).toBeEnabled();
+});

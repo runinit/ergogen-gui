@@ -1371,6 +1371,7 @@
 		const DEFAULT_POST_HEIGHT = 5;
 		const DEGREES = 180 / Math.PI;
 		const TANGENT_STEP = 0.0001;
+		const CORNER_CLEARANCE = 3;
 		const overlap = requireOverlap();
 
 		// Suggestions remain declarations; callers explicitly accept their stable anchors.
@@ -1412,7 +1413,8 @@
 		    let serial = 0;
 		    for (const edge of g.paths(base)) {
 		        const length = m.measure.pathLength(edge);
-		        if (length < size[0]) { continue }
+		        // Flat contacts need a straight support span and room before each corner.
+		        if (edge.type !== 'line' || length < size[0] + 2 * CORNER_CLEARANCE) { continue }
 		        const count = Math.max(1, Math.floor(length / Math.max(spacing, size[0])));
 		        for (let index = 0; index < count; index++) {
 		            const id = `gasket_${++serial}`, t = (index + 0.5) / count;
@@ -40178,7 +40180,10 @@ ${content}
 		                const relative=f.multiply(f.inverse(scene.assemblyFrame(id)),f.multiply(item.matrix,f.local(body.at || [0,0,0],body.rotate || 0)));
 		                const localItem={...item,matrix:relative};
 		                const bounds=geometry.bounds(localItem,{...body,at:[0,0,0],rotate:0});
-		                const model=m.model.moveRelative(new m.models.Rectangle(bounds[1][0]-bounds[0][0],bounds[1][1]-bounds[0][1]),bounds[0].slice(0,2));
+		                // Preserve in-plane body contours so rotated keys leave usable mounting space.
+		                const model=Math.abs(Math.abs(relative[10])-1)<=g.EPSILON
+		                    ? geometry.project(localItem,{...body,at:[0,0,0],rotate:0})
+		                    : m.model.moveRelative(new m.models.Rectangle(bounds[1][0]-bounds[0][0],bounds[1][1]-bounds[0][1]),bounds[0].slice(0,2));
 		                next.components[key]={size:body.size,radius:body.radius,height:[bounds[0][2],bounds[1][2]],anchor:{shift:[0,0]},motion:item.motion,
 		                    native:{matrix:relative,object:item.id,envelope:body}};
 		                publish(ref,model,item.sourcePath);

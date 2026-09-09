@@ -224,3 +224,15 @@ it('selects typed support and rejects legacy case creation', () => {
   });
   expect(() => createCase('points: {}', 'case')).toThrow(/native/);
 });
+
+it('batches inline assemblies without breaking the containing flow maps', async () => {
+  const { batchCaseEdit } = await import('./enclosureSource');
+  const source =
+    '# keep\ndesigns: {assemblies: {case: {mounting: bottom, ledge: {width: 2}}}}\n';
+  const next = batchCaseEdit(source, 'case', (doc, path) => {
+    doc.setIn([...path, 'mounting'], 'gasket');
+    doc.deleteIn([...path, 'ledge']);
+  });
+  expect(parse(next).designs.assemblies.case).toEqual({ mounting: 'gasket' });
+  expect(next).toContain('# keep');
+});

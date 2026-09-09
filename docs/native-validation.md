@@ -6,10 +6,10 @@ this file records verification of its implementation.
 
 | Check | Result |
 | --- | --- |
-| Engine: `npm test` | 259 passing; native API, cache regressions, imported solids and retained backend adapters |
-| GUI: `NODE_OPTIONS=--no-experimental-webstorage pnpm run precommit` | 502 tests passing; formatting, lint, types, and dependency checks pass |
+| Engine: `npm test` | 261 passing; native API, cache regressions, imported solids and retained backend adapters |
+| GUI: `NODE_OPTIONS=--no-experimental-webstorage pnpm run precommit` | 508 tests passing; formatting, lint, types, and dependency checks pass |
 | Packaging: `pnpm run test:release` | 9 passing |
-| Browser: focused BHK, native layout and regression specs | 7 passing across focused runs; includes offline BHK, alias undo and imported ZIP export |
+| Browser: focused BHK, gasket-plan and enclosure specs | 8 passing; includes desktop/phone editing, touch gestures and offline generation |
 | Engine and GUI production builds | Pass |
 | Installed engine source and architecture | Byte-identical to the enclosure checkout |
 
@@ -123,3 +123,16 @@ blocked after a mounting edit. Imported projects render the battery, export its
 STL, and retain the service opening in the shell. A separate solid-volume check
 verifies material was removed by the opening. These are software geometry checks,
 not physical-fit or fabrication approval.
+
+## Native gasket cleanup
+
+BHK now removes nine obsolete gasket anchors and six Corne screw-hole objects.
+The original baseline files remain immutable; parity checks exclude only those
+intentional removals. Automatic flat gaskets avoid curved and short corner spans.
+Regression tests cover mounting-mode cleanup and undo, inline YAML batch edits,
+contact grab offsets and final release coordinates, and dismissing touch hints.
+
+A rotated-body regression rejects rectangular bounds in place of the actual
+in-plane contour. BHK now receives angled thumb-edge contacts. Browser checks
+cover desktop and phone layouts, dragging, insertion/deletion, undo, wheel/pinch
+zoom and pan without geometry changes or covering the selected contact.

@@ -1,5 +1,25 @@
 # Changelog
 
+## Gasket mounting and direct plan editing
+
+September 09, 2026
+
+![Native BHK gaskets follow the thumb edges.](./public/images/changelog/bhk-gaskets-1280.png)
+
+Gasket mounting removes incompatible rigid supports. Saved conflicts have a
+Remove rigid supports action that keeps existing contacts in place.
+
+Automatic contacts avoid short corner spans and use the actual rotated component
+contours, restoring space beside thumb clusters. BHK's nine old gasket anchors
+and six Corne screw-hole objects are removed from the native example.
+
+The 2D plan supports wheel and pinch zoom, panning, and Fit. Dragging preserves
+the grab offset; the contact editor sits below the canvas and hints dismiss during
+manipulation. Inline YAML mounting edits remain valid and undoable.
+
+Reload BHK from Examples to use the cleaned configuration.
+[Phone preview](./public/images/changelog/bhk-gaskets-412.png).
+
 ## Reliable native analysis and imported enclosures
 
 September 09, 2026

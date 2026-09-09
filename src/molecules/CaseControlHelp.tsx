@@ -33,6 +33,7 @@ export default function CaseControlHelp({
       return;
     }
     let described: HTMLElement | null = null;
+    let touching = false;
     const hide = () => {
       if (described?.getAttribute('aria-describedby') === id) {
         described.removeAttribute('aria-describedby');
@@ -41,6 +42,14 @@ export default function CaseControlHelp({
       setHint(null);
     };
     const show = (event: Event) => {
+      if (
+        (touching && event.type === 'focusin') ||
+        ('pointerType' in event &&
+          (event.pointerType === 'touch' || (event as PointerEvent).buttons))
+      ) {
+        hide();
+        return;
+      }
       const target = (event.target as Element)?.closest<HTMLElement>(
         'button,input,select,summary'
       );
@@ -49,6 +58,7 @@ export default function CaseControlHelp({
       }
       if (
         !target ||
+        !!target.closest('[data-plan-controls]') ||
         target.getAttribute('aria-label')?.startsWith('Help:') ||
         target.hasAttribute('aria-describedby')
       ) {
@@ -88,14 +98,19 @@ export default function CaseControlHelp({
             : box.bottom + theme.caseWizard.hintGap,
       });
     };
+    const dismiss = (event: Event) => {
+      touching = 'pointerType' in event && event.pointerType === 'touch';
+      hide();
+    };
     const escape = (event: KeyboardEvent) => {
+      touching = false;
       if (event.key === 'Escape') {
         hide();
       }
     };
     element.addEventListener('focusin', show);
     element.addEventListener('pointerover', show);
-    element.addEventListener('pointerdown', show);
+    element.addEventListener('pointerdown', dismiss);
     element.addEventListener('focusout', hide);
     element.addEventListener('pointerout', hide);
     element.addEventListener('keydown', escape);
@@ -103,7 +118,7 @@ export default function CaseControlHelp({
       hide();
       element.removeEventListener('focusin', show);
       element.removeEventListener('pointerover', show);
-      element.removeEventListener('pointerdown', show);
+      element.removeEventListener('pointerdown', dismiss);
       element.removeEventListener('focusout', hide);
       element.removeEventListener('pointerout', hide);
       element.removeEventListener('keydown', escape);

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import makerjs, { IModel } from 'makerjs';
 import styled from 'styled-components';
 import {
@@ -10,7 +10,10 @@ import {
 import Field, { CaseHelp } from './CaseField';
 import { theme } from '../theme/theme';
 const PADDING = 8,
-  KEY_STEP = 0.5;
+  KEY_STEP = 0.5,
+  ZOOM_STEP = 1.25,
+  MIN_ZOOM = 0.5,
+  MAX_ZOOM = 12;
 const Frame = styled.div`
   position: relative;
   flex-shrink: 0;
@@ -32,16 +35,12 @@ const Frame = styled.div`
   }
 `;
 const Popover = styled.div`
-  position: absolute;
-  right: ${theme.caseWizard.gap};
-  top: ${theme.caseWizard.gap};
-  z-index: 1;
+  position: relative;
   background: ${theme.colors.backgroundLighter};
   border: 1px solid ${theme.colors.border};
   border-radius: ${theme.caseWizard.radius};
   padding: ${theme.caseWizard.gap};
-  width: ${theme.caseWizard.popoverWidth};
-  max-height: 85%;
+  margin: ${theme.caseWizard.gap};
   overflow: auto;
 `;
 function lines(model: IModel) {
@@ -161,7 +160,9 @@ export default function CasePlanPreview({
   onDuplicate,
 }: Props) {
   const svg = useRef<SVGSVGElement>(null);
-  const [tool, setTool] = useState<'select' | 'mount' | 'gasket'>('select');
+  const [tool, setTool] = useState<'select' | 'mount' | 'gasket' | 'pan'>(
+    'select'
+  );
   const [drag, setDrag] = useState<{
     item: CasePlacement;
     position: number[];
@@ -171,6 +172,50 @@ export default function CasePlanPreview({
   const box = analysis?.exterior
     ? makerjs.measure.modelExtents(analysis.exterior)
     : analysis?.bounds;
+  const [view, setView] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const grab = useRef([0, 0]);
+  const start = useRef([0, 0]);
+  const pan = useRef<number[] | null>(null);
+  const touches = useRef(new Map<number, number[]>());
+  const pinch = useRef(0);
+  const baseX = (box?.low[0] || 0) - PADDING;
+  const baseY = -(box?.high[1] || 0) - PADDING;
+  const baseWidth = (box?.width || 0) + PADDING * 2;
+  const baseHeight = (box?.height || 0) + PADDING * 2;
+  useEffect(() => setView(null), [baseX, baseY, baseWidth, baseHeight]);
+  useEffect(() => {
+    const node = svg.current;
+    const prevent = (event: WheelEvent) => event.preventDefault();
+    node?.addEventListener('wheel', prevent, { passive: false });
+    return () => node?.removeEventListener('wheel', prevent);
+  }, [baseWidth, baseHeight]);
+  const camera = view || {
+    x: baseX,
+    y: baseY,
+    width: baseWidth,
+    height: baseHeight,
+  };
+  const zoom = (
+    factor: number,
+    at = [camera.x + camera.width / 2, camera.y + camera.height / 2]
+  ) => {
+    const width = Math.max(
+      baseWidth / MAX_ZOOM,
+      Math.min(baseWidth / MIN_ZOOM, camera.width / factor)
+    );
+    const ratio = width / camera.width;
+    setView({
+      x: at[0] - (at[0] - camera.x) * ratio,
+      y: at[1] - (at[1] - camera.y) * ratio,
+      width,
+      height: camera.height * ratio,
+    });
+  };
   const chosen = analysis?.placements.find(
     (p) => `${p.kind === 'gasket' ? 'gaskets' : 'mounts'}.${p.id}` === selected
   );
@@ -242,12 +287,13 @@ export default function CasePlanPreview({
   }
   return (
     <Frame>
-      <div>
+      <div data-plan-controls>
         <strong>Mounting plan</strong>
         <CaseHelp label="Mounting system" />
-        {(['select', 'gasket', 'mount'] as const).map((t) => (
+        {(['select', 'gasket', 'mount', 'pan'] as const).map((t) => (
           <button
             key={t}
+            aria-describedby="mounting-plan-help"
             aria-pressed={tool === t}
             title={
               t === 'select'
@@ -256,10 +302,33 @@ export default function CasePlanPreview({
             }
             onClick={() => setTool(t)}
           >
-            {t === 'select' ? 'Select' : `Add ${t}`}
+            {t === 'select' ? 'Select' : t === 'pan' ? 'Pan' : `Add ${t}`}
           </button>
         ))}
+        <button
+          aria-describedby="mounting-plan-help"
+          aria-label="Zoom in mounting plan"
+          onClick={() => zoom(ZOOM_STEP)}
+        >
+          +
+        </button>
+        <button
+          aria-describedby="mounting-plan-help"
+          aria-label="Zoom out mounting plan"
+          onClick={() => zoom(1 / ZOOM_STEP)}
+        >
+          −
+        </button>
+        <button
+          aria-describedby="mounting-plan-help"
+          onClick={() => setView(null)}
+        >
+          Fit plan
+        </button>
       </div>
+      <p id="mounting-plan-help">
+        Drag contacts; scroll or pinch to zoom. Use Pan to move the view.
+      </p>
       <p>
         Outline · PCB · switch openings · mounting features —{' '}
         {box.width.toFixed(1)} × {box.height.toFixed(1)} mm
@@ -269,28 +338,97 @@ export default function CasePlanPreview({
         data-placements={analysis?.placements.length}
         data-candidates={analysis?.suggestions.length}
         aria-label="Interactive mounting plan"
-        viewBox={`${box.low[0] - PADDING} ${-box.high[1] - PADDING} ${box.width + PADDING * 2} ${box.height + PADDING * 2}`}
-        onPointerMove={(event) => {
-          if (drag) {
-            setDrag(move(drag.item, point(event)));
-          }
+        viewBox={`${camera.x} ${camera.y} ${camera.width} ${camera.height}`}
+        onWheel={(event) => {
+          const p = point(event);
+          zoom(event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP, [p[0], -p[1]]);
         }}
-        onPointerUp={() => {
-          if (drag) {
-            if (
-              drag.position.some(
-                (v, i) => Math.abs(v - drag.item.position[i]) > 0.001
-              ) ||
-              Math.abs(
-                drag.angle - Number(drag.item.definition.anchor?.rotate || 0)
-              ) > 0.001
-            ) {
-              commit(drag);
-            }
+        onPointerDown={(event) => {
+          if (event.pointerType === 'touch') {
+            touches.current.set(event.pointerId, [
+              event.clientX,
+              event.clientY,
+            ]);
+          }
+          if (touches.current.size === 2) {
+            const [a, b] = Array.from(touches.current.values());
+            pinch.current = Math.hypot(a[0] - b[0], a[1] - b[1]);
             setDrag(null);
+            svg.current?.setPointerCapture(event.pointerId);
+          }
+          if (tool === 'pan' || event.button === 1 || event.altKey) {
+            pan.current = point(event);
+            svg.current?.setPointerCapture(event.pointerId);
           }
         }}
-        onPointerCancel={() => setDrag(null)}
+        onPointerMove={(event) => {
+          if (touches.current.has(event.pointerId)) {
+            touches.current.set(event.pointerId, [
+              event.clientX,
+              event.clientY,
+            ]);
+          }
+          if (touches.current.size === 2) {
+            const [a, b] = Array.from(touches.current.values());
+            const distance = Math.hypot(a[0] - b[0], a[1] - b[1]);
+            const p = point({
+              clientX: (a[0] + b[0]) / 2,
+              clientY: (a[1] + b[1]) / 2,
+            });
+            if (pinch.current) {
+              zoom(distance / pinch.current, [p[0], -p[1]]);
+            }
+            pinch.current = distance;
+            return;
+          }
+          const p = point(event);
+          if (pan.current) {
+            setView({
+              ...camera,
+              x: camera.x + pan.current[0] - p[0],
+              y: camera.y - pan.current[1] + p[1],
+            });
+            return;
+          }
+          if (drag) {
+            setDrag(
+              move(
+                drag.item,
+                p.map((v, i) => v + grab.current[i])
+              )
+            );
+          }
+        }}
+        onPointerUp={(event) => {
+          touches.current.delete(event.pointerId);
+          pinch.current = 0;
+          pan.current = null;
+          if (
+            drag &&
+            Math.hypot(
+              event.clientX - start.current[0],
+              event.clientY - start.current[1]
+            ) > 1
+          ) {
+            // Commit the release position, even when the last move event was coalesced.
+            commit(
+              move(
+                drag.item,
+                point(event).map((v, i) => v + grab.current[i])
+              )
+            );
+          }
+          setDrag(null);
+          if (svg.current?.hasPointerCapture?.(event.pointerId)) {
+            svg.current.releasePointerCapture(event.pointerId);
+          }
+        }}
+        onPointerCancel={(event) => {
+          touches.current.delete(event.pointerId);
+          pinch.current = 0;
+          pan.current = null;
+          setDrag(null);
+        }}
       >
         <g transform="scale(1,-1)">
           <Drawing model={analysis?.exterior} color={theme.colors.textDarker} />
@@ -307,7 +445,7 @@ export default function CasePlanPreview({
               strokeWidth={3}
               fill="none"
               onClick={(event) => {
-                if (tool === 'select') {
+                if (tool === 'select' || tool === 'pan') {
                   return;
                 }
                 const hit = nearest(point(event), [edge]);
@@ -333,7 +471,10 @@ export default function CasePlanPreview({
             </g>
           ))}
           {analysis?.placements.map((item) => {
-            const active = drag?.item.id === item.id ? drag : null;
+            const active =
+              drag?.item.id === item.id && drag.item.kind === item.kind
+                ? drag
+                : null;
             const p = active?.position || item.position;
             return (
               <g
@@ -359,7 +500,26 @@ export default function CasePlanPreview({
                   )
                 }
                 onPointerDown={(event) => {
+                  if (tool === 'pan' || event.button === 1 || event.altKey) {
+                    return;
+                  }
                   event.stopPropagation();
+                  const p = point(event);
+                  grab.current = item.position.map((v, i) => v - p[i]);
+                  start.current = [event.clientX, event.clientY];
+                  if (event.pointerType === 'touch') {
+                    touches.current.set(event.pointerId, [
+                      event.clientX,
+                      event.clientY,
+                    ]);
+                    if (touches.current.size === 2) {
+                      const [a, b] = Array.from(touches.current.values());
+                      pinch.current = Math.hypot(a[0] - b[0], a[1] - b[1]);
+                      setDrag(null);
+                      svg.current?.setPointerCapture(event.pointerId);
+                      return;
+                    }
+                  }
                   onSelect(
                     `${item.kind === 'gasket' ? 'gaskets' : 'mounts'}.${item.id}`
                   );
@@ -398,9 +558,6 @@ export default function CasePlanPreview({
                   }
                 }}
               >
-                <title>
-                  {item.kind} {item.id}: drag to move; Delete removes
-                </title>
                 {item.kind === 'gasket' ? (
                   <rect
                     x={-Number(item.definition.size?.[0] || 10) / 2}
@@ -428,14 +585,7 @@ export default function CasePlanPreview({
         </g>
       </svg>
       {chosen && (
-        <Popover
-          role="dialog"
-          aria-label={`Edit ${chosen.id}`}
-          style={{
-            right: 'auto',
-            left: `clamp(0px, ${((chosen.position[0] - box.low[0]) / box.width) * 100}%, calc(100% - 260px))`,
-          }}
-        >
+        <Popover role="dialog" aria-label={`Edit ${chosen.id}`}>
           <strong>{chosen.id}</strong>
           <button
             aria-label="Close feature editor"

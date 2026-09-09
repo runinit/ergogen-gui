@@ -731,8 +731,24 @@ function CaseDraft({ onClose, initialView }: Props) {
     }
   };
   const chooseMounting = (value: unknown) => {
-    edit(['mounting'], value);
-    setAutomatic(String(value));
+    change((source) =>
+      batchCaseEdit(source, name, (doc, path) => {
+        doc.setIn([...path, 'mounting'], value);
+        if (value === 'gasket') {
+          doc.deleteIn([...path, 'ledge']);
+          for (const [id, mount] of Object.entries(spec.mounts || {})) {
+            if ((mount as CaseConfig).role !== 'case') {
+              doc.deleteIn([...path, 'mounts', id]);
+            }
+          }
+        } else {
+          doc.deleteIn([...path, 'gaskets']);
+        }
+      })
+    );
+    if (value !== spec.mounting) {
+      setAutomatic(String(value));
+    }
     setView('plan');
   };
   const chooseCount = (value: unknown) => {
@@ -1255,6 +1271,15 @@ function CaseDraft({ onClose, initialView }: Props) {
                     choices={['', ...MOUNT_STYLES]}
                     onChange={chooseMounting}
                   />
+                  {spec.mounting === 'gasket' &&
+                    (spec.ledge ||
+                      Object.values(spec.mounts || {}).some(
+                        (mount) => (mount as CaseConfig).role !== 'case'
+                      )) && (
+                      <button onClick={() => chooseMounting('gasket')}>
+                        Remove rigid supports
+                      </button>
+                    )}
                   <Field
                     label="Manufacturing preset"
                     value={spec.supplier || 'custom'}
@@ -1546,6 +1571,15 @@ function CaseDraft({ onClose, initialView }: Props) {
                     choices={['', ...MOUNT_STYLES]}
                     onChange={chooseMounting}
                   />
+                  {spec.mounting === 'gasket' &&
+                    (spec.ledge ||
+                      Object.values(spec.mounts || {}).some(
+                        (mount) => (mount as CaseConfig).role !== 'case'
+                      )) && (
+                      <button onClick={() => chooseMounting('gasket')}>
+                        Remove rigid supports
+                      </button>
+                    )}
                   <Field
                     label="Mount / gasket count"
                     value={spec.mount_count ?? ''}
@@ -2121,8 +2155,6 @@ function CaseDraft({ onClose, initialView }: Props) {
                   onSelect={(value) => {
                     setFeature(value);
                     setTreeSelection(value);
-                    setStep(5);
-                    setInspectorOpen(true);
                   }}
                   onEdit={editPlacement}
                   onAdd={addPlacement}

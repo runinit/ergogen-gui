@@ -53,3 +53,73 @@ it('moves a screw when its edge offset changes', () => {
   expect(onEdit).toHaveBeenCalled();
   expect(onEdit.mock.lastCall?.[1].anchor.shift).toEqual([10, -8]);
 });
+
+it('drags from the grabbed position and commits the final pointer location', () => {
+  vi.stubGlobal('PointerEvent', MouseEvent);
+  vi.stubGlobal(
+    'DOMPoint',
+    class {
+      constructor(
+        public x: number,
+        public y: number
+      ) {}
+      matrixTransform() {
+        return this;
+      }
+    }
+  );
+  const onEdit = vi.fn();
+  const item = {
+    id: 'pad',
+    kind: 'gasket' as const,
+    position: [10, -2.5],
+    definition: {
+      anchor: { shift: [10, -2.5] },
+      size: [10, 6],
+      placement: { edge: 'bottom', offset: 2.5 },
+    },
+  };
+  render(
+    <CasePlanPreview
+      analysis={{
+        model: new makerjs.models.Rectangle(40, 30),
+        bounds: { low: [0, 0], high: [40, 30], width: 40, height: 30 },
+        edges: [
+          {
+            id: 'bottom',
+            points: [
+              [0, 0],
+              [40, 0],
+            ],
+            length: 40,
+          },
+        ],
+        placements: [item],
+        suggestions: [],
+        findings: [],
+        parameters: {},
+        parts: {},
+      }}
+      selected="gaskets.pad"
+      onSelect={vi.fn()}
+      onEdit={onEdit}
+      onAdd={vi.fn()}
+      onRemove={vi.fn()}
+      onDuplicate={vi.fn()}
+    />
+  );
+  const svg = screen.getByLabelText('Interactive mounting plan');
+  Object.assign(svg, {
+    getScreenCTM: () => ({ inverse: () => ({}) }),
+    setPointerCapture: vi.fn(),
+    releasePointerCapture: vi.fn(),
+  });
+  fireEvent.pointerDown(screen.getByRole('button', { name: 'gasket pad' }), {
+    clientX: 14,
+    clientY: 2.5,
+  });
+  fireEvent.pointerMove(svg, { clientX: 18, clientY: 2.5 });
+  fireEvent.pointerUp(svg, { clientX: 20, clientY: 2.5 });
+  expect(onEdit.mock.lastCall?.[1].anchor.shift).toEqual([16, -2.5]);
+  vi.unstubAllGlobals();
+});

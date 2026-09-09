@@ -31,3 +31,15 @@ it('offers only native configurations with stable BHK object identities', () => 
     18, 27,
   ]);
 });
+
+it('omits obsolete BHK gasket anchors and screw-hole objects', () => {
+  const config = parse(BHK.value);
+  expect(
+    Object.keys(config.layout.objects).filter((id) =>
+      /^(gasket_mount_|corne_screw_)/.test(id)
+    )
+  ).toEqual([]);
+  expect(
+    Object.keys(config.units).filter((id) => id.startsWith('gasket_'))
+  ).toEqual([]);
+});

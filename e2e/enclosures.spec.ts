@@ -1,3 +1,4 @@
+import { parse } from 'yaml';
 import { test, expect, Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import JSZip from 'jszip';
@@ -124,7 +125,9 @@ test('creates a full gasket case through forms, exports and applies one undo ste
   await dialog.getByRole('button', { name: 'Apply design' }).click();
   await expect(dialog).not.toBeVisible();
   expect(await saved(page)).toContain('# Keep the original layout');
-  expect(await saved(page)).toContain('mounting: gasket');
+  expect(parse(await saved(page)).designs.assemblies.case.mounting).toBe(
+    'gasket'
+  );
   await page.evaluate(() =>
     (
       window as unknown as {

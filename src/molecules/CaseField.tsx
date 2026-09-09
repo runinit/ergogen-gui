@@ -95,7 +95,7 @@ const HELP: [RegExp, string][] = [
   ],
   [
     /mounting system/i,
-    'Tray supports the PCB; top and bottom attach the plate to a shell; gasket suspends the plate and attached PCB. Case-closing screws are separate.',
+    'Tray supports the PCB; top and bottom attach the plate to a shell; gasket suspends the plate and PCB. Choosing gasket removes rigid ledges and plate/PCB posts; case-closing screws remain. Undo restores the previous setup.',
   ],
   [
     /shell split|seam height/i,
