@@ -131,6 +131,8 @@ test('edits local key overrides, preserves arrangements, and enforces locks', as
       .undo()
   );
   await expect.poll(() => source(page)).toBe(beforeMove);
+  await expect(page.getByLabel('Layout X', { exact: true })).toHaveValue('5');
+  await expect(page.getByLabel('Layout X', { exact: true })).toBeEnabled();
   await expect(
     page.getByRole('status').filter({ hasText: /objects ·/ })
   ).toBeVisible();
@@ -144,6 +146,12 @@ test('edits local key overrides, preserves arrangements, and enforces locks', as
   );
   await page.mouse.up();
   await expect.poll(() => source(page)).not.toBe(beforeMove);
+  const movedX = parse(await source(page)).layout.objects.outer_home.placement
+    .override.at[0];
+  await expect(page.getByLabel('Layout X', { exact: true })).toHaveValue(
+    String(Number(movedX.toFixed(4)))
+  );
+  await expect(page.getByLabel('Layout X', { exact: true })).toBeEnabled();
   await page.evaluate(() =>
     (
       window as unknown as {
