@@ -631,3 +631,8 @@ hardware pockets and switch cutouts register their depth intervals with the
 compiler. Only additional removal reaches the solid kernel, preserving existing
 supports. Rejected relief retains the nominal pocket and emits a blocker at the
 specific feature. Generated plate outlines include the applied corner relief.
+
+Plate pockets are extracted from the completed nominal plate, including holes
+in a supplied plate profile and mounting holes. Overlapping cutouts become one
+void before relief; outer contours bound perimeter checks. Post clearance uses
+both XY geometry and overlapping Z intervals, excluding face-only contact.

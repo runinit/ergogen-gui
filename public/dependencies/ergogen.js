@@ -40598,8 +40598,21 @@ ${content}
 	function requirePocketPlan () {
 		if (hasRequiredPocketPlan) return pocketPlan;
 		hasRequiredPocketPlan = 1;
+		const m = require$$0$1;
 		const g = requireGeometry$1();
 		const tooling = requireTooling();
+
+		// Face contact alone cannot intersect the cutter's removal volume.
+		const overlapsHeight = (left, right) => Math.min(left.z + left.height, right.z + right.height) -
+		    Math.max(left.z, right.z) > g.TOLERANCE;
+
+		// Short relief arcs can extend past sampled boundary points; check their full bounds.
+		const contains = (outer, inner) => {
+		    const outside = m.measure.modelExtents(outer), inside = m.measure.modelExtents(inner);
+		    if (!outside || !inside) { return g.contains(outer, inner) }
+		    return inside.low.every((value, axis) => value >= outside.low[axis] - g.TOLERANCE) &&
+		        inside.high.every((value, axis) => value <= outside.high[axis] + g.TOLERANCE) && g.contains(outer, inner)
+		};
 
 		const intersects = (left, right) => !g.empty(g.combine(left, right, 'intersect'));
 
@@ -40625,13 +40638,13 @@ ${content}
 		                if (!webs.has(peer)) { webs.set(peer, g.offset(peer.model, minWall)); }
 		                return webs.get(peer)
 		            };
-		            if (!g.contains(boundaries.get(part), model)) {
+		            if (!contains(boundaries.get(part), model)) {
 		                failure = 'Cutter relief would breach the minimum wall. Use a smaller cutter or increase the surrounding material.';
 		            } else if (post && !g.contains(g.offset(post.model, -(post.min_wall ?? minWall)), model)) {
 		                failure = 'Cutter relief would thin the post wall around this hardware pocket. Use a smaller cutter or enlarge the post.';
 		            } else if (part === 'plate' && candidates.some(peer => peer !== entry && peer.part === part && intersects(model, web(peer)))) {
 		                failure = 'Cutter relief would thin the web between plate openings. Use a smaller cutter or increase their spacing.';
-		            } else if (bounds.posts.some(post => post.id !== id && !g.contains(nominal, g.combine(model, post.model, 'intersect')))) {
+		            } else if (bounds.posts.some(post => post.id !== id && overlapsHeight(entry, post) && !g.contains(nominal, g.combine(model, post.model, 'intersect')))) {
 		                failure = 'Cutter relief overlaps a mounting post. Move the post or use a smaller cutter.';
 		            }
 		            if (failure) { adjusted = false; }
@@ -40945,7 +40958,6 @@ ${content}
 		                const cutout = resolve(ref).model;
 		                g.requireContains(opening, cutout, `${name}.opening`);
 		                plateModel = subtract(plateModel, cutout);
-		                pocket(['plate'], ref, cutout, s.plate_z, s.plate);
 		            }
 		            const plateVoids = g.union(g.chains(plateModel).flatMap(chain => chain.contains || []).map(chain => m.chain.toNewModel(chain)));
 		            const clearPlate = (model, path) => {
@@ -41149,6 +41161,11 @@ ${content}
 		            }
 		            if (s.fillet) { top = kernel.fillet(top, s.fillet, s.height); }
 		            if (s.chamfer) { top = kernel.chamfer(top, s.chamfer, s.height); }
+		            // Inspect the finished plate so profile holes and overlapping cutouts share one plan.
+		            const plateChains = g.chains(plateModel);
+		            const plateBoundary = g.union(plateChains.map(chain => m.chain.toNewModel(chain)));
+		            const plateHoles = plateChains.flatMap(chain => chain.contains || []);
+		            plateHoles.forEach((chain, index) => pocket(['plate'], `holes.${index}`, m.chain.toNewModel(chain), s.plate_z, s.plate));
 		            const plate = kernel.extrude(plateModel, s.plate, s.plate_z);
 		            const parts = {bottom, top, plate};
 		            if (s.construction === 'midframe') {
@@ -41165,7 +41182,7 @@ ${content}
 		            }
 		            // Apply only additional tool relief, preserving posts and shelves already built.
 		            const machining = pocketPlan.prepare(pockets, s, {
-		                shell: exterior, plate: s.plate_profile ? resolve(s.plate_profile).model : base,
+		                shell: exterior, plate: plateBoundary,
 		                posts: features.filter(item => item.id.startsWith('mounts.'))
 		            }, name);
 		            for (const {part, model, nominal, z, height, adjusted} of machining) {
