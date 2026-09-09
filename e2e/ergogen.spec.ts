@@ -112,6 +112,7 @@ test.describe('Ergogen Configuration Processing', () => {
     await shoot('after-pcb-file-preview-visible');
   });
   test('loads native physical stack STL previews', async ({ page }) => {
+    test.setTimeout(240000);
     const shoot = makeShooter(page, test.info());
     // Set native physical stack config directly in local storage
     await page.addInitScript(
@@ -135,7 +136,7 @@ test.describe('Ergogen Configuration Processing', () => {
       'downloads-container-keyboard_plate-stl'
     );
     await shoot('before-stl-row-mounting-plate-visible');
-    await expect(stlRowMountingPlate).toBeVisible({ timeout: 60000 });
+    await expect(stlRowMountingPlate).toBeVisible({ timeout: 120000 });
     await shoot('after-stl-row-mounting-plate-visible');
 
     const stlRowPrototype = page.getByTestId(

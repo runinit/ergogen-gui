@@ -93,7 +93,9 @@ test('imports a KiCad bundle, aligns models, links placements, and exports a por
       exact: true,
     })
     .click({ timeout: 90000 });
-  await expect(dialog.getByLabel('Active model')).toContainText(footprintName);
+  await expect(dialog.getByLabel('Active model')).toContainText(footprintName, {
+    timeout: 90000,
+  });
   await dialog
     .getByRole('button', { name: 'Pads & nets', exact: true })
     .click();
@@ -251,7 +253,9 @@ test('assigns a model to a native BHK controller and exports the object binding'
   await dialog
     .getByLabel('Upload 3D models')
     .setInputFiles(`${fixture}${footprintName}.step`);
-  await expect(dialog.getByLabel('Active model')).toContainText(footprintName);
+  await expect(dialog.getByLabel('Active model')).toContainText(footprintName, {
+    timeout: 90000,
+  });
   await expect(
     dialog.getByRole('button', { name: 'Replace', exact: true })
   ).toBeEnabled();

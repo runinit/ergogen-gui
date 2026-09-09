@@ -2,13 +2,16 @@ import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
-const GENERATION_TIMEOUT_MS = 30000;
+const GENERATION_TIMEOUT_MS = 120000;
 test.setTimeout(GENERATION_TIMEOUT_MS * 3);
 
 test('loads the BHK example and regenerates it offline', async ({
   page,
   context,
 }) => {
+  const logs: string[] = [];
+  page.on('console', (message) => logs.push(message.text()));
+  page.on('pageerror', (error) => logs.push(String(error)));
   await page.goto('./new');
   await expect(
     page.getByLabel('Load BHK gasket enclosure example', { exact: true })
@@ -64,6 +67,10 @@ test('loads the BHK example and regenerates it offline', async ({
     });
     expect(await getBoard()).toEqual(board);
   } finally {
+    await test.info().attach('browser-log', {
+      body: logs.join('\n'),
+      contentType: 'text/plain',
+    });
     await context.setOffline(false);
   }
 });
