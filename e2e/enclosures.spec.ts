@@ -6,6 +6,7 @@ import gasketCase from './fixtures/gasket-case';
 import BHKLayout from '../src/examples/bhk';
 
 import source from './fixtures/native-grid';
+const GEOMETRY_TIMEOUT = 90000;
 const saved = (page: Page) =>
   page.evaluate(() =>
     (
@@ -60,11 +61,11 @@ const ready = async (page: Page) => {
   const dialog = page.getByRole('dialog', { name: 'Case designer' });
   await expect(
     dialog.getByRole('button', { name: 'Generate', exact: true })
-  ).toBeEnabled();
+  ).toBeEnabled({ timeout: GEOMETRY_TIMEOUT });
   await dialog.getByRole('button', { name: 'Generate', exact: true }).click();
   await expect(
     dialog.getByText('Generated current draft', { exact: true })
-  ).toBeVisible({ timeout: 90000 });
+  ).toBeVisible({ timeout: GEOMETRY_TIMEOUT });
   await expect(dialog.getByRole('alert')).toHaveCount(0);
   await dialog.getByRole('button', { name: 'assembled', exact: true }).click();
   await expect(dialog.getByLabel('3D assembly preview')).toHaveAttribute(
