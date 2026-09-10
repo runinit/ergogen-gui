@@ -1,3 +1,4 @@
+import { modelPreview } from '../utils/cachedModelPreview';
 import {
   graphicPoints,
   padOutline,
@@ -83,7 +84,7 @@ function ModelMesh({
   onSelect: () => void;
 }) {
   const object = useRef<Group>(null);
-  const source = assets[`__model_${model.asset}.json`];
+  const source = modelPreview(model, assets);
   const geometry = useMemo(() => {
     if (!source) {
       return null;

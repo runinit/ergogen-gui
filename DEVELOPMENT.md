@@ -12,7 +12,69 @@ perimeter arcs. Shallow steps merge into one clearance-preserving diagonal.
 BHK uses 8 mm simplification and 3 mm fillets.
 Both run in the generator before PCB and enclosure exports.
 
-This document serves as a knowledge base and architectural guide for the project, tracking implementation details, design decisions, and future tasks.
+This document serves as a knowledge base and architectural guide for the project, tracking implementation details and design decisions.
+
+## Board Studio and document session
+
+`BoardStudio` is the native workspace: Layout → Components → PCB → Case → Export.
+Its tree and inspector surround a shared physical-layout canvas. Phone panels
+replace the docked columns without removing editing controls. Legacy documents
+retain the existing workspace while native projects use Studio.
+
+`ConfigContext` owns the source, realtime source reference, project assets,
+custom injections and bounded undo/redo history. Code typing coalesces for 750 ms;
+a visual command or completed drag creates one entry. Switching projects resets
+history. IndexedDB stores imported assets per project and retains migration from
+the original asset store. Bundled footprint entries remain immutable; editing a
+library entry creates a custom override.
+
+`studioSource`, `layoutSource` and `designSource` implement document commands.
+They edit YAML ranges and materialize only the selected alias instance. Unrelated
+comments, expressions, object IDs and footprint/net identities stay intact.
+Duplicate keys receive new explicit net names and generated footprint references.
+Resizing an arrangement retains the IDs of existing cells. Deletion refuses
+referenced objects instead of leaving broken attachments.
+
+New projects start from numeric matrix dimensions (5 columns × 4 rows by default).
+Their keys mount on the PCB top surface; new thumb clusters and loose keys reuse
+that layer. Case-height changes therefore move the electronics with the PCB.
+Selection scope—Keys, Columns or Clusters—is separate from Select, Move and Pan.
+`ColumnInspector` edits a whole column's splay, stagger and offsets, and exposes
+its occupied and empty cells. Resizing preserves deleted holes; Add key restores
+a chosen cell. The engine assigns shared column/row nets; individual overrides
+remain available under Wiring. This interaction draws inspiration from the
+[Cosmos editor](https://ryanis.cool/cosmos/beta), using our existing theme,
+native YAML and physical geometry.
+
+`StudioCanvas` renders resolved engine envelopes. A move has an ephemeral source
+candidate, resolved through the layout worker before it is committed to history.
+Cancelled pointers and failed solutions discard that candidate. Dimensions and
+arrangement formulas remain authored expressions; movement changes local overrides.
+Camera state is independent of source history. Fit, wheel zoom, pan and pinch
+operate on the drawing; drag feedback is an absolute overlay that never resizes the canvas.
+
+`StudioInspector` edits parameters, arrangements, placement, solver freedoms,
+constraints, layers, physical envelopes and outline finishing. For a profile that
+references a boundary, it edits that boundary's finishing controls, so chamfer
+replaces fillet at its owner. Automatic outlines author explicit bridges between
+physical groups and retain typed selectors for future keys and PCB components.
+
+Embedded `CaseWizard` edits the same source and assets. It has no separate Apply
+or Cancel transaction. Existing analysis, clearance findings, process adaptation,
+mounting tools and reviewed manufacturing exports remain its responsibility.
+`StudioExport` provides editable project archives and current PCB/outline files;
+case solid exports go through the case review. A successful preview is not a
+physical-fit or fabrication approval.
+
+Worker results are revision checked against source, injection, library and asset
+content. Invalid drafts remain saved while the canvas retains last valid geometry.
+Stale results are labelled and cannot authorize exports. Explicit Generate builds
+solids; ordinary edits run analysis without repeatedly rebuilding solid geometry.
+
+The solver contract and source examples live in the engine's
+[living architecture](../ergogen/docs/architecture.md#layout-constraints).
+The `Constrained layout` gallery example demonstrates named dimensions, fixed
+coordinates, solver-owned movement and an arranged thumb cluster.
 
 ## Ergogen CLI
 
@@ -614,7 +676,8 @@ remain inline during batch updates. Redistribution preserves manual contacts.
 
 Clearance analysis preserves rotated body contours, leaving usable thumb-edge
 spans available for gaskets. The 2D plan owns a separate viewport for wheel/pinch zoom and pointer panning;
-Fit restores the boundary view. Dragging keeps the grab offset and commits the
+The main mounting plan flexes into the remaining preview height; compact profile
+diagrams retain their height cap. Fit restores the boundary view. Dragging keeps the grab offset and commits the
 release position once. The contact editor sits below the canvas. Contextual
 hints dismiss during manipulation and do not appear on touch-down.
 
@@ -636,3 +699,126 @@ Plate pockets are extracted from the completed nominal plate, including holes
 in a supplied plate profile and mounting holes. Overlapping cutouts become one
 void before relief; outer contours bound perimeter checks. Post clearance uses
 both XY geometry and overlapping Z intervals, excluding face-only contact.
+
+### Layout editing during board failures
+
+Board Studio resolves editable objects with the layout-only worker. Outline and
+PCB analysis runs separately: its errors cannot hide newly authored keys or
+prevent moving them. Old outlines are hidden while their analysis is stale;
+PCB exports still require successful current board analysis.
+
+Source editing retains one parsed YAML snapshot, shared by field readers and
+editors. Documents and values are cloned before exposure; aliases, source ranges
+and independent edits remain covered by regression tests. A different source
+replaces the snapshot, bounding retained configuration data.
+
+While Case is active, Board Studio suspends its layout and board workers; the
+case designer owns draft analysis. Returning to Layout resumes analysis. Explicit
+3D builds reuse a successfully completed worker when injections are unchanged,
+retaining the initialized CAD runtime. Busy, failed or changed-injection workers
+are replaced. Source, asset and request revisions still reject stale results;
+each build regenerates solids without reducing mesh precision or validation.
+
+Local source-edit benchmark (2026-09-10, warm median of three runs): creating a
+5×4 matrix fell from 1,631 ms to 955 ms; resizing the supplied Keyboard example's
+first column fell from 138 ms to 63 ms. These measure source transformations,
+not end-to-end browser latency. CAD initialization is now amortized across builds;
+complex Boolean operations and exports still run for every generation.
+
+`ClusterTree` keeps every authored cluster visible, including empty clusters.
+Columns and keys stay nested under their owner, with independent expansion.
+Deleting a cluster removes its members in one history entry; references from
+outside the deleted subtree and locked members still prevent deletion.
+
+`studioPlacement` stages additions beside the last resolved geometry. Additions
+refit the canvas without changing placement. MX presets in `keySizes` use a
+nominal 19.05 mm pitch and an 18 mm 1u envelope; custom millimetre dimensions remain
+editable. Presets change the selected keycap envelope, preserving switch holes,
+footprint bindings and other keys.
+
+`keyResize` stores explicit horizontal/vertical alignment in
+`properties.key_alignment`. Auto keeps the leftmost column's left edge and the
+rightmost column's right edge fixed. Left/centre/right and top/centre/bottom are
+available for manual control. Compensation uses the key's rotated axes and
+preserves manual offsets and expressions. Undo restores size and position together.
+
+`SelectionControls` shares batch sizing and relative adjustments between the
+inspector and `SelectionPopover`. Double-click, context menu, Shift+F10 or Quick
+edit opens the non-modal editor. Outside pointer input dismisses it before a
+canvas drag. `studioSelection` applies a whole selection in one source transaction;
+locked members reject the edit rather than partially updating it.
+
+`keyOptions` expands editor recipes into native object envelopes and footprint
+bindings. Project defaults live in `meta.studio.defaults`, matrix overrides in
+`meta.studio.layouts`, and column size overrides in `meta.studio.columns`.
+They affect newly created keys; Apply defaults updates existing cluster members
+explicitly. No background migration modifies saved layouts.
+
+New keys include an optional diode by default. LED placement is opt-in and uses
+the bundled `ceoloide/led_sk6812mini-e` provider. Both bindings use key-relative
+placement. Diodes split the switch/row connection with a unique per-key net;
+LEDs expose VCC, GND and per-key DIN/DOUT nets for PCB routing. These options add
+PCB footprints, not measured enclosure component bodies. Managed binding
+ownership in `meta.studio.electronics` supports removal and duplication without
+mutating shared parts. Standalone generation needs the LED provider injected.
+
+Rebuild board outline replaces the selected boundary in place, preserving profile
+references and finishing settings. Generated bridges are tracked in
+`meta.studio.bridges`; deleting their endpoints removes those bridges in the same
+edit. Manually authored external references remain protected.
+
+## Native new-design setup workspace
+
+`NewDesignWorkspace` owns an isolated setup draft. Layout, key assembly,
+controller/power, accessories and review are freely accessible sections. Cancel
+leaves the project untouched. Creation embeds resolved native YAML and selected
+model assets. Board Studio can reopen setup or apply an assembly to selected keys.
+
+```text
+Setup controls / assembly placement
+              |
+              v
+ designSetup compiler / applyAssembly / updateSetup
+              |
+              v
+ native parts + clusters + objects + PCB profiles
+              |
+              v
+ existing analysis / PCB / case services
+```
+
+`designSetup` allocates deterministic row/column nets and accessory GPIO in a
+single compilation. `properties.owner` links native diode/LED objects to keys;
+relative placements follow key transforms. Mirrored clusters use native mirror
+links and board-specific overrides. Templates are embedded under
+`meta.studio.templates`; personal-library revisions are snapshots, never implicit
+project updates. `updateSetup` compares the previous compiled setup with the new
+one and preserves manually changed YAML fields. `applyAssembly` scopes changes
+to selected keys and preserves customized placements by default.
+
+Footprint previews use the existing footprint service and a provider/parameter
+cache. Model STEP/STL assets load on demand through `componentModels`; dragging
+changes local placement only and does not invoke PCB or case generation. Pinned
+sources, hashes, licenses and current verification status live in
+`public/components/manifest.json` and `public/components/README.md`.
+
+Readiness is deliberately separate from generation: setup findings enter Board
+Studio's export review. Successful generation does not verify physical envelopes,
+model alignment, reversible jumpers or cable power mappings. The catalogue README
+records the current coverage and unresolved release requirements.
+
+Model preview recovery resolves cached meshes by full portable path when imported
+KiCad bindings lack an asset identifier. The model editor can rebuild a missing
+preview from a local WRL/STEP asset without attempting to download a project path.
+`cachedModelPreview` owns this lookup; `modelPreview` retains case mesh placement.
+
+### Studio release integration
+
+Browser tests enter native projects through Board Studio. Case settings update
+project history directly; Code is an explicit view. Source assertions read the
+active saved project so they also cover edits made with Code closed.
+
+Embedded case initialization renders the new case definition before adopting it
+into the project. Key position controls edit local placement overrides. Editing
+a source invalidates pending generation and releases the busy state; late worker
+responses cannot replace the current project.

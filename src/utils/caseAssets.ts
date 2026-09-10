@@ -2,13 +2,62 @@ import JSZip from 'jszip';
 import { storageKey } from './storageKey';
 export type CaseAssets = Record<string, string>;
 const STORE = 'assets';
+const PROJECTS = 'projects';
 const BINARY = 'base64:';
 function database(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(storageKey('ergogen-case-assets'), 1);
-    request.onupgradeneeded = () => request.result.createObjectStore(STORE);
+    const request = indexedDB.open(storageKey('ergogen-case-assets'), 2);
+    request.onupgradeneeded = () => {
+      for (const name of [STORE, PROJECTS]) {
+        if (!request.result.objectStoreNames.contains(name)) {
+          request.result.createObjectStore(name);
+        }
+      }
+    };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
+  });
+}
+export async function loadProjectAssets(id: string): Promise<CaseAssets> {
+  const db = await database();
+  const assets = await new Promise<CaseAssets | undefined>(
+    (resolve, reject) => {
+      const tx = db.transaction(PROJECTS),
+        request = tx.objectStore(PROJECTS).get(id);
+      tx.oncomplete = () => {
+        db.close();
+        resolve(request.result);
+      };
+      tx.onerror = () => {
+        db.close();
+        reject(tx.error);
+      };
+    }
+  );
+  // Existing projects inherit the old asset store once, then own their snapshot.
+  if (assets !== undefined) {
+    return assets;
+  }
+  const migrated = await loadAssets();
+  await saveProjectAssets(id, migrated);
+  return migrated;
+}
+export async function saveProjectAssets(
+  id: string,
+  assets: CaseAssets
+): Promise<void> {
+  const db = await database();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(PROJECTS, 'readwrite');
+    tx.objectStore(PROJECTS).put(assets, id);
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error);
+    };
   });
 }
 export async function loadAssets(): Promise<CaseAssets> {

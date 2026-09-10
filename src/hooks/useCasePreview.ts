@@ -19,7 +19,8 @@ function useCaseWorker(
   source: string,
   injections: string[][] | undefined,
   assets: Record<string, string>,
-  mode: 'generate' | 'analyze' | 'layout'
+  mode: 'generate' | 'analyze' | 'layout',
+  enabled = true
 ) {
   const { entries } = useFootprintLibrary();
   const mergedAssets = useMemo(
@@ -46,9 +47,9 @@ function useCaseWorker(
   const latest = useRef(revision);
   latest.current = revision;
   const generate = useCallback(() => {
-    // Reuse initialized analysis modules only after completion and with identical injections.
+    // Completed workers retain WASM modules; busy or changed-injection workers are replaced.
     const reusable =
-      mode !== 'generate' &&
+      owned.current &&
       settled.current &&
       workerInjections.current === injectionRevision;
     if (!reusable) {
@@ -90,7 +91,7 @@ function useCaseWorker(
       ) {
         return;
       }
-      settled.current = true;
+      settled.current = data.type === 'success';
       setPending(false);
       if (latest.current !== revision) {
         return;
@@ -131,9 +132,16 @@ function useCaseWorker(
     if (mode === 'generate') {
       return;
     }
+    if (!enabled) {
+      owned.current?.terminate();
+      owned.current = null;
+      settled.current = false;
+      setPending(false);
+      return;
+    }
     const timer = window.setTimeout(generate, ANALYSIS_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [generate, mode]);
+  }, [generate, mode, enabled]);
   return {
     result,
     error,
@@ -159,14 +167,16 @@ export function useCasePreview(
 export function useCaseAnalysis(
   source: string,
   injections: string[][] | undefined,
-  assets = EMPTY_ASSETS
+  assets = EMPTY_ASSETS,
+  enabled = true
 ) {
-  return useCaseWorker(source, injections, assets, 'analyze');
+  return useCaseWorker(source, injections, assets, 'analyze', enabled);
 }
 
 export function useLayoutAnalysis(
   source: string,
-  injections: string[][] | undefined
+  injections: string[][] | undefined,
+  enabled = true
 ) {
-  return useCaseWorker(source, injections, EMPTY_ASSETS, 'layout');
+  return useCaseWorker(source, injections, EMPTY_ASSETS, 'layout', enabled);
 }

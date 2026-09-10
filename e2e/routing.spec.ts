@@ -1,3 +1,4 @@
+import { createDraft, openCode, readSource, studio } from './utils/studio';
 import { test, expect } from '@playwright/test';
 import { makeShooter } from './utils/screenshots';
 import Absolem from '../src/examples/starter';
@@ -44,7 +45,10 @@ test.describe('Routing and Welcome Page', () => {
   test('"Add" (new config) button navigates to /new', async ({ page }) => {
     const shoot = makeShooter(page, test.info());
     // The header button that starts a new config on the home page
-    const newConfigButton = page.getByTestId('new-config-button');
+    const newConfigButton = page.getByRole('button', {
+      name: 'New',
+      exact: true,
+    });
 
     // 1. Set a valid config in local storage
     await page.addInitScript(
@@ -56,6 +60,7 @@ test.describe('Routing and Welcome Page', () => {
     await page.goto('./');
 
     // 2. Now the button should be visible, click it
+    await page.getByRole('button', { name: 'Projects', exact: true }).click();
     await shoot('before-new-config-button-visible');
     await expect(newConfigButton).toBeVisible();
     await shoot('after-new-config-button-visible');
@@ -73,10 +78,13 @@ test.describe('Routing and Welcome Page', () => {
   }) => {
     const shoot = makeShooter(page, test.info());
     await page.goto('./new');
-    await page.getByRole('button', { name: 'New native design' }).click();
+    await createDraft(page);
+    await openCode(page);
     await shoot('before-empty-config-url-and-editor');
     await expect(page).toHaveURL(/.*\/$/);
-    await expect(page.getByTestId('config-editor')).toBeVisible();
+    await expect(
+      page.getByLabel('Project YAML', { exact: true })
+    ).toBeVisible();
     await shoot('after-empty-config-url-and-editor');
 
     await expect(async () => {
@@ -93,13 +101,14 @@ test.describe('Routing and Welcome Page', () => {
     await page.getByText(Absolem.label).click();
     await shoot('before-example-url-and-editor');
     await expect(page).toHaveURL(/.*\/$/);
-    await expect(page.getByTestId('config-editor')).toBeVisible();
+    await openCode(page);
     await shoot('after-example-url-and-editor');
 
     // Verify the config was stored by checking localStorage rather than Monaco's DOM text,
     // which renders whitespace differently and is flaky to assert on.
     await page.reload();
-    await expect(page.getByTestId('config-editor')).toContainText('meta:');
-    await expect(page.getByTestId('config-editor')).toContainText('schema:');
+    await expect(studio(page)).toBeVisible();
+    expect(await readSource(page)).toContain('meta:');
+    expect(await readSource(page)).toContain('schema:');
   });
 });

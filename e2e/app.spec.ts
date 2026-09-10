@@ -1,18 +1,25 @@
 import { test, expect } from '@playwright/test';
-import { makeShooter } from './utils/screenshots';
+import { createDraft, openCode, readSource } from './utils/studio';
 
-test('renders editor and preview', async ({ page }) => {
-  const shoot = makeShooter(page, test.info());
+test('creates a matrix draft and previews its PCB', async ({ page }) => {
   await page.goto('./new');
-  await page.getByRole('button', { name: 'New native design' }).click();
-
-  const editor = page.getByTestId('config-editor');
-  await shoot('before-editor-visible');
-  await expect(editor).toBeVisible();
-  await shoot('after-editor-visible');
-
-  const preview = page.getByTestId('demo.svg-file-preview');
-  await shoot('before-preview-visible');
-  await expect(preview).toBeVisible();
-  await shoot('after-preview-visible');
+  await createDraft(page);
+  await expect(
+    page.getByRole('group', { name: 'Interactive board layout' })
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /^Select fingers_c\d+_r\d+$/ })
+  ).toHaveCount(20);
+  await openCode(page);
+  expect(await readSource(page)).toContain('schema: ergogen/v1');
+  await page
+    .getByRole('navigation', { name: 'Design workflow' })
+    .getByRole('button', { name: 'PCB', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'KiCad PCB', exact: true }).click();
+  await expect(page.locator('kicanvas-embed canvas').first()).toBeVisible({
+    timeout: 30000,
+  });
+  await expect(page.getByText(/PCB preview unavailable/)).toHaveCount(0);
+  await expect(page.locator('kicanvas-source')).toBeHidden();
 });

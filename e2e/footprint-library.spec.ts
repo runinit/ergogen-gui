@@ -1,3 +1,4 @@
+import { studio, openCase, openLibrary } from './utils/studio';
 import { CONFIG_LOCAL_STORAGE_KEY } from '../src/context/constants';
 import { test, expect, Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
@@ -55,11 +56,9 @@ const open = async (page: Page) => {
     { source, key: CONFIG_LOCAL_STORAGE_KEY }
   );
   await page.goto('./');
-  await expect(page.getByTestId('config-editor')).toBeVisible();
-  await page
-    .getByRole('button', { name: 'Footprint library', exact: true })
-    .click();
-  return page.getByRole('dialog', { name: 'Case designer' });
+  await expect(studio(page)).toBeVisible();
+  await openLibrary(page);
+  return studio(page);
 };
 test.setTimeout(240000);
 test.use({ actionTimeout: 15000 });
@@ -69,7 +68,7 @@ test('imports a KiCad bundle, aligns models, links placements, and exports a por
 }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  const dialog = await open(page);
+  let dialog = await open(page);
   const zip = new JSZip();
   zip.file(
     `capacitors.pretty/${footprintName}.kicad_mod`,
@@ -125,6 +124,7 @@ test('imports a KiCad bundle, aligns models, links placements, and exports a por
   await dialog
     .getByRole('button', { name: 'Preview in case', exact: true })
     .click();
+  dialog = page.getByRole('region', { name: 'Case designer' });
   await expect(
     dialog.getByRole('treeitem', { name: 'capacitor (4)', exact: true })
   ).toBeVisible({ timeout: 30000 });
@@ -202,28 +202,27 @@ test('imports a KiCad bundle, aligns models, links placements, and exports a por
     await offlinePage
       .getByTestId('local-file-input')
       .setInputFiles('test-results/cad-portable-project.zip');
-    await expect(offlinePage.getByTestId('config-editor')).toBeVisible();
-    await offlinePage
-      .getByRole('button', { name: 'Create / edit case', exact: true })
-      .click();
-    const reopened = offlinePage.getByRole('dialog', { name: 'Case designer' });
+    await expect(studio(offlinePage)).toBeVisible();
+    await openCase(offlinePage);
+    const reopened = offlinePage.getByRole('region', { name: 'Case designer' });
     await reopened
       .getByRole('button', { name: 'Generate', exact: true })
       .click();
     await expect(
       reopened.getByText('Generated current draft', { exact: true })
     ).toBeVisible({ timeout: 90000 });
-    await reopened
-      .getByRole('tab', { name: 'Footprint library', exact: true })
-      .click();
-    await reopened
+    await openLibrary(offlinePage);
+    await studio(offlinePage)
       .getByRole('button', {
         name: `${manifest.entries[0].name} · r1`,
         exact: true,
       })
       .click();
     await expect(
-      reopened.getByRole('spinbutton', { name: 'Model offset Z', exact: true })
+      studio(offlinePage).getByRole('spinbutton', {
+        name: 'Model offset Z',
+        exact: true,
+      })
     ).toHaveValue('1');
   } finally {
     await offlineContext.close();
@@ -242,11 +241,9 @@ test('assigns a model to a native BHK controller and exports the object binding'
     { source: config.toString(), key: CONFIG_LOCAL_STORAGE_KEY }
   );
   await page.goto('./');
-  await expect(page.getByTestId('config-editor')).toBeVisible();
-  await page
-    .getByRole('button', { name: 'Create / edit case', exact: true })
-    .click();
-  const dialog = page.getByRole('dialog', { name: 'Case designer' });
+  await expect(studio(page)).toBeVisible();
+  await openCase(page);
+  const dialog = page.getByRole('region', { name: 'Case designer' });
   await dialog
     .getByRole('treeitem', { name: 'controller (1)', exact: true })
     .click();

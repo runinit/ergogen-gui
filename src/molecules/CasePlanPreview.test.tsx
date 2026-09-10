@@ -123,3 +123,29 @@ it('drags from the grabbed position and commits the final pointer location', () 
   expect(onEdit.mock.lastCall?.[1].anchor.shift).toEqual([16, -2.5]);
   vi.unstubAllGlobals();
 });
+
+it('lets the mounting plan grow into the remaining preview height', () => {
+  render(
+    <CasePlanPreview
+      analysis={{
+        model: new makerjs.models.Rectangle(40, 30),
+        bounds: { low: [0, 0], high: [40, 30], width: 40, height: 30 },
+        edges: [],
+        placements: [],
+        suggestions: [],
+        findings: [],
+        parameters: {},
+        parts: {},
+      }}
+      selected=""
+      onSelect={vi.fn()}
+      onEdit={vi.fn()}
+      onAdd={vi.fn()}
+      onRemove={vi.fn()}
+      onDuplicate={vi.fn()}
+    />
+  );
+  const plan = screen.getByLabelText('Interactive mounting plan');
+  expect(getComputedStyle(plan).maxHeight).toBe('none');
+  expect(getComputedStyle(plan.parentElement!).flexGrow).toBe('1');
+});

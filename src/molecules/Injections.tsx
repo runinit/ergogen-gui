@@ -1,5 +1,6 @@
 import Icon from '../atoms/Icon';
-import bundledFootprints from '../../.generated/footprints.json';
+import coreFootprints from '../../.generated/footprints.json';
+import componentFootprints from '../catalogue/footprints.json';
 import InjectionRow from '../atoms/InjectionRow';
 import { Injection } from '../atoms/InjectionRow';
 import styled from 'styled-components';
@@ -12,6 +13,8 @@ import ConflictResolutionDialog from './ConflictResolutionDialog';
 import Title from '../atoms/Title';
 import { trackEvent } from '../utils/analytics';
 import { isFeatureEnabled } from '../utils/featureFlags';
+
+const bundledFootprints = { ...coreFootprints, ...componentFootprints };
 
 const ActionsContainer = styled.div`
   display: flex;

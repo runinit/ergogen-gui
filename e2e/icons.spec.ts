@@ -1,3 +1,4 @@
+import { createDraft, studio } from './utils/studio';
 import { expect, test } from '@playwright/test';
 
 test('hosts fonts locally, including the PCB viewer', async ({ page }) => {
@@ -9,6 +10,9 @@ test('hosts fonts locally, including the PCB viewer', async ({ page }) => {
   });
 
   await page.goto('./new');
+  await page.addScriptTag({
+    url: new URL('dependencies/kicanvas.js', page.url()).href,
+  });
   await page.evaluate(() => customElements.whenDefined('kicanvas-embed'));
   await page.evaluate(() => document.fonts.ready);
   expect(externalFonts).toEqual([]);
@@ -61,9 +65,9 @@ test('renders menu icons with external fonts blocked', async ({ page }) => {
     path: test.info().outputPath('welcome.png'),
     animations: 'disabled',
   });
-  await page.getByText('New native design', { exact: true }).click();
-  await expect(page.getByTestId('config-editor')).toBeVisible();
-  await navigation.click();
+  await createDraft(page);
+  await expect(studio(page)).toBeVisible();
+  await page.getByRole('button', { name: 'Projects', exact: true }).click();
   const icons = page.locator('.material-symbols-outlined:visible');
   for (const item of await icons.all()) {
     const bounds = await item.boundingBox();

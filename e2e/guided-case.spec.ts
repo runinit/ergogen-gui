@@ -1,3 +1,4 @@
+import { studio, openCase } from './utils/studio';
 import { test, expect, Page } from '@playwright/test';
 import source from './fixtures/native-grid';
 const open = async (page: Page) => {
@@ -12,12 +13,9 @@ const open = async (page: Page) => {
     source
   );
   await page.goto('./');
-  await expect(page.getByTestId('config-editor')).toBeVisible();
-  await page
-    .getByRole('button', { name: 'Create / edit case', exact: true })
-    .first()
-    .click();
-  return page.getByRole('dialog', { name: 'Case designer' });
+  await expect(studio(page)).toBeVisible();
+  await openCase(page);
+  return page.getByRole('region', { name: 'Case designer' });
 };
 test.setTimeout(120000);
 test('plans gasket mounting before solids and only generates explicitly', async ({
@@ -91,7 +89,7 @@ test('plans gasket mounting before solids and only generates explicitly', async 
   await dialog.getByRole('button', { name: 'Review', exact: true }).click();
   await dialog.getByRole('checkbox').check();
   await expect(
-    dialog.getByRole('button', { name: 'Apply design', exact: true })
+    dialog.getByRole('button', { name: 'Download ZIP', exact: true })
   ).toBeEnabled();
   expect(errors).toEqual([]);
 });
@@ -140,7 +138,9 @@ test('edits contacts with the keyboard and preserves manual ownership during red
   await expect(
     dialog.getByRole('button', { name: name!, exact: true })
   ).toHaveCount(0);
-  await dialog.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Undo project edit', exact: true })
+    .click();
   await expect(
     dialog.getByRole('button', { name: name!, exact: true })
   ).toBeVisible();
@@ -187,7 +187,7 @@ test('exports a middle frame and rejects an outdated result', async ({
   await dialog.getByRole('button', { name: 'Review', exact: true }).click();
   await dialog.getByRole('checkbox').check();
   await expect(
-    dialog.getByRole('button', { name: 'Apply design', exact: true })
+    dialog.getByRole('button', { name: 'Download ZIP', exact: true })
   ).toBeDisabled();
 });
 
@@ -257,16 +257,17 @@ test('imports an STL for a PCB component and packages its KiCad model associatio
     .async('string');
   expect(pcb).toContain('${KIPRJMOD}/models/controller.wrl');
   expect(zip.file('outputs/pcbs/models/controller.wrl')).not.toBeNull();
-  await dialog
-    .getByRole('button', { name: 'Apply design', exact: true })
+  await page
+    .getByRole('navigation', { name: 'Design workflow' })
+    .getByRole('button', { name: 'Layout', exact: true })
     .click();
   await expect(dialog).not.toBeVisible();
   await page.reload();
+  await openCase(page);
   await page
-    .getByRole('button', { name: 'Create / edit case', exact: true })
-    .first()
+    .getByRole('region', { name: 'Case designer' })
+    .getByRole('button', { name: 'Components', exact: true })
     .click();
-  await page.getByRole('button', { name: 'Components', exact: true }).click();
   await page
     .getByText('Custom:Controller · 1 placements', { exact: true })
     .click();
@@ -284,6 +285,10 @@ test('drags a gasket without generating and can undo the move', async ({
     .getByRole('button', { name: /^gasket gasket_/ })
     .first();
   await expect(contact).toBeVisible({ timeout: 30000 });
+  await expect(
+    dialog.getByText('Calculating mounting plan…', { exact: true })
+  ).toHaveCount(0, { timeout: 30000 });
+  await contact.scrollIntoViewIfNeeded();
   const id = await contact.getAttribute('aria-label');
   const before = await contact.getAttribute('transform');
   const box = (await contact.boundingBox())!;
@@ -298,7 +303,9 @@ test('drags a gasket without generating and can undo the move', async ({
   const moved = dialog.getByRole('button', { name: id!, exact: true });
   await expect(moved).toHaveAttribute('data-owner', 'manual');
   await expect(moved).not.toHaveAttribute('transform', before!);
-  await dialog.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Undo project edit', exact: true })
+    .click();
   await expect(moved).toHaveAttribute('transform', before!);
   await expect(dialog.getByLabel('3D assembly preview')).toHaveCount(0);
 });

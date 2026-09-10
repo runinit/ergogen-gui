@@ -5,6 +5,7 @@ import Example3 from './split';
 import Example4 from './physical-stack';
 import Example5 from './imported-pcb';
 import Example6 from './bhk';
+import Constrained from './constrained';
 
 export interface ConfigOption {
   readonly value: string;
@@ -25,6 +26,7 @@ export const exampleOptions: readonly GroupedOption[] = [
       Example4,
       Example5,
       Example6,
+      Constrained,
     ],
   },
 ];

@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
 
-const cacheForRelease = (version) => {
+const routesForRelease = (version) => {
   const routes = [];
   const source = fs.readFileSync(path.join(__dirname, '../../src/service-worker.ts'), 'utf8');
   const code = ts.transpileModule(source, {
@@ -17,7 +17,7 @@ const cacheForRelease = (version) => {
   const noop = () => {};
   const workbox = {
     clientsClaim: noop, ExpirationPlugin: Strategy, precacheAndRoute: noop,
-    createHandlerBoundToURL: noop, registerRoute: (match, strategy) => routes.push([match, strategy]),
+    createHandlerBoundToURL: (url) => ({ precacheUrl: url }), registerRoute: (match, strategy) => routes.push([match, strategy]),
     CacheFirst: Strategy, StaleWhileRevalidate: Strategy, NetworkFirst: Strategy,
     CacheableResponsePlugin: Strategy, initialize: noop,
   };
@@ -26,9 +26,23 @@ const cacheForRelease = (version) => {
     self: { addEventListener: noop, __WB_MANIFEST: [], location: { origin: 'https://example.com' } },
     require: (name) => name.endsWith('package.json') ? { version } : workbox,
   });
-  return routes.find(([match]) => match({url: new URL('https://example.com/dependencies/kicanvas.js'), request: {mode: 'cors'}}))[1].cacheName;
+  return routes;
 };
 
-test('new releases cannot reuse the old viewer cache', () => {
+const cacheForRelease = (version) => routesForRelease(version).find(([match]) =>
+  match({url: new URL('https://example.com/dependencies/extra.js'), request: {mode: 'cors'}})
+)[1].cacheName;
+
+test('new releases cannot reuse the old dependency cache', () => {
   assert.notEqual(cacheForRelease('0.18.0'), cacheForRelease('0.19.0'));
+});
+
+test('revisioned viewer requests use the current precache', () => {
+  const routes = routesForRelease('0.19.0');
+  const request = { mode: 'cors' };
+  const route = routes.find(([match]) => match({
+    url: new URL('https://example.com/dependencies/kicanvas.js?v=new-release'), request,
+  }));
+  assert.equal(route[1].precacheUrl, '/dependencies/kicanvas.js');
+  assert.equal(route[0]({ url: new URL('https://other.example/dependencies/kicanvas.js?v=new-release'), request }), false);
 });

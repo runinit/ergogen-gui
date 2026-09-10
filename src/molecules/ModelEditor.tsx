@@ -1,7 +1,10 @@
+import manifest from '../../public/components/manifest.json';
+import { loadComponentModel } from '../utils/componentModels';
+import { modelPreview } from '../utils/cachedModelPreview';
 import { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import type { ModelBinding, Vec3 } from '../types/footprint';
-import type { CaseAssets } from '../utils/caseAssets';
+import { findAsset, type CaseAssets } from '../utils/caseAssets';
 import { readFootprintFiles, prepareModel } from '../utils/footprintService';
 import { fetchModel, modelUrl } from '../utils/modelSources';
 import { librarySnapshot } from '../utils/footprintLibrary';
@@ -32,6 +35,7 @@ export default function ModelEditor({
   onBusy,
 }: Props) {
   const [url, setUrl] = useState('');
+  const [bundled, setBundled] = useState('');
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   useEffect(() => {
@@ -99,6 +103,11 @@ export default function ModelEditor({
     setBusy('Downloading model…');
     setError('');
     try {
+      const local = findAsset(source, assets);
+      if (local) {
+        await importSources([{ name: local, source: assets[local] }], slot);
+        return;
+      }
       const normalized = modelUrl(source);
       const cached = librarySnapshot()
         .flatMap((entry) =>
@@ -264,7 +273,7 @@ export default function ModelEditor({
             Origin (0, 0, 0) is marked by the axes. Drag the matching canvas
             controls to align the model.
           </p>
-          {!assets[`__model_${model.asset}.json`] && (
+          {!modelPreview(model, assets) && (
             <p role="status">
               Model unavailable locally. Dimensions and clearance remain
               unchecked.{' '}
@@ -291,6 +300,62 @@ export default function ModelEditor({
           )}
         </>
       )}
+      <details>
+        <summary>Bundled models</summary>
+        <label>
+          Bundled model
+          <select
+            value={bundled}
+            onChange={(event) => setBundled(event.target.value)}
+          >
+            <option value="">Choose model</option>
+            {manifest.models.map((model) => (
+              <option key={model.file} value={model.file}>
+                {model.file}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          disabled={!bundled || !!busy}
+          onClick={async () => {
+            operation.current?.abort();
+            const controller = new AbortController();
+            operation.current = controller;
+            setBusy('Loading bundled model…');
+            setError('');
+            try {
+              const imported = await loadComponentModel(bundled);
+              controller.signal.throwIfAborted();
+              onChange([...models, imported.model], {
+                ...assets,
+                ...imported.assets,
+              });
+              onSelect(models.length);
+            } catch (reason) {
+              if (!controller.signal.aborted) {
+                setError(String(reason));
+              }
+            } finally {
+              if (operation.current === controller) {
+                setBusy('');
+              }
+            }
+          }}
+        >
+          Add bundled model
+        </button>
+        <p>
+          Source models retain their original origin. Confirm alignment and
+          mounting height.
+        </p>
+        {bundled.startsWith('Nice_') && (
+          <p>
+            CC BY-NC-SA 4.0 · noncommercial use. nice!nano: Joe Scotto /
+            infused-kim. nice!view: TweetyDaBird / infused-kim.
+          </p>
+        )}
+      </details>
       <details>
         <summary>KiCad reference or public URL</summary>
         <label>

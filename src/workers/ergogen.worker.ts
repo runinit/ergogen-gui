@@ -6,9 +6,13 @@ import { createInjectionModule } from '../utils/injectionEvaluator';
 import { attachModelMeshes } from '../utils/modelPreview';
 import { loadAssets } from '../utils/caseAssets';
 import footprints from '../../.generated/footprints.json';
+import componentFootprints from '../catalogue/footprints.json';
 
 // Register the pinned libraries before processing user configurations.
-for (const [name, source] of Object.entries(footprints)) {
+for (const [name, source] of Object.entries({
+  ...footprints,
+  ...componentFootprints,
+})) {
   ergogen.inject('footprint', name, createInjectionModule(source));
 }
 

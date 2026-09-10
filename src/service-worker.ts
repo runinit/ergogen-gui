@@ -1,18 +1,12 @@
 /**
  * Ergogen GUI Service Worker
  *
- * This file is compiled by CRA's Workbox InjectManifest plugin (because it
- * exists at `src/service-worker.ts`). The plugin injects the precache manifest
- * into `self.__WB_MANIFEST` at build time.
+ * Vite's InjectManifest plugin injects the precache manifest at build time.
  *
  * Caching strategy overview:
- * - **Precache** (install-time): All webpack-bundled JS/CSS/HTML assets are
- *   precached automatically via `self.__WB_MANIFEST`. These include the app
- *   shell, chunks, and the entry HTML.
- * - **Runtime – public dependencies**: Large third-party JS bundles loaded via
- *   `<script>` tags in index.html (`dependencies/*.js`, `kicanvas.js`, etc.)
- *   are cached on first use with a CacheFirst strategy so they load instantly
- *   on subsequent visits, even offline.
+ * - **Precache**: App JS/CSS/HTML, public dependency bundles, fonts and bundled
+ *   component footprints/models are installed together for offline design setup.
+ * - **Runtime dependencies**: Requests absent from the manifest use CacheFirst.
  * - **Fonts**: Locally bundled Fontsource assets are precached with the app.
  * - **Runtime – Google Analytics**: Uses workbox-google-analytics to queue
  *   analytics events in IndexedDB when offline and replay them when
@@ -57,10 +51,18 @@ self.addEventListener('message', (event) => {
 });
 
 // --------------------------------------------------------------------------
-// Precache: all webpack-bundled assets (injected at build time by CRA)
+// Precache: app and bundled assets (injected at build time by Vite)
 // --------------------------------------------------------------------------
 
 precacheAndRoute(self.__WB_MANIFEST);
+
+// Resolve the viewer's version query to this build's precached bundle offline.
+const pcbViewerPath = `${publicUrl}/dependencies/kicanvas.js`;
+registerRoute(
+  ({ url }: { url: URL }) =>
+    url.origin === self.location.origin && url.pathname === pcbViewerPath,
+  createHandlerBoundToURL(pcbViewerPath)
+);
 
 // --------------------------------------------------------------------------
 // SPA Navigation: route all navigation requests to index.html so that React
@@ -84,10 +86,8 @@ registerRoute(
 // --------------------------------------------------------------------------
 // Runtime – Public dependencies
 //
-// The large third-party bundles loaded via <script> tags (maker.js, bezier.js,
-// hull.js, kle.js, kicanvas.js) live under /dependencies/. They are NOT part
-// of the webpack bundle so they are not precached. We cache them on first
-// access so subsequent loads (including offline) are instant.
+// Bundled scripts use precache above. Cache additional dependency requests on
+// first access so subsequent loads remain available offline.
 // --------------------------------------------------------------------------
 
 registerRoute(

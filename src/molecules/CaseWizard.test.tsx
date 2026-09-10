@@ -5,6 +5,7 @@ import CaseWizard from './CaseWizard';
 
 const mocks = vi.hoisted(() => ({
   generate: vi.fn(),
+  edit: vi.fn(),
   preview: vi.fn(),
   draft: vi.fn(),
   error: '',
@@ -16,6 +17,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../context/ConfigContext', () => ({
   useConfigContext: () => ({
     getRealtimeConfigInput: () => mocks.source,
+    configInput: mocks.source,
+    editSource: (source: string) => {
+      mocks.edit(source);
+      mocks.source = source;
+    },
     injectionInput: [],
     results: null,
     generateNow: mocks.generate,
@@ -304,4 +310,14 @@ it('explains automatic CNC relief and chooses a smaller default plate cutter', (
   });
   expect(screen.getByLabelText('plate cutter diameter (mm)')).toHaveValue('1');
   expect(screen.getByText(/CNC adds corner relief/i)).toBeVisible();
+});
+
+it('initializes an embedded case before reading its regions', () => {
+  render(<CaseWizard presentation="embedded" onClose={mocks.close} />);
+  expect(
+    screen.getByRole('region', { name: 'Case designer' })
+  ).toBeInTheDocument();
+  expect(
+    parse(mocks.edit.mock.calls[0][0]).designs.assemblies.case
+  ).toBeDefined();
 });

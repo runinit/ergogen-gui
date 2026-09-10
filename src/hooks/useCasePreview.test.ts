@@ -144,3 +144,51 @@ it('reuses a settled analysis worker when only draft geometry changes', () => {
   expect(mocks.workers[0].postMessage).toHaveBeenCalledTimes(2);
   hook.unmount();
 });
+
+it('reuses a successful CAD worker for the next explicit build', () => {
+  const hook = renderHook(({ source }) => useCasePreview(source, injections), {
+    initialProps: { source: 'one' },
+  });
+  act(() => hook.result.current.generate());
+  const worker = mocks.workers[0];
+  respond(worker);
+  hook.rerender({ source: 'two' });
+  act(() => hook.result.current.generate());
+  expect(mocks.workers).toHaveLength(1);
+  expect(worker.terminate).not.toHaveBeenCalled();
+  expect(worker.postMessage.mock.calls.at(-1)[0].inputConfig).toBe('two');
+  respond(worker);
+  expect(hook.result.current.stale).toBe(false);
+  hook.unmount();
+});
+it('restarts a busy CAD worker and replaces it when injections change', () => {
+  const hook = renderHook(
+    ({ injections }) => useCasePreview('draft', injections),
+    { initialProps: { injections: [] as string[][] } }
+  );
+  act(() => hook.result.current.generate());
+  act(() => hook.result.current.generate());
+  expect(mocks.workers).toHaveLength(2);
+  expect(mocks.workers[0].terminate).toHaveBeenCalled();
+  respond(mocks.workers[1]);
+  hook.rerender({ injections: [['footprint', 'custom', 'changed']] });
+  act(() => hook.result.current.generate());
+  expect(mocks.workers).toHaveLength(3);
+  hook.unmount();
+});
+it('stops unused analysis and resumes it when enabled again', () => {
+  const hook = renderHook(
+    ({ enabled }) => useCaseAnalysis('draft', injections, {}, enabled),
+    { initialProps: { enabled: true } }
+  );
+  act(() => vi.advanceTimersByTime(200));
+  hook.rerender({ enabled: false });
+  expect(mocks.workers[0].terminate).toHaveBeenCalled();
+  expect(hook.result.current.pending).toBe(false);
+  act(() => vi.advanceTimersByTime(500));
+  expect(mocks.workers).toHaveLength(1);
+  hook.rerender({ enabled: true });
+  act(() => vi.advanceTimersByTime(200));
+  expect(mocks.workers).toHaveLength(2);
+  hook.unmount();
+});

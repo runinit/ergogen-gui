@@ -43,6 +43,37 @@ global.window.ergogen = {
 };
 
 import { ConfigContextProvider } from './ConfigContext';
+import { applyDesignEdit } from '../utils/designSource';
+
+it('edits and undoes a design without a mounted code editor', async () => {
+  let session: ReturnType<typeof useConfigContext>;
+  const Capture = () => {
+    session = useConfigContext();
+    return null;
+  };
+  render(
+    <ConfigContextProvider>
+      <Capture />
+    </ConfigContextProvider>
+  );
+  act(() => {
+    session!.createNewConfig('schema: ergogen/v1\nlayout: {}\n', 'History');
+  });
+  const before = session!.configInput!;
+  const after = before + 'units: {pitch: 19}\n';
+  act(() => {
+    applyDesignEdit(before, after);
+  });
+  expect(session!.configInput).toBe(after);
+  act(() => {
+    session!.undo();
+  });
+  expect(session!.configInput).toBe(before);
+  act(() => {
+    session!.redo();
+  });
+  expect(session!.configInput).toBe(after);
+});
 
 const mockConfig = 'points: {}';
 
@@ -96,6 +127,25 @@ const mockInitialConfig = (config: string) => {
     })
   );
 };
+
+it('uses the native project title when creating an unnamed project', () => {
+  let session: ReturnType<typeof useConfigContext>;
+  const Read = () => {
+    session = useConfigContext();
+    return null;
+  };
+  render(
+    <ConfigContextProvider>
+      <Read />
+    </ConfigContextProvider>
+  );
+  act(() => {
+    session!.createNewConfig(
+      'schema: ergogen/v1\nmeta: {name: Studio board}\nlayout: {}\n'
+    );
+  });
+  expect(session!.activeConfigName).toBe('Studio board');
+});
 
 describe('ConfigContextProvider', () => {
   beforeEach(() => {
@@ -1688,4 +1738,23 @@ it('adopts the case result without rebuilding the same captured draft', async ()
     });
   });
   expect(mockErgogenWorker.postMessage.mock.calls.length).toBe(count + 1);
+});
+it('clears a previous generation error when creating another project', () => {
+  let session: ReturnType<typeof useConfigContext>;
+  const Read = () => {
+    session = useConfigContext();
+    return null;
+  };
+  render(
+    <ConfigContextProvider>
+      <Read />
+    </ConfigContextProvider>
+  );
+  act(() => {
+    session!.setError('Previous project failed');
+  });
+  act(() => {
+    session!.createNewConfig('schema: ergogen/v1\nlayout: {}\n', 'Next');
+  });
+  expect(session!.error).toBeNull();
 });

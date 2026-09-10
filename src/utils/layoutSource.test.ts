@@ -99,3 +99,17 @@ layout:
     )
   ).toThrow(/locked/);
 });
+
+it('resizes solver freedoms on an alias without changing its source', () => {
+  const before =
+    'schema: ergogen/v1\nlayout:\n  objects:\n    base: &key {kind: key, placement: {solve: [x]}}\n    copy: *key\n';
+  const after = setLayout(
+    before,
+    'objects',
+    'copy',
+    ['placement', 'solve'],
+    ['x', 'y']
+  );
+  expect(after).toContain('base: &key {kind: key, placement: {solve: [x]}}');
+  expect(parse(after).layout.objects.copy.placement.solve).toEqual(['x', 'y']);
+});

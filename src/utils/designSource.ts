@@ -1,4 +1,5 @@
-import { isMap, isScalar, parseDocument, stringify } from 'yaml';
+import { isMap, isScalar, isNode, stringify } from 'yaml';
+import { sourceDocument } from './sourceSnapshot';
 
 export type SourcePath = (string | number)[];
 export const DESIGN_EDIT_EVENT = 'ergogen-design-edit';
@@ -9,7 +10,7 @@ export interface DesignEditEvent {
 }
 
 const document = (source: string) => {
-  const doc = parseDocument(source, { keepSourceTokens: true });
+  const doc = sourceDocument(source);
   if (doc.errors.length) {
     throw new Error(doc.errors[0].message);
   }
@@ -61,7 +62,7 @@ export function editDesign(
       aliasDuplicateObjects: false,
       lineWidth: 0,
     }).trim();
-    const end = source.lastIndexOf('}', parent.range[1]);
+    const end = source.lastIndexOf('}', parent.range[1] - 1);
     return (
       source.slice(0, end) +
       (parent.items.length ? ', ' : '') +
@@ -153,6 +154,44 @@ export function applyDesignEdit(before: string, after: string): void {
   const detail: DesignEditEvent = { before, after, applied: false };
   window.dispatchEvent(new CustomEvent(DESIGN_EDIT_EVENT, { detail }));
   if (!detail.applied) {
-    throw new Error('Open the configuration editor before editing the design.');
+    throw new Error(
+      'The source changed before this edit. Retry using the current project.'
+    );
   }
+}
+
+export function editField(
+  source: string,
+  path: SourcePath,
+  value: unknown
+): string {
+  const doc = sourceDocument(source);
+  if (doc.errors.length) {
+    throw new Error(doc.errors[0].message);
+  }
+  const node = doc.getIn(path, true);
+  if (!node || isScalar(node)) {
+    return editDesign(source, path, value);
+  }
+  if (!isNode(node) || !node.range) {
+    throw new Error('This field has no editable source range.');
+  }
+  // Replace this field only, including when a list gains or loses a member.
+  const next = stringify(value, {
+    collectionStyle: 'flow',
+    lineWidth: 0,
+    aliasDuplicateObjects: false,
+  }).trimEnd();
+  const newline =
+    source[node.range[1] - 1] === '\n'
+      ? source.includes('\r\n')
+        ? '\r\n'
+        : '\n'
+      : '';
+  return (
+    source.slice(0, node.range[0]) +
+    next +
+    newline +
+    source.slice(node.range[1])
+  );
 }

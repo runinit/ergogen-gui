@@ -40,3 +40,10 @@ const layers = new LayerSet(highlighted, theme.board);
 const painter = new BoardPainter(new NullRenderer(), layers, theme.board);
 painter.paint_net(highlighted, 0);
 assert.equal((layers.overlay.graphics as NullRenderLayer).shapes.length, 1, 'empty net must not highlight all nets');
+
+// Unconnected copper pads have no net label; painting must still finish.
+const unconnected = new KicadPCB('unconnected', wrap(`
+ (layers (0 "F.Cu" signal) (2 "B.Cu" signal))
+ (footprint "switch" (layer "F.Cu") (at 0 0)
+  (pad "1" thru_hole circle (at 0 0) (size 2 2) (drill 1) (layers "*.Cu" "*.Mask")))`));
+new BoardPainter(new NullRenderer(), new LayerSet(unconnected, theme.board), theme.board).paint(unconnected);

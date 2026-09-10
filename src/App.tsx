@@ -590,7 +590,10 @@ const AppContent = ({
           data-testid="bulk-download-dialog"
         />
       )}
-      <Header onUpdate={onUpdate} onInstall={onInstall} />
+      {(!configInput?.includes('ergogen/v1') ||
+        configContext?.showSettings) && (
+        <Header onUpdate={onUpdate} onInstall={onInstall} />
+      )}
       <LoadingBar
         visible={configContext?.isGenerating ?? false}
         data-testid="loading-bar"
@@ -606,7 +609,13 @@ const AppContent = ({
           <Route
             path="/"
             // The routing decision is now based on the reactive `configInput` state.
-            element={configInput ? <Ergogen /> : <Navigate to="/new" replace />}
+            element={
+              configInput ? (
+                <Ergogen onUpdate={onUpdate} onInstall={onInstall} />
+              ) : (
+                <Navigate to="/new" replace />
+              )
+            }
           />
           <Route path="/new" element={<Welcome />} />
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,3 +1,4 @@
+import { studio, openCase, readSource } from './utils/studio';
 import { parse } from 'yaml';
 import { test, expect, Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
@@ -7,16 +8,7 @@ import BHKLayout from '../src/examples/bhk';
 
 import source from './fixtures/native-grid';
 const GEOMETRY_TIMEOUT = 90000;
-const saved = (page: Page) =>
-  page.evaluate(() =>
-    (
-      window as unknown as {
-        monaco: { editor: { getModels(): { getValue(): string }[] } };
-      }
-    ).monaco.editor
-      .getModels()[0]
-      .getValue()
-  );
+const saved = readSource;
 const load = async (page: Page, config: string) => {
   await page.addInitScript((config) => {
     const preview = location.pathname.startsWith('/ergogen-gui-preview/');
@@ -29,21 +21,15 @@ const load = async (page: Page, config: string) => {
     }
   }, config);
   await page.goto('./');
-  await expect(page.getByTestId('config-editor')).toBeVisible();
-  await page.waitForFunction(
-    () => !!(window as unknown as { monaco?: unknown }).monaco
-  );
+  await expect(studio(page)).toBeVisible();
   await page.evaluate(() => navigator.serviceWorker.ready);
 };
 const open = async (page: Page) => {
-  await page
-    .getByRole('button', { name: 'Create / edit case', exact: true })
-    .first()
-    .click();
-  return page.getByRole('dialog', { name: 'Case designer' });
+  await openCase(page);
+  return page.getByRole('region', { name: 'Case designer' });
 };
 const choose = async (page: Page) => {
-  const dialog = page.getByRole('dialog', { name: 'Case designer' });
+  const dialog = page.getByRole('region', { name: 'Case designer' });
   await dialog.getByRole('button', { name: 'Layout', exact: true }).click();
   if (await dialog.getByLabel('Switch family', { exact: true }).count()) {
     await dialog
@@ -58,7 +44,7 @@ const choose = async (page: Page) => {
   ).toBeVisible({ timeout: 30000 });
 };
 const ready = async (page: Page) => {
-  const dialog = page.getByRole('dialog', { name: 'Case designer' });
+  const dialog = page.getByRole('region', { name: 'Case designer' });
   await expect(
     dialog.getByRole('button', { name: 'Generate', exact: true })
   ).toBeEnabled({ timeout: GEOMETRY_TIMEOUT });
@@ -76,18 +62,23 @@ const ready = async (page: Page) => {
 
 test.setTimeout(180000);
 
-test('creates a full gasket case through forms, exports and applies one undo step', async ({
+test('autosaves gasket case edits, restores them with undo and exports solids', async ({
   page,
 }) => {
   await load(page, source);
-  const original = await saved(page);
   let dialog = await open(page);
   await choose(page);
+  const original = await saved(page);
   await dialog.getByRole('button', { name: 'Enclosure', exact: true }).click();
   await dialog.getByLabel('Wall thickness (mm)', { exact: true }).fill('4');
   await dialog.getByLabel('Wall thickness (mm)', { exact: true }).press('Tab');
-  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-  expect(await saved(page)).toBe(original);
+  await page
+    .getByRole('navigation', { name: 'Design workflow' })
+    .getByRole('button', { name: 'Layout', exact: true })
+    .click();
+  expect(parse(await saved(page)).designs.assemblies.case.wall).toBe(4);
+  await page.getByRole('button', { name: 'Undo project edit' }).click();
+  await expect.poll(() => saved(page)).toBe(original);
 
   dialog = await open(page);
   await choose(page);
@@ -110,7 +101,7 @@ test('creates a full gasket case through forms, exports and applies one undo ste
   await dialog.getByRole('button', { name: 'Review', exact: true }).click();
   await dialog.getByRole('checkbox').check();
   await expect(
-    dialog.getByRole('button', { name: 'Apply design' })
+    dialog.getByRole('button', { name: 'Download ZIP' })
   ).toBeEnabled({ timeout: 90000 });
   const downloading = page.waitForEvent('download');
   await dialog.getByRole('button', { name: 'Download ZIP' }).click();
@@ -123,22 +114,15 @@ test('creates a full gasket case through forms, exports and applies one undo ste
     'MANIFOLD_SOLID_BREP'
   );
   expect(names.some((name) => name.endsWith('/case_plate.dxf'))).toBe(true);
-  await dialog.getByRole('button', { name: 'Apply design' }).click();
+  await page
+    .getByRole('navigation', { name: 'Design workflow' })
+    .getByRole('button', { name: 'Layout', exact: true })
+    .click();
   await expect(dialog).not.toBeVisible();
   expect(await saved(page)).toContain('# Keep the original layout');
   expect(parse(await saved(page)).designs.assemblies.case.mounting).toBe(
     'gasket'
   );
-  await page.evaluate(() =>
-    (
-      window as unknown as {
-        monaco: { editor: { getModels(): { undo(): void }[] } };
-      }
-    ).monaco.editor
-      .getModels()[0]
-      .undo()
-  );
-  await expect.poll(() => saved(page)).toBe(original);
 });
 
 test('reopens a gasket enclosure offline without touching production storage', async ({
@@ -159,7 +143,10 @@ test('reopens a gasket enclosure offline without touching production storage', a
     path: 'test-results/gasket-enclosure-bottom.png',
     fullPage: true,
   });
-  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page
+    .getByRole('navigation', { name: 'Design workflow' })
+    .getByRole('button', { name: 'Layout', exact: true })
+    .click();
   await page.waitForFunction(async () => {
     const keys = await caches.keys();
     for (const key of keys.filter((key) => key.startsWith('design-wasm-'))) {
@@ -173,7 +160,7 @@ test('reopens a gasket enclosure offline without touching production storage', a
   await context.setOffline(true);
   try {
     await page.reload();
-    await expect(page.getByTestId('config-editor')).toBeVisible();
+    await expect(studio(page)).toBeVisible();
     dialog = await open(page);
     await ready(page);
     if (new URL(page.url()).pathname.startsWith('/ergogen-gui-preview/')) {
@@ -196,10 +183,11 @@ test('uses the supplier CNC preset with explicit corner relief', async ({
   await dialog.getByRole('button', { name: 'Review', exact: true }).click();
   await dialog.getByRole('checkbox').check();
   await expect(
-    dialog.getByRole('button', { name: 'Apply design', exact: true })
+    dialog.getByRole('button', { name: 'Download ZIP', exact: true })
   ).toBeEnabled();
-  await dialog
-    .getByRole('button', { name: 'Apply design', exact: true })
+  await page
+    .getByRole('navigation', { name: 'Design workflow' })
+    .getByRole('button', { name: 'Layout', exact: true })
     .click();
   await expect.poll(() => saved(page)).toContain('corner_relief: 0.5');
   await expect
@@ -225,7 +213,10 @@ test('keeps the native BHK boundary and limits switch selections to typed keys',
   await expect(dialog.getByLabel('Interactive mounting plan')).toBeVisible({
     timeout: 30000,
   });
-  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page
+    .getByRole('navigation', { name: 'Design workflow' })
+    .getByRole('button', { name: 'Layout', exact: true })
+    .click();
   expect(await saved(page)).toBe(original);
 });
 

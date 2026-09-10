@@ -1,5 +1,78 @@
 # Changelog
 
+## PCB viewer recovery
+
+September 10, 2026
+
+Load KiCanvas on demand with a revisioned asset URL. Keep PCB source hidden
+during startup and offer retry when loading fails. Unconnected pads no longer
+crash net-label rendering. Downloaded PCB data remains unchanged.
+
+Studio now initializes new cases safely, preserves key offsets, and opens the
+case from the footprint preview action. Editing during generation releases the
+Generate button while keeping old results marked stale.
+
+Bundled component assets and the PCB viewer now load offline after the app installs, including the first new design.
+
+## WRL preview recovery and nice! models
+
+September 10, 2026
+
+Resolve locally packaged WRL models without downloading a project-relative path.
+Cached previews now follow portable model paths even when an imported binding
+has no asset identifier.
+
+The model editor includes bundled nice!nano v2 and nice!view STEP models, with
+source attribution and noncommercial licensing shown. New-design nice!nano
+previews and exports include its model. Confirm alignment and socket height.
+
+## New-design setup workspace
+
+September 10, 2026
+
+Start with a matrix, optional thumbs and key assembly settings in one workspace.
+Edit switch, diode and LED positions with numeric controls, dragging or keyboard
+nudging. Named templates retain embedded project snapshots when the personal
+library changes.
+
+- Reopen setup while preserving manual layout edits.
+- Generate native owned diode/LED objects and deterministic matrix nets.
+- Preview bundled switch and selected controller STEP models locally.
+- Keep unresolved catalogue and electrical choices visible as draft blockers.
+
+The initial catalogue remains under verification. See
+[component coverage](./public/components/README.md) for missing models and
+unverified split-link and wireless combinations.
+
+## Parametric Board Studio
+
+September 10, 2026
+
+![Select a matrix column to change every key together.](./public/images/changelog/studio-matrix-desktop.png)
+
+Designing a keyboard previously required switching between source edits, layout
+previews and a separate case draft. Native projects now share one editable
+workspace from layout through manufacturing review.
+
+**What changed:**
+
+- Create a matrix by row and column count, then select keys, columns or clusters.
+- Add clusters beside existing keys and keep editing when an outline needs repair.
+- Navigate nested cluster, column and key branches; delete clusters with Undo.
+- Choose MX keycap size presets or enter custom width and depth.
+- Keep outside edges aligned, or choose explicit horizontal/vertical alignment.
+- Quick-edit keys, columns and matrices with relative movement and rotation.
+- Save layout spacing, key size and optional diode/LED defaults for new keys.
+- Rebuild the current outline after placement, preserving its finishing settings.
+- Adjust whole-column splay and offsets; add, remove or rotate individual keys.
+- Assign row and column nets automatically while retaining explicit overrides.
+- Edit thumb arcs, linked mirrors and named dimensions.
+- Apply alignment, distance, angle, equal-spacing and symmetry constraints.
+- Place components on physical layers and inspect their height and stacking.
+- Share autosave and undo between the canvas, inspector, Code and case tools.
+- Pan and zoom the canvas, with full editing panels on phones.
+- Download current PCB files and outlines; review case checks before exporting solids.
+
 ## CNC corners adapt to the cutter
 
 September 09, 2026

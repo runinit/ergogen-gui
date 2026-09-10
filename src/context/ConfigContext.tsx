@@ -1,4 +1,10 @@
-import { loadAssets } from '../utils/caseAssets';
+import {
+  loadProjectAssets,
+  saveProjectAssets,
+  CaseAssets,
+} from '../utils/caseAssets';
+import { createHistory, EditKind } from '../utils/projectHistory';
+import { DESIGN_EDIT_EVENT, DesignEditEvent } from '../utils/designSource';
 import { useFootprintLibrary } from '../hooks/useFootprintLibrary';
 import { resolveLibrary, libraryAssets } from '../utils/footprintLibrary';
 import { storageKey } from '../utils/storageKey';
@@ -62,6 +68,11 @@ interface SavedConfig {
   updatedAt: string;
   previewSvg?: string;
 }
+type ProjectSnapshot = {
+  source: string;
+  assets?: CaseAssets;
+  injections?: string[][];
+};
 
 interface MultiConfigContainer {
   version: number;
@@ -132,6 +143,13 @@ type ContextProps = {
   getRealtimeConfigInput: () => string | undefined;
   updateRealtimeConfigInput: (val: string | undefined) => void;
   setConfigInput: Dispatch<SetStateAction<string | undefined>>;
+  editSource: (source: string, kind?: EditKind) => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  projectAssets: CaseAssets;
+  setProjectAssets: Dispatch<SetStateAction<CaseAssets>>;
   configs: SavedConfig[];
   activeConfigId: string | null;
   activeConfigName: string;
@@ -505,6 +523,16 @@ const ConfigContextProvider = ({
   const isPreviewRef = useRef<boolean>(isPreview);
   const previewConfigRef = useRef<string | null>(previewConfig);
   const configInputRef = useRef<string | undefined>(configInputState);
+  const history = useRef(
+    createHistory<ProjectSnapshot>({ source: configInputState || '' })
+  );
+  const replaying = useRef(false);
+  const editKind = useRef<EditKind>('command');
+  const [, setHistoryRevision] = useState(0);
+  useEffect(() => {
+    history.current.reset({ source: configInputRef.current || '' });
+    setHistoryRevision((revision) => revision + 1);
+  }, [activeConfigId]);
 
   useEffect(() => {
     configsRef.current = configs;
@@ -526,6 +554,9 @@ const ConfigContextProvider = ({
     null
   );
   const caseAssets = useRef<Record<string, string> | undefined>(undefined);
+  const [projectAssets, setAssetState] = useState<CaseAssets>({});
+  const assetOwner = useRef<string | null>(null);
+  const pendingAssetEdits = useRef<SetStateAction<CaseAssets>[]>([]);
   const realtimeConfigInputRef = useRef<string | undefined>(configInputState);
 
   useEffect(() => {
@@ -535,6 +566,8 @@ const ConfigContextProvider = ({
   const updateRealtimeConfigInput = useCallback((val: string | undefined) => {
     if (val !== realtimeConfigInputRef.current) {
       activeRequestRef.current = null;
+      setIsGenerating(false);
+      setIsJscadConverting(false);
       currentConfigVersion.current += 1;
       setResultsStale(true);
     }
@@ -570,9 +603,35 @@ const ConfigContextProvider = ({
     }
   }, []);
 
-  const [storedInjections, setInjectionInput] = useLocalStorage<string[][]>(
+  const [storedInjections, saveInjections] = useLocalStorage<string[][]>(
     storageKey('ergogen:injection'),
     initialInjectionInput
+  );
+  const storedInjectionsRef = useRef(storedInjections);
+  storedInjectionsRef.current = storedInjections;
+  const setInjectionInput = useCallback(
+    (value: SetStateAction<string[][] | undefined>) => {
+      const next =
+        typeof value === 'function'
+          ? value(storedInjectionsRef.current)
+          : value;
+      if (!replaying.current) {
+        history.current.sync({
+          source: configInputRef.current || '',
+          assets: caseAssets.current || {},
+          injections: storedInjectionsRef.current || [],
+        });
+        history.current.record({
+          source: configInputRef.current || '',
+          assets: caseAssets.current,
+          injections: next,
+        });
+        setHistoryRevision((revision) => revision + 1);
+      }
+      storedInjectionsRef.current = next;
+      saveInjections(next);
+    },
+    [saveInjections]
   );
   const { entries: libraryEntries } = useFootprintLibrary();
   const injectionInput = useMemo(
@@ -599,7 +658,11 @@ const ConfigContextProvider = ({
   const [info, setInfo] = useState<string | null>(null);
   const activeRequestRef = useRef<string | null>(null);
   const [resultsStale, setResultsStale] = useState(false);
-  const inputIdentity = JSON.stringify([injectionInput, linkedAssets]);
+  const inputIdentity = JSON.stringify([
+    injectionInput,
+    linkedAssets,
+    projectAssets,
+  ]);
   const previousIdentity = useRef(inputIdentity);
   if (previousIdentity.current !== inputIdentity) {
     activeRequestRef.current = null;
@@ -607,9 +670,81 @@ const ConfigContextProvider = ({
   }
   useEffect(() => {
     setResultsStale(true);
+    if (!activeRequestRef.current) {
+      setIsGenerating(false);
+      setIsJscadConverting(false);
+    }
   }, [inputIdentity]);
   const [results, setResults] = useState<Results | null>(null);
   const [resultsVersion, setResultsVersion] = useState<number>(0);
+  const setProjectAssets = useCallback((value: SetStateAction<CaseAssets>) => {
+    const id = activeConfigIdRef.current || 'preview';
+    if (assetOwner.current !== id) {
+      assetOwner.current = id;
+      caseAssets.current = undefined;
+      pendingAssetEdits.current = [];
+    }
+    // Functional edits need the loaded baseline; replacements already own it.
+    if (typeof value === 'function' && !caseAssets.current) {
+      pendingAssetEdits.current.push(value);
+      return;
+    }
+    const next =
+      typeof value === 'function' ? value(caseAssets.current || {}) : value;
+    if (!replaying.current) {
+      history.current.sync({
+        source: configInputRef.current || '',
+        assets: caseAssets.current || {},
+        injections: storedInjectionsRef.current || [],
+      });
+      history.current.record({
+        source: configInputRef.current || '',
+        assets: next,
+        injections: storedInjectionsRef.current,
+      });
+      setHistoryRevision((revision) => revision + 1);
+    }
+    caseAssets.current = next;
+    activeRequestRef.current = null;
+    setAssetState(next);
+    setResultsStale(true);
+    void saveProjectAssets(activeConfigIdRef.current || 'preview', next).catch(
+      (error) => setError(`Project assets could not be saved: ${String(error)}`)
+    );
+  }, []);
+  useEffect(() => {
+    let live = true;
+    const id = activeConfigId || 'preview';
+    if (assetOwner.current !== id) {
+      assetOwner.current = id;
+      caseAssets.current = undefined;
+      pendingAssetEdits.current = [];
+      setAssetState({});
+    }
+    if (caseAssets.current) {
+      return;
+    }
+    loadProjectAssets(id)
+      .then((assets) => {
+        if (!live || assetOwner.current !== id || caseAssets.current) {
+          return;
+        }
+        caseAssets.current = assets;
+        setAssetState(assets);
+        const edits = pendingAssetEdits.current.splice(0);
+        for (const edit of edits) {
+          setProjectAssets(edit);
+        }
+      })
+      .catch((error) => {
+        if (live && typeof indexedDB !== 'undefined') {
+          setError(`Project assets could not be loaded: ${String(error)}`);
+        }
+      });
+    return () => {
+      live = false;
+    };
+  }, [activeConfigId, setProjectAssets]);
   const [settings, setSettings] = useLocalStorage<AppSettings>(
     storageKey('ergogen:settings'),
     getDefaultSettings()
@@ -1151,7 +1286,10 @@ const ConfigContextProvider = ({
         const savedAssets =
           typeof indexedDB === 'undefined'
             ? {}
-            : await loadAssets().catch(() => ({}));
+            : (caseAssets.current ??
+              (await loadProjectAssets(
+                activeConfigIdRef.current || 'preview'
+              )));
         if (activeRequestRef.current !== requestId) {
           return;
         }
@@ -1249,13 +1387,37 @@ const ConfigContextProvider = ({
             )
           : valueOrFunc;
 
-      if (newVal === prevVal) return;
+      if (newVal === prevVal) {
+        return;
+      }
+      setError(null);
+      if (!replaying.current) {
+        history.current.sync({
+          source: prevVal || '',
+          assets: caseAssets.current || {},
+          injections: storedInjectionsRef.current || [],
+        });
+        history.current.record(
+          {
+            source: newVal || '',
+            assets: caseAssets.current,
+            injections: storedInjectionsRef.current,
+          },
+          editKind.current
+        );
+      }
+      setHistoryRevision((revision) => revision + 1);
       if (newVal !== realtimeConfigInputRef.current) {
         activeRequestRef.current = null;
+        // Superseded responses are ignored, so release their busy state here.
+        setIsGenerating(false);
+        setIsJscadConverting(false);
         currentConfigVersion.current += 1;
         setResultsStale(true);
       }
 
+      configInputRef.current = newVal;
+      realtimeConfigInputRef.current = newVal;
       setConfigInputState(newVal);
 
       if (isPreviewRef.current) {
@@ -1321,6 +1483,57 @@ const ConfigContextProvider = ({
     []
   );
 
+  const editSource = useCallback(
+    (source: string, kind: EditKind = 'command') => {
+      editKind.current = kind;
+      setConfigInput(source);
+      editKind.current = 'command';
+    },
+    [setConfigInput]
+  );
+  const undo = useCallback(() => {
+    const source = history.current.undo();
+    if (source === undefined) {
+      return;
+    }
+    replaying.current = true;
+    setConfigInput(source.source);
+    if (source.assets) {
+      setProjectAssets(source.assets);
+    }
+    if (source.injections) {
+      setInjectionInput(source.injections);
+    }
+    replaying.current = false;
+  }, [setConfigInput, setProjectAssets, setInjectionInput]);
+  const redo = useCallback(() => {
+    const source = history.current.redo();
+    if (source === undefined) {
+      return;
+    }
+    replaying.current = true;
+    setConfigInput(source.source);
+    if (source.assets) {
+      setProjectAssets(source.assets);
+    }
+    if (source.injections) {
+      setInjectionInput(source.injections);
+    }
+    replaying.current = false;
+  }, [setConfigInput, setProjectAssets, setInjectionInput]);
+  useEffect(() => {
+    const apply = (event: Event) => {
+      const detail = (event as CustomEvent<DesignEditEvent>).detail;
+      if (detail.applied || detail.before !== realtimeConfigInputRef.current) {
+        return;
+      }
+      editSource(detail.after);
+      detail.applied = true;
+    };
+    window.addEventListener(DESIGN_EDIT_EVENT, apply);
+    return () => window.removeEventListener(DESIGN_EDIT_EVENT, apply);
+  }, [editSource]);
+
   const selectConfig = useCallback(
     (id: string | null) => {
       resetLineage();
@@ -1355,12 +1568,28 @@ const ConfigContextProvider = ({
   const createNewConfig = useCallback(
     (content: string, name?: string) => {
       resetLineage();
+      setError(null);
       setResults(null);
       const nextUntitledNum = getNextIndexForPattern(
         configsRef.current,
         /^Untitled\s+(\d+)$/
       );
-      const configName = name || `Untitled ${nextUntitledNum}`;
+      let title = '';
+      try {
+        const native = yaml.load(content) as {
+          schema?: string;
+          meta?: { name?: unknown };
+        };
+        if (
+          native?.schema === 'ergogen/v1' &&
+          typeof native.meta?.name === 'string'
+        ) {
+          title = native.meta.name.trim();
+        }
+      } catch {
+        /* Invalid drafts still need a saved project. */
+      }
+      const configName = name || title || `Untitled ${nextUntitledNum}`;
       const newId = generateUUID();
       const now = new Date().toISOString();
       const newConfig: SavedConfig = {
@@ -1429,11 +1658,23 @@ const ConfigContextProvider = ({
   );
 
   const duplicateConfig = useCallback(
-    (id: string) => {
+    async (id: string) => {
       resetLineage();
       setResults(null);
       const found = configsRef.current.find((c) => c.id === id);
       if (found) {
+        const copiedAssets =
+          assetOwner.current === id && caseAssets.current
+            ? { ...caseAssets.current }
+            : await loadProjectAssets(id).catch((error) => {
+                setError(
+                  `Project assets could not be copied: ${String(error)}`
+                );
+                return null;
+              });
+        if (!copiedAssets) {
+          return;
+        }
         const newId = generateUUID();
         const now = new Date().toISOString();
         const newConfig: SavedConfig = {
@@ -1455,13 +1696,15 @@ const ConfigContextProvider = ({
         activeConfigIdRef.current = newId;
         configInputRef.current = found.config;
 
+        setProjectAssets(copiedAssets);
+
         saveMultiConfigToStorage(updatedConfigs, newId);
         trackEvent('config_duplicated', {
           stored_configs_count: updatedConfigs.length,
         });
       }
     },
-    [resetLineage]
+    [resetLineage, setProjectAssets]
   );
 
   const deleteConfig = useCallback(
@@ -1647,7 +1890,9 @@ const ConfigContextProvider = ({
 
       if (configInputState) {
         generateNow(configInputState, injectionInput, {
-          pointsonly: !autoGen3D,
+          pointsonly:
+            parseConfig(configInputState)[1]?.schema === 'ergogen/v1' ||
+            !autoGen3D,
         });
       }
     }
@@ -1659,6 +1904,7 @@ const ConfigContextProvider = ({
     autoGen3D,
     generateNow,
     handleErgogenWorkerMessage,
+    parseConfig,
   ]);
 
   /**
@@ -1671,7 +1917,9 @@ const ConfigContextProvider = ({
     );
     if (autoGen && !showSettings && !cadActive) {
       processInput(configInputState, injectionInput, {
-        pointsonly: !autoGen3D,
+        pointsonly:
+          parseConfig(configInputState || '')[1]?.schema === 'ergogen/v1' ||
+          !autoGen3D,
       });
     }
   }, [
@@ -1682,6 +1930,7 @@ const ConfigContextProvider = ({
     cadActive,
     showSettings,
     processInput,
+    parseConfig,
   ]);
 
   // Trigger background preview generation on mount if loadedVersion is 1 or hadLegacyConfig is true
@@ -1720,6 +1969,8 @@ const ConfigContextProvider = ({
     }
   }, [workerReady, loadedVersion, hadLegacyConfig]);
 
+  const canUndo = history.current.canUndo,
+    canRedo = history.current.canRedo;
   const contextValue = useMemo(
     () => ({
       configInput: configInputState,
@@ -1727,6 +1978,13 @@ const ConfigContextProvider = ({
       updateRealtimeConfigInput,
       setConfigInput,
       configs,
+      editSource,
+      undo,
+      redo,
+      canUndo,
+      canRedo,
+      projectAssets,
+      setProjectAssets,
       activeConfigId,
       activeConfigName,
       isPreview,
@@ -1787,6 +2045,13 @@ const ConfigContextProvider = ({
     }),
     [
       configInputState,
+      canUndo,
+      canRedo,
+      projectAssets,
+      setProjectAssets,
+      editSource,
+      undo,
+      redo,
       getRealtimeConfigInput,
       updateRealtimeConfigInput,
       setConfigInput,

@@ -1,5 +1,6 @@
-import { isAlias, isMap, isSeq, parseDocument, stringify } from 'yaml';
-import { editDesign, SourcePath } from './designSource';
+import { isAlias, isMap, isSeq, stringify } from 'yaml';
+import { editDesign, editField, SourcePath } from './designSource';
+import { sourceDocument, sourceValue } from './sourceSnapshot';
 
 export type LayoutSection = 'objects' | 'clusters';
 const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
@@ -7,7 +8,7 @@ const PRECISION = 1_000_000;
 
 // Only materialize the selected instance; leave the shared alias definition intact.
 function instance(source: string, path: SourcePath): string {
-  const document = parseDocument(source, { keepSourceTokens: true });
+  const document = sourceDocument(source);
   if (document.errors.length) {
     throw new Error(document.errors[0].message);
   }
@@ -33,13 +34,21 @@ function instance(source: string, path: SourcePath): string {
 }
 
 function target(source: string, section: LayoutSection, id: string) {
-  const data = parseDocument(source).toJS();
+  const data = sourceValue(source) as {
+    layout?: Record<
+      string,
+      Record<
+        string,
+        { cluster?: string; locked?: boolean; mirror?: { source: string } }
+      >
+    >;
+  };
   const root = ['layout', section, id];
   if (data?.layout?.[section]?.[id]) {
     const cluster = data.layout[section][id].cluster;
     return {
       root,
-      locked: !!data.layout.clusters?.[cluster]?.locked,
+      locked: !!(cluster && data.layout.clusters?.[cluster]?.locked),
       generated: false,
     };
   }
@@ -53,7 +62,7 @@ function target(source: string, section: LayoutSection, id: string) {
       continue;
     }
     const member = id.slice(cluster.length + 2);
-    if (data.layout.objects?.[member]?.cluster === spec.mirror.source) {
+    if (data.layout?.objects?.[member]?.cluster === spec.mirror.source) {
       return {
         root: ['layout', 'clusters', cluster, 'overrides', member],
         locked: !!spec.locked,
@@ -74,7 +83,7 @@ export function setLayout(
   const { root, locked, generated } = target(source, section, id);
   let result = generated ? source : instance(source, root);
   const path = [...root, ...field];
-  const document = parseDocument(result);
+  const document = sourceDocument(result);
   if (
     locked ||
     (document.getIn([...root, 'locked']) && field[0] !== 'locked')
@@ -92,7 +101,7 @@ export function setLayout(
     });
     return result;
   }
-  return editDesign(result, path, value);
+  return editField(result, path, value);
 }
 
 export function moveLayout(
@@ -113,7 +122,7 @@ export function moveLayout(
   );
   const { root, generated } = target(source, section, id);
   const materialized = generated ? source : instance(source, root);
-  const current = parseDocument(materialized).getIn([
+  const current = sourceDocument(materialized).getIn([
     ...root,
     'placement',
     'override',

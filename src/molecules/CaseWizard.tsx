@@ -68,10 +68,13 @@ const FINDING_STEPS: [RegExp, string][] = [
   ],
 ];
 
-const Shell = styled.section`
-  position: fixed;
+const Shell = styled.section<{ $embedded?: boolean }>`
+  position: ${(p) => (p.$embedded ? 'relative' : 'fixed')};
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
   inset: 0;
-  z-index: ${theme.caseWizard.overlay};
+  z-index: ${(p) => (p.$embedded ? 'auto' : theme.caseWizard.overlay)};
   background: ${theme.colors.background};
   color: ${theme.colors.text};
   display: flex;
@@ -342,8 +345,16 @@ const PROCESS_DEFAULTS = {
   },
 };
 
-type Props = { onClose: () => void; initialView?: 'case' | 'library' | 'yaml' };
-export default function CaseWizard({ onClose, initialView }: Props) {
+type Props = {
+  onClose: () => void;
+  initialView?: 'case' | 'library' | 'yaml';
+  presentation?: 'embedded' | 'dialog';
+};
+export default function CaseWizard({
+  onClose,
+  initialView,
+  presentation,
+}: Props) {
   const context = useConfigContext();
   const [initialError] = useState(() => {
     try {
@@ -368,25 +379,50 @@ export default function CaseWizard({ onClose, initialView }: Props) {
       </Shell>
     );
   }
-  return <CaseDraft onClose={onClose} initialView={initialView} />;
+  return (
+    <CaseDraft
+      onClose={onClose}
+      initialView={initialView}
+      presentation={presentation}
+    />
+  );
 }
 
-function CaseDraft({ onClose, initialView }: Props) {
+function CaseDraft({ onClose, initialView, presentation }: Props) {
   const context = useConfigContext();
+  const embedded = presentation === 'embedded';
   const treeButton = useRef<HTMLButtonElement>(null);
   const inspectorButton = useRef<HTMLButtonElement>(null);
   const setCadActive = context?.setCadActive;
   useEffect(() => {
+    if (embedded) {
+      return;
+    }
     setCadActive?.(true);
     return () => setCadActive?.(false);
-  }, [setCadActive]);
+  }, [setCadActive, embedded]);
   const base = useRef(context?.getRealtimeConfigInput() || '');
   const [name, setName] = useState(() => caseNames(base.current)[0] || 'case');
-  const [draft, setDraft] = useState(() =>
+  const [localDraft, setDraft] = useState(() =>
     caseNames(base.current).length
       ? base.current
       : createCase(base.current, 'case')
   );
+  const initialized = useRef(false);
+  // The first render needs the generated case before it enters project history.
+  const draft =
+    embedded && initialized.current
+      ? context?.configInput || localDraft
+      : localDraft;
+  useEffect(() => {
+    if (!embedded || initialized.current) {
+      return;
+    }
+    initialized.current = true;
+    if (localDraft !== context?.getRealtimeConfigInput()) {
+      context?.editSource(localDraft);
+    }
+  }, [embedded, localDraft, context]);
   const liveDraft = useRef(draft);
   liveDraft.current = draft;
   const [step, setStep] = useState(0);
@@ -399,30 +435,43 @@ function CaseDraft({ onClose, initialView }: Props) {
   const [hidden, setHidden] = useState<string[]>([]);
   const [yamlDraft, setYamlDraft] = useState(draft);
   const [treeSelection, setTreeSelection] = useState('');
-  const [localAssets, setAssets] = useState<Record<string, string>>({});
+  const [localAssets, setLocalAssets] = useState<Record<string, string>>({});
+  const setAssets =
+    embedded && context?.setProjectAssets
+      ? context.setProjectAssets
+      : setLocalAssets;
   const { entries } = useFootprintLibrary();
   const assets = useMemo(
     () => ({
       ...libraryAssets(context?.injectionInput, entries),
-      ...localAssets,
+      ...(embedded ? context?.projectAssets : localAssets),
     }),
-    [context?.injectionInput, entries, localAssets]
+    [
+      context?.injectionInput,
+      context?.projectAssets,
+      embedded,
+      entries,
+      localAssets,
+    ]
   );
   const [automatic, setAutomatic] = useState('');
   const history = useRef<string[]>([]);
   useEffect(() => {
+    if (embedded) {
+      return;
+    }
     let live = true;
     loadAssets()
       .then((value) => {
         if (live) {
-          setAssets(value);
+          setLocalAssets(value);
         }
       })
       .catch(() => {});
     return () => {
       live = false;
     };
-  }, []);
+  }, [embedded]);
   const [error, setError] = useState('');
   const [view, setView] = useState('plan');
   const [selected, setSelected] = useState('');
@@ -526,7 +575,7 @@ function CaseDraft({ onClose, initialView }: Props) {
   );
   const disconnected = /Expected one connected region/.test(preview.error);
   const staleSource =
-    base.current !== (context?.getRealtimeConfigInput() || '');
+    !embedded && base.current !== (context?.getRealtimeConfigInput() || '');
   const processes = [
     'bottom',
     'top',
@@ -556,13 +605,19 @@ function CaseDraft({ onClose, initialView }: Props) {
   }, [feature, step]);
   const change = (transform: (source: string) => string) => {
     try {
-      const previous = liveDraft.current;
+      const previous = embedded
+        ? context?.getRealtimeConfigInput() || liveDraft.current
+        : liveDraft.current;
       const next = transform(previous);
       const parsed = parseDocument(next);
       if (parsed.errors.length) {
         throw new Error(parsed.errors[0].message);
       }
-      history.current.push(previous);
+      if (embedded) {
+        context?.editSource(next);
+      } else {
+        history.current.push(previous);
+      }
       liveDraft.current = next;
       setDraft(next);
       setError('');
@@ -942,12 +997,16 @@ function CaseDraft({ onClose, initialView }: Props) {
 
   return (
     <Shell
+      $embedded={embedded}
       ref={dialog}
-      role="dialog"
-      aria-modal="true"
+      role={embedded ? 'region' : 'dialog'}
+      aria-modal={embedded ? undefined : true}
       aria-label="Case designer"
       tabIndex={-1}
       onKeyDown={(event) => {
+        if (embedded) {
+          return;
+        }
         if (event.key === 'Escape') {
           if (treeOpen || inspectorOpen) {
             const button = (treeOpen ? treeButton : inspectorButton).current;
@@ -983,55 +1042,57 @@ function CaseDraft({ onClose, initialView }: Props) {
       }}
     >
       {workspace === 'case' && <CaseControlHelp root={dialog} />}
-      <Header>
-        <div>
-          <h1>
-            <img
-              src={`${import.meta.env.BASE_URL}ergogen.png`}
-              alt="Ergogen"
-              width="28"
-              height="28"
-            />{' '}
-            {context?.activeConfigName || 'Ergogen'} / Case
-          </h1>
-          <p>
-            Select a part · prepare · inspect · export
-            {process.env.REACT_APP_DEPLOYMENT_CHANNEL === 'preview'
-              ? ` · Preview ${process.env.REACT_APP_BUILD_REVISION?.slice(0, 7)}`
-              : ''}
-          </p>
-        </div>
-        <WorkspaceTabs role="tablist" aria-label="Workspace views">
-          <button
-            role="tab"
-            aria-selected={workspace === 'case'}
-            onClick={() => setWorkspace('case')}
-          >
-            Case
-          </button>
-          <button
-            role="tab"
-            aria-selected={workspace === 'library'}
-            onClick={() => {
-              setLibraryOpened(true);
-              setWorkspace('library');
-            }}
-          >
-            Footprint library
-          </button>
-          <button
-            role="tab"
-            aria-selected={workspace === 'yaml'}
-            onClick={() => {
-              setYamlDraft(draft);
-              setWorkspace('yaml');
-            }}
-          >
-            YAML
-          </button>
-        </WorkspaceTabs>
-        <button onClick={onClose}>Cancel</button>
-      </Header>
+      {!embedded && (
+        <Header>
+          <div>
+            <h1>
+              <img
+                src={`${import.meta.env.BASE_URL}ergogen.png`}
+                alt="Ergogen"
+                width="28"
+                height="28"
+              />{' '}
+              {context?.activeConfigName || 'Ergogen'} / Case
+            </h1>
+            <p>
+              Select a part · prepare · inspect · export
+              {process.env.REACT_APP_DEPLOYMENT_CHANNEL === 'preview'
+                ? ` · Preview ${process.env.REACT_APP_BUILD_REVISION?.slice(0, 7)}`
+                : ''}
+            </p>
+          </div>
+          <WorkspaceTabs role="tablist" aria-label="Workspace views">
+            <button
+              role="tab"
+              aria-selected={workspace === 'case'}
+              onClick={() => setWorkspace('case')}
+            >
+              Case
+            </button>
+            <button
+              role="tab"
+              aria-selected={workspace === 'library'}
+              onClick={() => {
+                setLibraryOpened(true);
+                setWorkspace('library');
+              }}
+            >
+              Footprint library
+            </button>
+            <button
+              role="tab"
+              aria-selected={workspace === 'yaml'}
+              onClick={() => {
+                setYamlDraft(draft);
+                setWorkspace('yaml');
+              }}
+            >
+              YAML
+            </button>
+          </WorkspaceTabs>
+          <button onClick={onClose}>Cancel</button>
+        </Header>
+      )}
       {libraryOpened && (
         <LibraryPane $active={workspace === 'library'}>
           <Suspense fallback={<Status>Opening footprint library…</Status>}>
@@ -1117,19 +1178,21 @@ function CaseDraft({ onClose, initialView }: Props) {
                   ? 'Changes not generated'
                   : 'Generated current draft'}
             </span>
-            <button
-              disabled={!history.current.length}
-              onClick={() => {
-                const previous = history.current.pop();
-                if (previous) {
-                  setDraft(previous);
-                  setConfirmed(false);
-                }
-              }}
-              title="Undo the last draft edit"
-            >
-              Undo
-            </button>
+            {!embedded && (
+              <button
+                disabled={!history.current.length}
+                onClick={() => {
+                  const previous = history.current.pop();
+                  if (previous) {
+                    setDraft(previous);
+                    setConfirmed(false);
+                  }
+                }}
+                title="Undo the last draft edit"
+              >
+                Undo
+              </button>
+            )}
           </Controls>
           <Body>
             <TreePanel $open={treeOpen} aria-label="Assembly panel">
@@ -2085,9 +2148,11 @@ function CaseDraft({ onClose, initialView }: Props) {
                     </span>
                   </label>
                   <Controls>
-                    <button onClick={apply} disabled={blocked || !confirmed}>
-                      Apply design
-                    </button>
+                    {!embedded && (
+                      <button onClick={apply} disabled={blocked || !confirmed}>
+                        Apply design
+                      </button>
+                    )}
                     <button
                       disabled={blocked || !confirmed}
                       onClick={() =>

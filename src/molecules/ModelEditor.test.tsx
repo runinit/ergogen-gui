@@ -97,3 +97,36 @@ it('keeps model changes owned by the active import and discards cancelled reads'
   );
   expect(change).not.toHaveBeenCalled();
 });
+it('rebuilds a local WRL preview without downloading its project path', async () => {
+  const model: ModelBinding = {
+    path: '${KIPRJMOD}/models/board.wrl',
+    offset: [1, 2, 3],
+    rotate: [0, 0, 90],
+    scale: [1, 1, 1],
+  };
+  const change = vi.fn();
+  const spy = vi.spyOn(
+    await import('../utils/footprintService'),
+    'prepareModel'
+  );
+  render(
+    <ModelEditor
+      models={[model]}
+      assets={{ 'board.wrl': '#VRML V2.0 utf8' }}
+      selected={0}
+      onSelect={vi.fn()}
+      onChange={change}
+    />
+  );
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Resolve model reference' })
+  );
+  await waitFor(() => expect(change).toHaveBeenCalled());
+  expect(spy).toHaveBeenCalledWith(
+    'board.wrl',
+    '#VRML V2.0 utf8',
+    expect.any(AbortSignal),
+    undefined
+  );
+  spy.mockRestore();
+});

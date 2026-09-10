@@ -1,3 +1,4 @@
+import { studio, openCase } from './utils/studio';
 import { expect, test, Page } from '@playwright/test';
 import { stringify } from 'yaml';
 import {
@@ -61,12 +62,9 @@ const load = async (page: Page, config: unknown) => {
     }
   );
   await page.goto('./');
-  await expect(page.getByTestId('config-editor')).toBeVisible();
-  await page
-    .getByRole('button', { name: 'Create / edit case', exact: true })
-    .first()
-    .click();
-  return page.getByRole('dialog', { name: 'Case designer' });
+  await expect(studio(page)).toBeVisible();
+  await openCase(page);
+  return page.getByRole('region', { name: 'Case designer' });
 };
 
 test('retains height blockers after cached mounting changes', async ({
@@ -111,7 +109,7 @@ test('retains height blockers after cached mounting changes', async ({
   await dialog.getByRole('button', { name: 'Review', exact: true }).click();
   await expect(blocker).toBeVisible({ timeout: TIMEOUT });
   await dialog.getByRole('checkbox').check();
-  for (const name of ['Apply design', 'Download ZIP']) {
+  for (const name of ['Download ZIP']) {
     await expect(
       dialog.getByRole('button', { name, exact: true })
     ).toBeDisabled();
@@ -125,7 +123,7 @@ test('generates imported PCB with a native battery and shell opening', async ({
   await page.evaluate(
     async ({ name, source }) => {
       await new Promise<void>((resolve, reject) => {
-        const request = indexedDB.open(name, 1);
+        const request = indexedDB.open(name);
         request.onupgradeneeded = () =>
           request.result.createObjectStore('assets');
         request.onerror = () => reject(request.error);

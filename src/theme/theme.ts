@@ -1,5 +1,20 @@
 export const theme = {
   spacing: { xs: '0.25rem', sm: '0.5rem', md: '1rem', lg: '1.5rem' },
+  studio: {
+    selected: '#203c2c',
+    treeWidth: '240px',
+    inspectorWidth: '320px',
+    popoverWidth: '420px',
+    popoverHeight: '70dvh',
+    breakpoint: '1050px',
+    touchSize: '44px',
+    panelLayer: 600,
+    popoverLayer: 610,
+    grid: '#303632',
+    key: '#c7d5de',
+    outline: '#79b7d4',
+    component: '#c3a96c',
+  },
   cad: {
     treeWidth: '260px',
     inspectorWidth: '340px',

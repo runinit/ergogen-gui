@@ -6,6 +6,7 @@ import { theme } from '../theme/theme';
 import { useConfigContext } from '../context/ConfigContext';
 import { exampleOptions, ConfigOption } from '../examples';
 import Starter from '../examples/starter';
+import NewDesignWorkspace from '../molecules/NewDesignWorkspace';
 import { fetchConfigFromUrl, GitInjection } from '../utils/github';
 import { ConflictResolutionStrategy } from '../utils/injections';
 import { loadLocalFile } from '../utils/localFiles';
@@ -400,6 +401,7 @@ const allExamples: ConfigOption[] = exampleOptions
 const Welcome = () => {
   const navigate = useNavigate();
   const configContext = useConfigContext();
+  const [setupOpen, setSetupOpen] = useState(false);
   const [repoInput, setRepoInput] = useState('');
   const [provider, setProvider] = useState<'github' | 'codeberg' | 'forgejo'>(
     'github'
@@ -821,6 +823,28 @@ const Welcome = () => {
           data-testid="conflict-resolution-dialog"
         />
       )}
+      {setupOpen && (
+        <NewDesignWorkspace
+          onCancel={() => setSetupOpen(false)}
+          onCreate={(source, assets, injections) => {
+            if (!configContext) {
+              return;
+            }
+            configContext.createNewConfig(source);
+            configContext.setProjectAssets(assets);
+            if (injections?.length) {
+              configContext.setInjectionInput((before) => [
+                ...(before || []).filter(
+                  (item) => !injections.some((next) => next[1] === item[1])
+                ),
+                ...injections,
+              ]);
+            }
+            setSetupOpen(false);
+            setShouldNavigate(true);
+          }}
+        />
+      )}
       <WelcomeContainer>
         <Header>Ergogen Web UI</Header>
         <SubHeader>
@@ -832,9 +856,9 @@ const Welcome = () => {
         <OptionsContainer>
           <OptionBox>
             <h2>Start Fresh</h2>
-            <p>Start with a native key and an editable board profile.</p>
+            <p>Choose your layout, key assemblies and electronics.</p>
             <Button
-              onClick={() => handleSelectExample(Starter.value)}
+              onClick={() => setSetupOpen(true)}
               aria-label="New native design"
               data-testid="empty-config-button"
             >

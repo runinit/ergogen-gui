@@ -16,6 +16,7 @@ import Downloads from './molecules/Downloads';
 import Injections from './molecules/Injections';
 import FilePreview from './molecules/FilePreview';
 import DesignWorkspace from './molecules/DesignWorkspace';
+import BoardStudio from './molecules/BoardStudio';
 import CaseWizard from './molecules/CaseWizard';
 import ResizablePanel from './molecules/ResizablePanel';
 import { Preview } from './atoms/DownloadRow';
@@ -958,4 +959,22 @@ const Ergogen = () => {
   );
 };
 
-export default Ergogen;
+export default function ProjectWorkspace({
+  onUpdate,
+  onInstall,
+}: {
+  onUpdate?: () => void;
+  onInstall?: () => void;
+}) {
+  const context = useConfigContext();
+  if (context?.configInput?.includes('ergogen/v1') && !context.showSettings) {
+    return (
+      <BoardStudio
+        key={context.activeConfigId || 'preview'}
+        onUpdate={onUpdate}
+        onInstall={onInstall}
+      />
+    );
+  }
+  return <Ergogen />;
+}

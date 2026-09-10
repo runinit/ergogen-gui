@@ -34,6 +34,17 @@ const Frame = styled.div`
     font: inherit;
   }
 `;
+// The main plan fills its pane; small profile diagrams retain their height cap.
+const PlanFrame = styled(Frame)`
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 ${theme.caseWizard.planHeight};
+  > svg {
+    flex: 1;
+    height: 0;
+    max-height: none;
+  }
+`;
 const Popover = styled.div`
   position: relative;
   background: ${theme.colors.backgroundLighter};
@@ -65,7 +76,7 @@ function lines(model: IModel) {
   });
   return result;
 }
-function Drawing({ model, color }: { model?: IModel; color: string }) {
+export function Drawing({ model, color }: { model?: IModel; color: string }) {
   const segments = useMemo(() => (model ? lines(model) : []), [model]);
   return (
     <g fill="none" stroke={color} strokeWidth={0.35}>
@@ -286,7 +297,7 @@ export default function CasePlanPreview({
     return <p>Resolve a board outline to edit mounting locations.</p>;
   }
   return (
-    <Frame>
+    <PlanFrame>
       <div data-plan-controls>
         <strong>Mounting plan</strong>
         <CaseHelp label="Mounting system" />
@@ -666,7 +677,7 @@ export default function CasePlanPreview({
           <button onClick={() => onRemove(chosen)}>Delete</button>
         </Popover>
       )}
-    </Frame>
+    </PlanFrame>
   );
 }
 export function StackDiagram({ spec }: { spec: CaseConfig }) {

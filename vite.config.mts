@@ -42,7 +42,7 @@ export default defineConfig(({ mode }) => {
         manifest: false, // We use the existing public/manifest.json
         injectManifest: {
           injectionPoint: 'self.__WB_MANIFEST',
-          globPatterns: ['**/*.{js,css,html,woff,woff2}'],
+          globPatterns: ['**/*.{js,css,html,woff,woff2}', 'components/**/*'],
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         },
       }),

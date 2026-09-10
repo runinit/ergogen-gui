@@ -1,3 +1,4 @@
+import { studio, openCase } from './utils/studio';
 import { expect, test } from '@playwright/test';
 import BHK from '../src/examples/bhk';
 
@@ -18,12 +19,9 @@ for (const viewport of [
       localStorage.setItem(prefix + 'ergogen:config', JSON.stringify(source));
     }, BHK.value);
     await page.goto('./');
-    await expect(page.getByTestId('config-editor')).toBeVisible();
-    await page
-      .getByRole('button', { name: 'Create / edit case', exact: true })
-      .first()
-      .click();
-    const dialog = page.getByRole('dialog', { name: 'Case designer' });
+    await expect(studio(page)).toBeVisible();
+    await openCase(page);
+    const dialog = page.getByRole('region', { name: 'Case designer' });
     if (viewport.width < 600) {
       await dialog
         .getByRole('button', { name: 'Assembly tree', exact: true })
@@ -82,18 +80,23 @@ for (const viewport of [
           { x: x + 50, y, id: 2 },
         ],
       });
+      await expect(plan).not.toHaveAttribute('viewBox', originalView!);
       await client.send('Input.dispatchTouchEvent', {
         type: 'touchEnd',
         touchPoints: [],
       });
       await expect(plan).not.toHaveAttribute('viewBox', originalView!);
       await expect(dialog.getByRole('tooltip')).toHaveCount(0);
+      await client.send('Emulation.setTouchEmulationEnabled', {
+        enabled: false,
+      });
       await client.detach();
       await dialog
         .getByRole('button', { name: 'Fit plan', exact: true })
         .click();
     }
 
+    await plan.scrollIntoViewIfNeeded();
     const wheelArea = (await plan.boundingBox())!;
     await page.mouse.move(
       wheelArea.x + wheelArea.width / 2,
@@ -106,6 +109,7 @@ for (const viewport of [
     await dialog.getByRole('button', { name: 'Zoom in mounting plan' }).click();
     await expect(plan).not.toHaveAttribute('viewBox', originalView!);
     await dialog.getByRole('button', { name: 'Pan', exact: true }).click();
+    await plan.scrollIntoViewIfNeeded();
     const box = (await plan.boundingBox())!;
     const zoomed = await plan.getAttribute('viewBox');
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -123,6 +127,7 @@ for (const viewport of [
     const pad = pads.first();
     const name = (await pad.getAttribute('aria-label'))!;
     const before = (await pad.getAttribute('transform'))!;
+    await pad.scrollIntoViewIfNeeded();
     const position = (await pad.boundingBox())!;
     await page.mouse.move(
       position.x + position.width / 2,
@@ -145,7 +150,9 @@ for (const viewport of [
     expect((await editor.boundingBox())!.y).toBeGreaterThanOrEqual(
       (await plan.boundingBox())!.y + (await plan.boundingBox())!.height
     );
-    await dialog.getByRole('button', { name: 'Undo', exact: true }).click();
+    await page
+      .getByRole('button', { name: 'Undo project edit', exact: true })
+      .click();
     await expect(
       plan.getByRole('button', { name, exact: true })
     ).toHaveAttribute('transform', before, { timeout: TIMEOUT });
@@ -153,6 +160,7 @@ for (const viewport of [
     await dialog
       .getByRole('button', { name: 'Add gasket', exact: true })
       .click();
+    await plan.scrollIntoViewIfNeeded();
     const edgePoint = await plan
       .locator('polyline[stroke="transparent"]')
       .evaluateAll((elements) => {

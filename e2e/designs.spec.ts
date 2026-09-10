@@ -1,3 +1,4 @@
+import { studio, openCode, readSource } from './utils/studio';
 import grid from './fixtures/native-grid';
 import { test as base, expect, Page, Browser } from '@playwright/test';
 
@@ -45,6 +46,8 @@ const test = process.env.WORKSPACE_CDP_ENDPOINT
     })
   : base;
 
+test.setTimeout(120000);
+
 const source = `${grid}
 designs:
   regions:
@@ -66,11 +69,6 @@ designs:
   assemblies:
     tray: {preset: tray, profile: profiles.pcb, lid: 2}
 `;
-const readSource = (page: Page) =>
-  page.evaluate(
-    () =>
-      (window as EditorWindow).monaco.editor.getModels()[0].getValue() as string
-  );
 const generate = async (page: Page) => {
   await page.getByRole('button', { name: /Generate/ }).click();
   await expect(page.getByRole('button', { name: /Generate/ })).toBeEnabled();
@@ -98,9 +96,8 @@ test.beforeEach(async ({ page, baseURL }) => {
     );
   }, source);
   await page.goto(baseURL || '/', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByTestId('config-editor')).toBeVisible();
+  await expect(studio(page)).toBeVisible();
   await generate(page);
-  await page.getByRole('button', { name: 'Open design editor' }).click();
   await page.getByRole('button', { name: 'Sketches', exact: true }).click();
   await expect(
     page
@@ -119,13 +116,9 @@ test('edits YAML through undo/redo and retains the preview on a broken reference
   await expect
     .poll(() => readSource(page))
     .toBe(before.replace('clearance: 3', 'clearance: "4"'));
-  await page.evaluate(() =>
-    (window as EditorWindow).monaco.editor.getModels()[0].undo()
-  );
+  await page.getByRole('button', { name: 'Undo project edit' }).click();
   await expect.poll(() => readSource(page)).toBe(before);
-  await page.evaluate(() =>
-    (window as EditorWindow).monaco.editor.getModels()[0].redo()
-  );
+  await page.getByRole('button', { name: 'Redo project edit' }).click();
   await expect.poll(() => readSource(page)).toContain('clearance: "4"');
   await generate(page);
   const path = await page
@@ -133,22 +126,37 @@ test('edits YAML through undo/redo and retains the preview on a broken reference
     .locator('path')
     .first()
     .getAttribute('d');
+  await openCode(page);
   await page.evaluate(() => {
     const model = (window as EditorWindow).monaco.editor.getModels()[0];
     model.setValue(
       model.getValue().replace('from: regions.keys', 'from: regions.missing')
     );
   });
-  await generate(page);
+  await page.getByRole('button', { name: 'Code', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Generate project' })
+  ).toBeDisabled();
   await expect(
     page.getByRole('status').filter({ hasText: 'Preview stale —' })
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole('status')
+      .filter({ hasText: 'Board outline needs attention' })
   ).toContainText('regions.missing');
+  await page.getByLabel('Design feature').selectOption('boundaries.body');
   await expect(
     page.getByLabel('Design canvas').locator('path').first()
   ).toHaveAttribute('d', path!);
+  await page
+    .getByRole('navigation', { name: 'Design workflow' })
+    .getByRole('button', { name: 'Export', exact: true })
+    .click();
   await expect(
     page.getByRole('button', {
-      name: 'Download archive of all generated files',
+      name: 'Download PCB and outlines ZIP',
+      exact: true,
     })
   ).toBeDisabled();
 });

@@ -35,7 +35,7 @@ The normal build repackages the selected engine into
 
 ## Native configuration snapshot
 
-The dependency and lockfile select `ergogen-native-78485e1ac8c1.tgz`, built from the
+The previous dependency `ergogen-native-78485e1ac8c1.tgz` was built from the
 local enclosure checkout at engine commit `a9d1cc4`, including
 CNC plate-hole, post-height and relief-bound fixes. This snapshot includes `schema: ergogen/v1`,
 physical layers, typed objects, and native PCB inventory. It is not a published
@@ -45,3 +45,13 @@ SHA-256: `78485e1ac8c13ab799501787fc196a123f3107b5e9f67392c0741026ed75c73f`
 
 Installed engine sources match the enclosure checkout byte for byte. The package
 excludes the historical test harness. Keep the upstream license and attribution.
+
+## Board Studio snapshot
+
+The selected dependency is `ergogen-studio-7f774f2566c3.tgz`, a local source snapshot
+of engine commit `44bbc26`. It includes planar layout constraints,
+column transforms, automatic matrix nets, validated corner rounding and
+sub-tolerance offset repair during solid conversion.
+The source is committed; this is not an npm release.
+
+SHA-256: `7f774f2566c399d658ffc2662937b2190c8eb0f00bd200339848c3ffe3ba8f39`
