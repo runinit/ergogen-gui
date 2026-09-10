@@ -33,6 +33,12 @@ test('ignores a stale dependency cache after upgrading', async ({ page }) => {
     await navigator.serviceWorker.ready;
   });
   await page.reload();
+  await page.addScriptTag({
+    url: new URL(
+      'dependencies/kicanvas.js?v=kicad10-unconnected-pads-1',
+      page.url()
+    ).href,
+  });
   const viewer = await page.evaluate(async () => {
     await customElements.whenDefined('kicanvas-embed');
     return {

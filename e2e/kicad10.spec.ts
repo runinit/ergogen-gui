@@ -13,6 +13,12 @@ test('viewer reports malformed input then loads a native board', async ({
   page,
 }) => {
   await page.goto('./');
+  await page.addScriptTag({
+    url: new URL(
+      'dependencies/kicanvas.js?v=kicad10-unconnected-pads-1',
+      page.url()
+    ).href,
+  });
   await page.evaluate(() => customElements.whenDefined('kicanvas-embed'));
   for (const [source, expected] of [
     ['(kicad_pcb (', 'error'],
@@ -68,6 +74,12 @@ test('viewer reports malformed input then loads a native board', async ({
 
 test('viewer reports unavailable WebGL', async ({ page }) => {
   await page.goto('./');
+  await page.addScriptTag({
+    url: new URL(
+      'dependencies/kicanvas.js?v=kicad10-unconnected-pads-1',
+      page.url()
+    ).href,
+  });
   await page.evaluate(() => customElements.whenDefined('kicanvas-embed'));
   const result = await page.evaluate(async (pcb) => {
     HTMLCanvasElement.prototype.getContext = (() =>
@@ -94,6 +106,12 @@ test('viewer reports unavailable WebGL', async ({ page }) => {
 if (process.env.BHK_PCB) {
   test('loads the BHK acceptance board', async ({ page }) => {
     await page.goto('./');
+    await page.addScriptTag({
+      url: new URL(
+        'dependencies/kicanvas.js?v=kicad10-unconnected-pads-1',
+        page.url()
+      ).href,
+    });
     await page.evaluate(() => customElements.whenDefined('kicanvas-embed'));
     const pcb = readFileSync(process.env.BHK_PCB!, 'utf8');
     const result = await page.evaluate(async (pcb) => {

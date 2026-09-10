@@ -1,5 +1,13 @@
 # Changelog
 
+## PCB viewer recovery
+
+September 10, 2026
+
+Load KiCanvas on demand with a revisioned asset URL. Keep PCB source hidden
+during startup and offer retry when loading fails. Unconnected pads no longer
+crash net-label rendering. Downloaded PCB data remains unchanged.
+
 ## CNC corners adapt to the cutter
 
 September 09, 2026
