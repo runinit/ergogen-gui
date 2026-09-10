@@ -8,7 +8,12 @@ import {
   adjustSelection,
 } from '../utils/studioSelection';
 import { getValue, readStudio } from '../utils/studioSource';
-import { keyElectronics, keyOptions } from '../utils/keyOptions';
+import {
+  keyElectronics,
+  keyOptions,
+  hasElectronics,
+  electronicsAt,
+} from '../utils/keyOptions';
 import type { KeyAlignment } from '../utils/keyResize';
 import { setLayout } from '../utils/layoutSource';
 
@@ -230,16 +235,7 @@ export default function SelectionControls({
                 <input
                   type="checkbox"
                   aria-label={`Selection ${kind}`}
-                  checked={keys.every(
-                    (id) =>
-                      !!getValue(source, [
-                        'layout',
-                        'objects',
-                        id,
-                        'footprints',
-                        `studio_${kind}`,
-                      ])
-                  )}
+                  checked={keys.every((id) => hasElectronics(source, id, kind))}
                   onChange={(event) => {
                     const enabled = event.target.checked;
                     edit((before) =>
@@ -248,42 +244,12 @@ export default function SelectionControls({
                           next,
                           readStudio(next).layout.objects?.[id]?.cluster
                         );
-                        const diode = !!getValue(next, [
-                          'layout',
-                          'objects',
-                          id,
-                          'footprints',
-                          'studio_diode',
-                        ]);
-                        const led = !!getValue(next, [
-                          'layout',
-                          'objects',
-                          id,
-                          'footprints',
-                          'studio_led',
-                        ]);
+                        const diode = hasElectronics(next, id, 'diode');
+                        const led = hasElectronics(next, id, 'led');
                         return keyElectronics(next, id, {
                           ...options,
-                          diodeAt:
-                            (getValue(next, [
-                              'layout',
-                              'objects',
-                              id,
-                              'footprints',
-                              'studio_diode',
-                              'placement',
-                              'at',
-                            ]) as number[]) || options.diodeAt,
-                          ledAt:
-                            (getValue(next, [
-                              'layout',
-                              'objects',
-                              id,
-                              'footprints',
-                              'studio_led',
-                              'placement',
-                              'at',
-                            ]) as number[]) || options.ledAt,
+                          diodeAt: electronicsAt(next, id, 'diode'),
+                          ledAt: electronicsAt(next, id, 'led'),
                           diode,
                           led,
                           [kind]: enabled,

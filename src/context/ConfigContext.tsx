@@ -144,6 +144,10 @@ type ContextProps = {
   updateRealtimeConfigInput: (val: string | undefined) => void;
   setConfigInput: Dispatch<SetStateAction<string | undefined>>;
   editSource: (source: string, kind?: EditKind) => void;
+  commitProject: (
+    snapshot: ProjectSnapshot,
+    additions?: { assets?: CaseAssets; injections?: string[][] }
+  ) => void;
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
@@ -1341,6 +1345,7 @@ const ConfigContextProvider = ({
     if (cadActive) {
       processInput.cancel();
     }
+    return () => processInput.cancel();
   }, [cadActive, processInput]);
 
   /**
@@ -1490,6 +1495,55 @@ const ConfigContextProvider = ({
       editKind.current = 'command';
     },
     [setConfigInput]
+  );
+  const commitProject = useCallback(
+    (
+      snapshot: ProjectSnapshot,
+      additions?: { assets?: CaseAssets; injections?: string[][] }
+    ) => {
+      if ((snapshot.assets || additions?.assets) && !caseAssets.current) {
+        throw new Error(
+          'Project assets are loading. Retry this edit when they finish.'
+        );
+      }
+      const before = {
+        source: configInputRef.current || '',
+        assets: caseAssets.current || {},
+        injections: storedInjectionsRef.current || [],
+      };
+      const after = { ...before, ...snapshot };
+      if (additions?.assets) {
+        after.assets = { ...after.assets, ...additions.assets };
+      }
+      const injections = additions?.injections;
+      if (injections?.length) {
+        after.injections = [
+          ...after.injections.filter(
+            (item) =>
+              !injections.some(
+                (next) => next[0] === item[0] && next[1] === item[1]
+              )
+          ),
+          ...injections,
+        ];
+      }
+      history.current.sync(before);
+      replaying.current = true;
+      try {
+        setConfigInput(after.source);
+        if (snapshot.assets || additions?.assets) {
+          setProjectAssets(after.assets);
+        }
+        if (snapshot.injections || injections?.length) {
+          setInjectionInput(after.injections);
+        }
+      } finally {
+        replaying.current = false;
+      }
+      history.current.record(after);
+      setHistoryRevision((revision) => revision + 1);
+    },
+    [setConfigInput, setProjectAssets, setInjectionInput]
   );
   const undo = useCallback(() => {
     const source = history.current.undo();
@@ -1979,6 +2033,7 @@ const ConfigContextProvider = ({
       setConfigInput,
       configs,
       editSource,
+      commitProject,
       undo,
       redo,
       canUndo,
@@ -2050,6 +2105,7 @@ const ConfigContextProvider = ({
       projectAssets,
       setProjectAssets,
       editSource,
+      commitProject,
       undo,
       redo,
       getRealtimeConfigInput,

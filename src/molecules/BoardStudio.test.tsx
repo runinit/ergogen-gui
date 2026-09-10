@@ -1,6 +1,8 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useState } from 'react';
 import { parse } from 'yaml';
+import { compileSetup, defaultSetup } from '../utils/designSetup';
+import { setValue } from '../utils/studioSource';
 import BoardStudio from './BoardStudio';
 import { useLayoutAnalysis, useCaseAnalysis } from '../hooks/useCasePreview';
 
@@ -44,9 +46,9 @@ vi.mock('./FootprintLibrary', () => ({
 }));
 vi.mock('./CaseWizard', () => ({ default: () => <div>Case tools</div> }));
 vi.mock('./FilePreview', () => ({ default: () => <div>PCB viewer</div> }));
-function Harness() {
+function Harness({ initial }: { initial?: string }) {
   const [source, setSource] = useState(
-    'schema: ergogen/v1\nunits: {pitch: 19}\nlayout: {objects: {}}\n'
+    initial || 'schema: ergogen/v1\nunits: {pitch: 19}\nlayout: {objects: {}}\n'
   );
   current = source;
   hooks.useConfigContext.mockReturnValue({
@@ -202,4 +204,36 @@ it('opens the case from the footprint library preview action', async () => {
     await screen.findByRole('button', { name: 'Preview in case' })
   );
   expect(screen.getByText('Case tools')).toBeInTheDocument();
+});
+
+it('reviews an edited column removal and preserves the source on Cancel', () => {
+  const source = setValue(
+    compileSetup({ ...defaultSetup(), columns: 2, rows: 1 }),
+    ['layout', 'objects', 'fingers_c2_r1', 'placement'],
+    { override: { at: [2, 0, 0] } }
+  );
+  render(<Harness initial={source} />);
+  fireEvent.click(screen.getByRole('button', { name: 'fingers 2 keys' }));
+  fireEvent.blur(screen.getByLabelText('Matrix columns'), {
+    target: { value: '1' },
+  });
+  expect(
+    screen.getByRole('dialog', { name: 'Review matrix resize' })
+  ).toBeVisible();
+  expect(current).toBe(source);
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(current).toBe(source);
+  expect(screen.getByLabelText('Matrix columns')).toHaveValue(2);
+  fireEvent.blur(screen.getByLabelText('Matrix columns'), {
+    target: { value: '1' },
+  });
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Remove keys and resize' })
+  );
+  const objects = parse(current).layout.objects;
+  expect(objects.fingers_c2_r1).toBeUndefined();
+  expect(objects.fingers_c2_r1_diode).toBeUndefined();
+  expect(parse(current).layout.clusters.fingers.arrangement.columns).toEqual([
+    'c1',
+  ]);
 });

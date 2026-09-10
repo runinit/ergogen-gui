@@ -67,3 +67,26 @@ it('keeps electronics editable after duplicating a key', async () => {
     parse(next).layout.objects.fingers_c1_r1.footprints.studio_diode
   ).toBeDefined();
 });
+it('keeps explicit matrix size and component offsets above its assembly defaults', async () => {
+  const { compileSetup, defaultSetup } = await import('./designSetup');
+  const { applyAssembly } = await import('./applyAssembly');
+  const { resizeCluster } = await import('./studioSource');
+  const setup = { ...defaultSetup(), columns: 1, rows: 1 };
+  let next = applyAssembly(
+    compileSetup(setup),
+    ['fingers_c1_r1'],
+    setup,
+    'preserve',
+    'cluster'
+  );
+  next = setKeyOptions(
+    next,
+    { size: [27.525, 18], diodeAt: [3, -4, 0] },
+    'fingers'
+  );
+  const objects = parse(
+    resizeCluster(next, 'fingers', { columns: ['c1', 'c2'] })
+  ).layout.objects;
+  expect(objects.fingers_c2_r1.envelopes.keycap.size).toEqual([27.525, 18]);
+  expect(objects.fingers_c2_r1_diode.placement.at).toEqual([3, -4, 0]);
+});

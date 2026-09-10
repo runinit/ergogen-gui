@@ -1,6 +1,11 @@
+import { keepControllerPins, syncControllerNets } from './assemblyNets';
+import { syncLedChains } from './assemblyWiring';
+import { syncAssemblyMirrors } from './assemblyMirrors';
+import { setupBaseline } from './setupRepair';
+import { reviewResize } from './resizeReview';
 import { parse } from 'yaml';
 import { compileSetup, DesignSetup } from './designSetup';
-import { getValue, removeValue, setValue } from './studioSource';
+import { getValue, removeValue, removeObject, setValue } from './studioSource';
 import type { SourcePath } from './designSource';
 const mapping = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
@@ -14,10 +19,27 @@ export function updateSetup(source: string, setup: DesignSetup): string {
       'This project has no saved setup. Edit its layout directly.'
     );
   }
-  const before = parse(compileSetup(previous));
+  const before = parse(
+    setupBaseline(
+      previous,
+      Number(getValue(source, ['meta', 'studio', 'setupRevision']) || 1)
+    )
+  );
   const next = parse(compileSetup(setup));
   const current = parse(source);
+  const removed = Object.entries(current.layout.objects || {})
+    .filter(
+      ([id, item]) =>
+        (item as { kind?: string }).kind === 'key' &&
+        before.layout.objects[id] &&
+        !next.layout.objects[id]
+    )
+    .map(([id]) => id);
   let result = source;
+  for (const id of removed) {
+    result = removeObject(result, 'objects', id);
+  }
+  const edited = parse(result);
   const merge = (
     base: unknown,
     edited: unknown,
@@ -43,6 +65,13 @@ export function updateSetup(source: string, setup: DesignSetup): string {
       merge(base[key], edited[key], value[key], [...path, key]);
     }
   };
-  merge(before, current, next, []);
-  return setValue(result, ['meta', 'studio', 'setup'], setup);
+  merge(before, edited, next, []);
+  result = setValue(result, ['meta', 'studio', 'setup'], setup);
+  result = syncControllerNets(
+    keepControllerPins(
+      source,
+      syncAssemblyMirrors(source, syncLedChains(source, result))
+    )
+  );
+  return reviewResize(source, result, removed);
 }

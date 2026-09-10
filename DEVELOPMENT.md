@@ -796,6 +796,37 @@ project updates. `updateSetup` compares the previous compiled setup with the new
 one and preserves manually changed YAML fields. `applyAssembly` scopes changes
 to selected keys and preserves customized placements by default.
 
+`keyAssembly` is the shared compiler for setup, added cells/clusters and assembly
+updates. Switch bodies and generated models follow footprint placement while
+keycap/plate openings stay at the key origin. Explicit dimensions, model transforms
+and switch nets survive a template update. Applying a template to a column or
+cluster records its default for future keys; changed snapshots receive a new
+embedded revision rather than replacing another key's template.
+
+`assemblyWiring` maintains managed per-board LED chains: SK6812 pad 4 is DIN,
+pad 2 is DOUT. Geometry edits leave nets unchanged. Topology changes reconnect
+managed links; custom wiring remains intact and produces a review finding.
+`assemblyMirrors` updates generated board-specific overrides by three-way merge.
+`assemblyNets` reuses existing matrix net names and allocates only unused MCU pins;
+pin shortages become electrical findings instead of replacing manual assignments.
+
+Automatic key regions use keycap envelopes; separate component regions still
+support PCB-mounted electronics. `assemblySupport` adds or removes generated
+component regions as options change, including mirrored objects. `setupRepair`
+upgrades recognizable published
+setup drafts once, guarded by `meta.studio.setupRevision`. It repairs generated
+LED mappings and key regions, preserves authored fields and leaves non-setup
+projects untouched. This metadata revision does not change `ergogen/v1`.
+
+Shrinks build a complete candidate before changing the project. `ResizeReview`
+carries the before/after source and affected keys when a key or its owned
+components were edited. Cancel keeps the draft; confirmation removes the keys
+and their owned components atomically. Locks and external references block the
+candidate, and source changes invalidate an open review. `commitProject` records
+source, model assets and custom injections as one undoable transaction; resolved
+library injections are not copied into project overrides. Pending generation is
+cancelled when its callback changes or the project session unmounts.
+
 Footprint previews use the existing footprint service and a provider/parameter
 cache. Model STEP/STL assets load on demand through `componentModels`; dragging
 changes local placement only and does not invoke PCB or case generation. Pinned

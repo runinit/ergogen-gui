@@ -1,5 +1,5 @@
 import { stringify } from 'yaml';
-import { setupModels } from './componentModels';
+import { assemblyParts, compileKey, SETUP_REVISION } from './keyAssembly';
 
 export type AssemblyPlacement = {
   at: [number, number];
@@ -38,7 +38,6 @@ export type DesignSetup = {
   template: KeyAssembly;
 };
 const PCB_THICKNESS = 1.6;
-const BODY_HEIGHT = { diode: 1.35, led: 1.9 };
 const GPIO = [
   'P0',
   'P1',
@@ -252,30 +251,7 @@ export function compileSetup(setup: DesignSetup): string {
   const pcbs: Record<string, object> = {};
   const parts: Record<string, object> = {};
   const reversible = setup.topology === 'reversible';
-  const isMx = setup.family === 'mx';
-  parts.key = {
-    revision: '1',
-    envelopes: {
-      pcb: { size: [18, 18] },
-      keycap: { size: isMx ? [18, 18] : [17.5, 16.5] },
-      plate: { size: [14, 14] },
-      body: { size: [14, 14], height: [0, isMx ? 11.6 : 5.2] },
-    },
-  };
-  parts.diode = {
-    revision: '1',
-    envelopes: {
-      pcb: { size: [4, 2] },
-      body: { size: [2.8, 1.8], height: [0, 1.35] },
-    },
-  };
-  parts.led = {
-    revision: '1',
-    envelopes: {
-      pcb: { size: [5, 5] },
-      body: { size: [3.2, 2.8], height: [0, 1.9] },
-    },
-  };
+  Object.assign(parts, assemblyParts(setup));
   const boards = setup.topology === 'mirrored' ? ['left', 'right'] : ['main'];
   for (const [boardIndex, board] of Array.from(boards.entries())) {
     const prefix = boards.length > 1 ? `${board}_` : '';
@@ -308,106 +284,26 @@ export function compileSetup(setup: DesignSetup): string {
     const key = (id: string, column: number, row: number, thumb = false) => {
       const columnNet = `${prefix}C${column + 1}`,
         rowNet = `${prefix}R${row + 1}`;
-      const sw = setup.template.switch;
-      const params = {
-        from: columnNet,
-        to: setup.diode ? `${id}_switch` : rowNet,
-        hotswap: setup.mounting === 'hotswap',
-        solder: setup.mounting === 'solder',
-        reversible,
-        side: sw.side,
-        switch_3dmodel_filename: setupModels(setup)[0]
-          ? '${KIPRJMOD}/models/' + setupModels(setup)[0]
-          : '',
-        hotswap_3dmodel_filename: setupModels(setup)[1]
-          ? '${KIPRJMOD}/models/' + setupModels(setup)[1]
-          : '',
-        ...(!isMx
-          ? {
-              choc_v1_support: setup.family === 'choc_v1',
-              choc_v2_support: setup.family === 'choc_v2',
-            }
-          : {}),
-      };
-      objects[id] = {
-        kind: 'key',
-        part: 'key',
-        envelopes: { body: { at: [...sw.at, 0], rotate: sw.rotate } },
-        pcb: board,
-        cluster: thumb ? `${prefix}thumbs` : cluster,
-        ...(thumb
-          ? {
-              placement: {
-                at: [column * setup.pitch, -setup.pitch, 0],
-                rotate: -15,
-              },
-            }
-          : { cell: [`c${column + 1}`, `r${row + 1}`] }),
-        models: setupModels(setup).map((name) => ({
-          path: '${KIPRJMOD}/models/' + name,
-          asset: name,
-          offset: [...sw.at, 0],
-          rotate: [0, 0, sw.rotate],
-          scale: [1, 1, 1],
-        })),
-        properties: {
-          column_net: columnNet,
-          row_net: rowNet,
-          assembly_template: setup.template.name,
-        },
-        footprints: {
-          switch: {
-            what: isMx ? 'ceoloide/switch_mx' : 'ceoloide/switch_choc_v1_v2',
-            params,
-            placement: { at: [...sw.at, 0], rotate: sw.rotate },
-          },
-        },
-      };
-      for (const kind of ['diode', 'led'] as const) {
-        if (!setup[kind]) {
-          continue;
-        }
-        const offset = setup.template[kind];
-        const input =
-          ledIndex === 0 ? `${prefix}LED_DATA` : `${prefix}LED_${ledIndex}`;
-        const netParams =
-          kind === 'diode'
-            ? { from: `${id}_switch`, to: rowNet }
-            : {
-                P1: 'VCC',
-                P2: input,
-                P3: 'GND',
-                P4: `${prefix}LED_${++ledIndex}`,
-              };
-        objects[`${id}_${kind}`] = {
-          kind: 'component',
-          part: kind,
-          cluster: thumb ? `${prefix}thumbs` : cluster,
-          ...(!thumb ? { cell: [`c${column + 1}`, `r${row + 1}`] } : {}),
+      Object.assign(
+        objects,
+        compileKey(setup, id, {
           pcb: board,
-          side: offset.side === 'F' ? 'top' : 'bottom',
-          // Footprint side alone does not transform a native physical envelope.
-          envelopes: {
-            body: {
-              height:
-                offset.side === 'B'
-                  ? [-PCB_THICKNESS - BODY_HEIGHT[kind], -PCB_THICKNESS]
-                  : [0, BODY_HEIGHT[kind]],
-            },
-          },
-          placement: { ref: id, at: [...offset.at, 0], rotate: offset.rotate },
-          properties: { owner: id, role: kind },
-          footprints: {
-            main: {
-              what:
-                kind === 'diode'
-                  ? 'ceoloide/diode_tht_sod123'
-                  : 'ceoloide/led_sk6812mini-e',
-              params: { ...netParams, side: offset.side, reversible },
-            },
-          },
-        };
-      }
+          cluster: thumb ? `${prefix}thumbs` : cluster,
+          ...(thumb
+            ? {
+                placement: {
+                  at: [column * setup.pitch, -setup.pitch, 0],
+                  rotate: -15,
+                },
+              }
+            : { cell: [`c${column + 1}`, `r${row + 1}`] }),
+          columnNet,
+          rowNet,
+          ledInput:
+            ledIndex === 0 ? `${prefix}LED_DATA` : `${prefix}LED_${ledIndex}`,
+          ledOutput: `${prefix}LED_${++ledIndex}`,
+        })
+      );
     };
     for (let c = 0; c < setup.columns; c++) {
       for (let r = 0; r < setup.rows; r++) {
@@ -564,7 +460,7 @@ export function compileSetup(setup: DesignSetup): string {
     }
     regions[board] = {
       select: { pcb: board, kind: 'key' },
-      envelope: 'pcb',
+      envelope: 'keycap',
       close: 2,
     };
     const hasComponents = Object.values(objects).some(
@@ -636,6 +532,7 @@ export function compileSetup(setup: DesignSetup): string {
               Object.keys((boundary as { bridges?: object }).bridges || {}),
             ])
           ),
+          setupRevision: SETUP_REVISION,
           setup: structuredClone(setup),
           findings: setupFindings(setup),
           templates: { [setup.template.name]: setup.template },

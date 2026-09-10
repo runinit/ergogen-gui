@@ -1,3 +1,8 @@
+import { syncAssemblySupport } from './assemblySupport';
+import { reviewResize } from './resizeReview';
+import { syncAssemblyMirrors } from './assemblyMirrors';
+import { syncControllerNets } from './assemblyNets';
+import { syncLedChains } from './assemblyWiring';
 import type { LayoutReport } from 'ergogen/src/native';
 import { isMap, isScalar, isNode, parseDocument } from 'yaml';
 import { sourceDocument, sourceValue } from './sourceSnapshot';
@@ -205,7 +210,11 @@ export function addObject(
   } else if (kind !== 'anchor') {
     item.envelopes = { body: { size: [10, 10] }, pcb: { size: [10, 10] } };
   }
-  const pcb = Object.keys(data.pcbs || {})[0];
+  const pcb =
+    data.layout.layers?.[
+      data.layout.clusters?.[cluster || '']?.layer || ''
+    ]?.surface?.match(/^pcb\.(.+)\.top$/)?.[1] ||
+    Object.keys(data.pcbs || {})[0];
   if (pcb && kind !== 'anchor') {
     item.pcb = pcb;
     if (!cluster) {
@@ -269,9 +278,11 @@ export function addCluster(
           type,
           columns: ['c1'],
           rows: ['r1'],
-          pitch: getValue(result, ['meta', 'studio', 'defaults', 'pitch'])
-            ? keyOptions(result).pitch
-            : ['pitch', 'pitch'],
+          pitch:
+            getValue(result, ['meta', 'studio', 'defaults', 'pitch']) ||
+            getValue(result, ['meta', 'studio', 'setup'])
+              ? keyOptions(result).pitch
+              : ['pitch', 'pitch'],
         }
       : type === 'arc'
         ? { type, radius: 45, start: -15, step: 30 }
@@ -546,9 +557,14 @@ export function removeObject(
       source = removeValue(source, ['meta', 'studio', 'columns', target.id]);
     }
   }
-  return targets.reduce(
+  const next = targets.reduce(
     (next, target) => removeValue(next, ['layout', target.section, target.id]),
     source
+  );
+  return syncControllerNets(
+    syncAssemblySupport(
+      syncAssemblyMirrors(source, syncLedChains(source, next))
+    )
   );
 }
 export function resizeCluster(
@@ -588,8 +604,10 @@ export function resizeCluster(
   const memberKey = (item: StudioItem) =>
     arc ? String(item.index) : JSON.stringify(item.cell);
   let result = source;
+  const removed: string[] = [];
   for (const [key, item] of members) {
     if (!desired.includes(memberKey(item))) {
+      removed.push(key);
       result = removeObject(result, 'objects', key);
     }
   }
@@ -626,9 +644,16 @@ export function resizeCluster(
       ['layout', 'objects', key, arc ? 'index' : 'cell'],
       arc ? Number(cell) : JSON.parse(cell)
     );
+    const pcb =
+      data.layout.layers?.[cluster.layer || '']?.surface?.match(
+        /^pcb\.(.+)\.top$/
+      )?.[1];
+    if (pcb) {
+      result = setValue(result, ['layout', 'objects', key, 'pcb'], pcb);
+    }
     result = applyKeyDefaults(result, key);
   }
-  return result;
+  return reviewResize(source, result, removed);
 }
 function copyBindings(item: StudioItem) {
   if (!item.footprints) {
@@ -774,12 +799,20 @@ export function duplicateObject(
         result = copyKeyRecipe(result, key, copy);
       }
     }
-    return setLayout(
-      result,
-      section,
-      next,
-      ['placement', 'override', 'at'],
-      [20, 0, 0]
+    return syncControllerNets(
+      syncAssemblyMirrors(
+        source,
+        syncLedChains(
+          source,
+          setLayout(
+            result,
+            section,
+            next,
+            ['placement', 'override', 'at'],
+            [20, 0, 0]
+          )
+        )
+      )
     );
   }
   const { cell: _cell, index: _index, cluster: _cluster, ...copy } = item;
@@ -795,7 +828,12 @@ export function duplicateObject(
     },
     placement: { ref: id, at: [20, 0, 0] },
   });
-  return copyKeyRecipe(result, id, next);
+  return syncControllerNets(
+    syncAssemblyMirrors(
+      source,
+      syncLedChains(source, copyKeyRecipe(result, id, next))
+    )
+  );
 }
 
 export function addOutline(

@@ -1,5 +1,19 @@
 # Changelog
 
+## Reliable setup and assembly edits
+
+September 10, 2026
+
+Growing a new design now adds complete switch, diode and LED assemblies. New keys
+inherit matrix nets and scoped templates; linked halves retain separate wiring.
+Assembly offsets move the switch clearance body with its footprint and preserve
+manual model and wiring overrides.
+
+Saved setup drafts receive the corrected LED input/output mapping and keycap-based
+outline where their generated definitions are unchanged. Custom wiring remains
+visible for review. Shrinking a matrix asks before removing edited keys, and Undo
+restores setup source, models and footprint overrides together.
+
 ## PCB viewer recovery
 
 September 10, 2026

@@ -43,7 +43,7 @@ describe('new design compiler', () => {
     );
     expect(
       doc.layout.clusters.right_fingers.overrides.left_fingers_c1_r1_led
-        .footprints.main.params.P2
+        .footprints.main.params.P4
     ).toBe('right_LED_DATA');
   });
   it('reports pin exhaustion rather than silently omitting connections', () => {

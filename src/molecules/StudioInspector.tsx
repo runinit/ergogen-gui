@@ -41,6 +41,7 @@ export default function StudioInspector({
 }: Props) {
   const { section, id } = selection;
   const [newName, setNewName] = useState('');
+  const [resizeAttempt, setResizeAttempt] = useState(0);
   const objectSection = section === 'objects' || section === 'clusters';
   const item = objectSection ? data.layout[section]?.[id] : undefined;
   const resolved = objectSection ? report?.[section]?.[id] : undefined;
@@ -555,7 +556,7 @@ export default function StudioInspector({
           <h3>Arrangement</h3>
           {(['columns', 'rows'] as const).map((name) => (
             <StudioField
-              key={`${id}-${name}-${item.arrangement![name]?.length}`}
+              key={`${id}-${name}-${item.arrangement![name]?.length}-${resizeAttempt}`}
             >
               <span>{name === 'columns' ? 'Columns' : 'Rows'}</span>
               <input
@@ -565,17 +566,20 @@ export default function StudioInspector({
                 max="100"
                 disabled={locked}
                 defaultValue={item.arrangement![name]?.length || 1}
-                onBlur={(event) =>
+                onBlur={(event) => {
+                  const count = Number(event.target.value);
+                  // Keep the field on the saved size while a removal is reviewed.
+                  setResizeAttempt((attempt) => attempt + 1);
                   edit((before) =>
                     resizeCluster(before, id, {
                       [name]: matrixNames(
                         item.arrangement![name] || [],
-                        Number(event.target.value),
+                        count,
                         name === 'columns' ? 'c' : 'r'
                       ),
                     })
-                  )
-                }
+                  );
+                }}
               />
             </StudioField>
           ))}

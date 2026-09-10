@@ -1,3 +1,9 @@
+import { applyAssembly } from './applyAssembly';
+import {
+  defaultSetup,
+  type DesignSetup,
+  type KeyAssembly,
+} from './designSetup';
 import { getValue, setValue, removeValue, readStudio } from './studioSource';
 import { setLayout } from './layoutSource';
 
@@ -8,6 +14,7 @@ export interface KeyOptions {
   led: boolean;
   diodeAt: number[];
   ledAt: number[];
+  assemblyTemplate?: string;
 }
 const DEFAULT_KEY_OPTIONS: KeyOptions = {
   size: [18, 18],
@@ -22,28 +29,51 @@ export function keyOptions(
   cluster = '',
   column = ''
 ): KeyOptions {
-  return {
+  const setup = getValue(source, ['meta', 'studio', 'setup']) as
+    | DesignSetup
+    | undefined;
+  const templateOptions = (template: KeyAssembly): Partial<KeyOptions> => ({
+    size: template.options?.family?.startsWith('choc')
+      ? [17.5, 16.5]
+      : [18, 18],
+    diode: template.options?.diode ?? setup?.diode ?? DEFAULT_KEY_OPTIONS.diode,
+    led: template.options?.led ?? setup?.led ?? DEFAULT_KEY_OPTIONS.led,
+    diodeAt: [...template.diode.at, 0],
+    ledAt: [...template.led.at, 0],
+  });
+  let options = {
     ...DEFAULT_KEY_OPTIONS,
-    ...((getValue(source, [
-      'meta',
-      'studio',
-      'defaults',
-    ]) as Partial<KeyOptions>) || {}),
-    ...((getValue(source, [
-      'meta',
-      'studio',
-      'layouts',
-      cluster,
-    ]) as Partial<KeyOptions>) || {}),
-    ...((getValue(source, [
-      'meta',
-      'studio',
-      'columns',
-      cluster,
-      column,
-    ]) as Partial<KeyOptions>) || {}),
+    ...(setup
+      ? {
+          pitch: [setup.pitch, setup.pitch],
+          ...templateOptions(setup.template),
+        }
+      : {}),
   };
+  for (const path of [
+    ['defaults'],
+    ['layouts', cluster],
+    ['columns', cluster, column],
+  ]) {
+    const custom = (getValue(source, ['meta', 'studio', ...path]) ||
+      {}) as Partial<KeyOptions>;
+    const template =
+      custom.assemblyTemplate &&
+      (getValue(source, [
+        'meta',
+        'studio',
+        'templates',
+        custom.assemblyTemplate,
+      ]) as KeyAssembly | undefined);
+    options = {
+      ...options,
+      ...(template ? templateOptions(template) : {}),
+      ...custom,
+    };
+  }
+  return options;
 }
+
 export function setKeyOptions(
   source: string,
   options: Partial<KeyOptions>,
@@ -61,6 +91,89 @@ export function setKeyOptions(
   });
 }
 
+export function hasElectronics(
+  source: string,
+  id: string,
+  role: 'diode' | 'led'
+): boolean {
+  return (
+    Object.values(readStudio(source).layout.objects || {}).some(
+      (item) => item.properties?.owner === id && item.properties?.role === role
+    ) ||
+    !!getValue(source, [
+      'layout',
+      'objects',
+      id,
+      'footprints',
+      `studio_${role}`,
+    ])
+  );
+}
+export function electronicsAt(
+  source: string,
+  id: string,
+  role: 'diode' | 'led'
+): number[] {
+  const data = readStudio(source);
+  const owned = Object.values(data.layout.objects || {}).find(
+    (item) => item.properties?.owner === id && item.properties?.role === role
+  );
+  return (owned?.placement?.at ||
+    getValue(source, [
+      'layout',
+      'objects',
+      id,
+      'footprints',
+      `studio_${role}`,
+      'placement',
+      'at',
+    ]) ||
+    keyOptions(source, data.layout.objects?.[id]?.cluster)[
+      role === 'diode' ? 'diodeAt' : 'ledAt'
+    ]) as number[];
+}
+export function keySetup(source: string, id: string): DesignSetup | undefined {
+  const saved = getValue(source, ['meta', 'studio', 'setup']) as
+    | DesignSetup
+    | undefined;
+  const item = readStudio(source).layout.objects?.[id];
+  const options = keyOptions(source, item?.cluster, item?.cell?.[0]);
+  const name = item?.properties?.assembly_template || options.assemblyTemplate;
+  const template = getValue(source, [
+    'meta',
+    'studio',
+    'templates',
+    String(name || saved?.template.name || ''),
+  ]) as KeyAssembly | undefined;
+  if (!saved && !template) {
+    return undefined;
+  }
+  const resolved = template || saved!.template;
+  const inherited = item?.properties?.assembly_template
+    ? {}
+    : {
+        diode: options.diode,
+        led: options.led,
+        template: {
+          ...resolved,
+          diode: {
+            ...resolved.diode,
+            at: [options.diodeAt[0], options.diodeAt[1]] as [number, number],
+          },
+          led: {
+            ...resolved.led,
+            at: [options.ledAt[0], options.ledAt[1]] as [number, number],
+          },
+        },
+      };
+  return {
+    ...(saved || defaultSetup()),
+    ...resolved.options,
+    template: resolved,
+    ...inherited,
+  };
+}
+
 // Save only managed bindings so disabling an option restores authored wiring.
 export function keyElectronics(
   source: string,
@@ -70,6 +183,30 @@ export function keyElectronics(
   const item = readStudio(source).layout.objects?.[id];
   if (!item || item.kind !== 'key') {
     return source;
+  }
+  const setup = keySetup(source, id);
+  if (setup) {
+    return applyAssembly(
+      source,
+      [id],
+      {
+        ...setup,
+        diode: options.diode,
+        led: options.led,
+        template: {
+          ...setup.template,
+          diode: {
+            ...setup.template.diode,
+            at: [options.diodeAt[0], options.diodeAt[1]],
+          },
+          led: {
+            ...setup.template.led,
+            at: [options.ledAt[0], options.ledAt[1]],
+          },
+        },
+      },
+      'preserve'
+    );
   }
   let result = source;
   for (const kind of ['diode', 'led'] as const) {
@@ -195,6 +332,9 @@ export function applyKeyDefaults(source: string, id: string): string {
     ['envelopes', 'keycap', 'size'],
     options.size
   );
-  result = keyElectronics(result, id, options);
+  const setup = keySetup(source, id);
+  result = setup
+    ? applyAssembly(result, [id], setup, 'preserve')
+    : keyElectronics(result, id, options);
   return result;
 }

@@ -1,26 +1,10 @@
 import type { ModelBinding } from '../types/footprint';
 import { encodeAsset } from './caseAssets';
-import type { DesignSetup } from './designSetup';
 const cache = new Map<
   string,
   Promise<{ model: ModelBinding; assets: Record<string, string> }>
 >();
-export function setupModels(setup: Pick<DesignSetup, 'family' | 'mounting'>) {
-  const names =
-    setup.family === 'mx'
-      ? ['SW_Cherry_MX_PCB.stp']
-      : setup.family === 'choc_v1'
-        ? ['SW_Kailh_Choc_V1.stp']
-        : [];
-  if (setup.mounting === 'hotswap' && setup.family !== 'choc_v2') {
-    names.push(
-      setup.family === 'mx'
-        ? 'SW_Hotswap_Kailh_MX.stp'
-        : 'SW_Hotswap_Kailh_Choc_V1.stp'
-    );
-  }
-  return names;
-}
+export { setupModels } from './keyAssembly';
 export function loadComponentModel(name: string) {
   let pending = cache.get(name);
   if (!pending) {

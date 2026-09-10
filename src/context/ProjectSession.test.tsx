@@ -176,3 +176,51 @@ it('releases the generate control when edits supersede a running request', async
   expect(session.isGenerating).toBe(false);
   expect(session.resultsStale).toBe(true);
 });
+it('undoes an assembly source, model and footprint update as one transaction', async () => {
+  mount();
+  act(() => {
+    session.createNewConfig(source);
+    session.setProjectAssets({ old: 'old' });
+  });
+  await waitFor(() => expect(session.projectAssets).toEqual({ old: 'old' }));
+  const before = session.configInput;
+  act(() =>
+    session.commitProject({
+      source: source + '# assembly\n',
+      assets: { old: 'old', model: 'model' },
+      injections: [['footprint', 'new', 'new']],
+    })
+  );
+  act(() => session.undo());
+  expect(session.configInput).toBe(before);
+  expect(session.projectAssets).toEqual({ old: 'old' });
+  expect(session.injectionInput?.some((item) => item[1] === 'new')).toBe(false);
+});
+it('cancels queued generation when the project session unmounts', async () => {
+  vi.useFakeTimers();
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    const view = render(
+      <ConfigContextProvider>
+        <Capture />
+      </ConfigContextProvider>
+    );
+    act(() => {
+      session.createNewConfig(source, 'Queued');
+      session.setAutoGen(true);
+      session.setShowSettings(false);
+    });
+    await act(async () => {});
+    view.unmount();
+    error.mockClear();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(error).not.toHaveBeenCalledWith(
+      'Worker not available for processing request.'
+    );
+  } finally {
+    vi.useRealTimers();
+    error.mockRestore();
+  }
+});

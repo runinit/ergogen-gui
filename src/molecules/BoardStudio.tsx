@@ -1,3 +1,7 @@
+import { ResizeReview, type ResizeProposal } from '../utils/resizeReview';
+import { repairSetup } from '../utils/setupRepair';
+import { keySetup } from '../utils/keyOptions';
+import ResizeReviewDialog from './ResizeReviewDialog';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box,
@@ -113,6 +117,26 @@ export default function BoardStudio({
   const [review, setReview] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
   const [assemblyKeys, setAssemblyKeys] = useState<string[]>([]);
+  const [resizeReview, setResizeReview] = useState<{
+    proposal: ResizeProposal;
+    finish: (source: string) => void;
+  } | null>(null);
+  const repaired = useRef(new Set<string>());
+  const editSource = context?.editSource;
+  useEffect(() => {
+    if (parsed.error || repaired.current.has(source)) {
+      return;
+    }
+    try {
+      const next = repairSetup(source);
+      if (next !== source) {
+        repaired.current.add(source);
+        editSource?.(next);
+      }
+    } catch (caught) {
+      setError(String(caught));
+    }
+  }, [source, parsed.error, editSource]);
   const [quickRequest, setQuickRequest] = useState(0);
   const treeTrigger = useRef<HTMLButtonElement>(null),
     inspectorTrigger = useRef<HTMLButtonElement>(null);
@@ -150,13 +174,20 @@ export default function BoardStudio({
     layout.stale || layout.pending || !!layout.error || !!parsed.error;
   const boardStale =
     analysis.stale || analysis.pending || !!analysis.error || !!parsed.error;
-  const edit = (transform: (before: string) => string) => {
+  const edit = (
+    transform: (before: string) => string,
+    finish: (source: string) => void = (next) => context?.editSource(next)
+  ) => {
     try {
       const before = context?.getRealtimeConfigInput() || '';
       const next = transform(before);
-      context?.editSource(next);
+      finish(next);
       setError('');
     } catch (caught) {
+      if (caught instanceof ResizeReview) {
+        setResizeReview({ proposal: caught.proposal, finish });
+        return;
+      }
       setError(String(caught));
     }
   };
@@ -331,8 +362,11 @@ export default function BoardStudio({
   const setupIssues = ((!parsed.error &&
     getValue(source, ['meta', 'studio', 'findings'])) ||
     []) as string[];
+  const electricalIssues = ((!parsed.error &&
+    getValue(source, ['meta', 'studio', 'electricalFindings'])) ||
+    []) as string[];
   const findings = [
-    ...setupIssues.map((message) => ({
+    ...[...setupIssues, ...electricalIssues].map((message) => ({
       feature: 'meta.studio.setup',
       sourcePath: 'meta.studio.setup',
       code: 'setup-incomplete',
@@ -409,9 +443,37 @@ export default function BoardStudio({
         }
       }}
     >
+      {resizeReview && (
+        <ResizeReviewDialog
+          proposal={resizeReview.proposal}
+          onCancel={() => setResizeReview(null)}
+          onApply={() => {
+            if (
+              context.getRealtimeConfigInput() !== resizeReview.proposal.before
+            ) {
+              setError(
+                'The project changed during review. Resize again to review the current keys.'
+              );
+              setResizeReview(null);
+              return;
+            }
+            try {
+              resizeReview.finish(resizeReview.proposal.after);
+              setResizeReview(null);
+              setError('');
+            } catch (caught) {
+              setError(String(caught));
+            }
+          }}
+        />
+      )}
       {setupOpen && (
         <NewDesignWorkspace
-          initial={savedSetup || defaultSetup()}
+          initial={
+            (assemblyKeys.length
+              ? keySetup(source, assemblyKeys[0])
+              : savedSetup) || defaultSetup()
+          }
           mode={assemblyKeys.length ? 'assembly' : 'design'}
           onCancel={() => setSetupOpen(false)}
           onCreate={(next, newAssets, injections) => {
@@ -420,21 +482,29 @@ export default function BoardStudio({
               'studio',
               'setup',
             ]) as DesignSetup;
-            edit((before) =>
-              assemblyKeys.length
-                ? applyAssembly(before, assemblyKeys, setup, 'preserve')
-                : updateSetup(before, setup)
+            edit(
+              (before) =>
+                assemblyKeys.length
+                  ? applyAssembly(
+                      before,
+                      assemblyKeys,
+                      setup,
+                      'preserve',
+                      selection?.section === 'clusters'
+                        ? 'cluster'
+                        : selection?.section === 'columns'
+                          ? 'column'
+                          : 'keys'
+                    )
+                  : updateSetup(before, setup),
+              (after) => {
+                context.commitProject(
+                  { source: after },
+                  { assets: newAssets, injections }
+                );
+                setSetupOpen(false);
+              }
             );
-            context.setProjectAssets((before) => ({ ...before, ...newAssets }));
-            if (injections?.length) {
-              context.setInjectionInput((before) => [
-                ...(before || []).filter(
-                  (item) => !injections.some((next) => next[1] === item[1])
-                ),
-                ...injections,
-              ]);
-            }
-            setSetupOpen(false);
           }}
         />
       )}

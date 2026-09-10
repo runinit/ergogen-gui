@@ -8,6 +8,9 @@ import { expect, test, Page } from '@playwright/test';
 import Stack from '../src/examples/physical-stack';
 import Columns from '../src/examples/columns';
 import { parse } from 'yaml';
+import { compileSetup, defaultSetup } from '../src/utils/designSetup';
+import { setupBaseline } from '../src/utils/setupRepair';
+import { setValue } from '../src/utils/studioSource';
 
 const TIMEOUT = 120000;
 test.setTimeout(TIMEOUT);
@@ -231,4 +234,114 @@ layout:
   ).toBe(10);
   await page.getByRole('button', { name: 'Undo project edit' }).click();
   await expect.poll(() => source(page)).toBe(original);
+});
+
+test('grows an onboarding matrix and adds an owned thumb assembly', async ({
+  page,
+}) => {
+  await load(
+    page,
+    compileSetup({ ...defaultSetup(), columns: 2, rows: 1, led: true })
+  );
+  await page
+    .getByRole('button', { name: 'fingers 2 keys', exact: true })
+    .click();
+  await page.getByLabel('Matrix columns').fill('3');
+  await page.getByLabel('Matrix columns').press('Tab');
+  await expect
+    .poll(
+      async () =>
+        parse(await source(page)).layout.objects.fingers_c3_r1_diode?.footprints
+          .main.params.to
+    )
+    .toBe('R1');
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await page.getByLabel('New item kind').selectOption('arc');
+  await page.getByLabel('New item name').fill('thumbs');
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'thumbs 3 keys', exact: true })
+  ).toBeVisible();
+  await expect
+    .poll(
+      async () =>
+        parse(await source(page)).layout.objects.thumbs_0_led?.properties.owner
+    )
+    .toBe('thumbs_0');
+  await expect(
+    page.getByRole('status').filter({ hasText: /Layout resolved/ })
+  ).toBeVisible({ timeout: TIMEOUT });
+  await page.screenshot({
+    path: test.info().outputPath('onboarding-growth.png'),
+  });
+});
+test('cancels, confirms and undoes removal of an edited column', async ({
+  page,
+}) => {
+  const initial = setValue(
+    compileSetup({ ...defaultSetup(), columns: 2, rows: 1, led: true }),
+    ['layout', 'objects', 'fingers_c2_r1', 'placement'],
+    { override: { at: [2, 0, 0] } }
+  );
+  await load(page, initial);
+  await page
+    .getByRole('button', { name: 'fingers 2 keys', exact: true })
+    .click();
+  const columns = page.getByLabel('Matrix columns');
+  await columns.fill('1');
+  await columns.press('Tab');
+  const review = page.getByRole('dialog', { name: 'Review matrix resize' });
+  await expect(review).toBeVisible();
+  expect(await source(page)).toBe(initial);
+  await review.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(columns).toHaveValue('2');
+  expect(await source(page)).toBe(initial);
+  await columns.fill('1');
+  await columns.press('Tab');
+  await page.screenshot({ path: test.info().outputPath('resize-review.png') });
+  await review.getByRole('button', { name: 'Remove keys and resize' }).click();
+  await expect
+    .poll(async () => parse(await source(page)).layout.objects.fingers_c2_r1)
+    .toBeUndefined();
+  expect(
+    parse(await source(page)).layout.objects.fingers_c2_r1_led
+  ).toBeUndefined();
+  await page.getByRole('button', { name: 'Undo project edit' }).click();
+  await expect.poll(() => source(page)).toBe(initial);
+});
+test('repairs a published setup draft on a narrow screen without touching custom nets', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const initial = setValue(
+    setupBaseline({ ...defaultSetup(), columns: 2, rows: 1, led: true }, 1),
+    [
+      'layout',
+      'objects',
+      'fingers_c2_r1_led',
+      'footprints',
+      'main',
+      'params',
+      'P4',
+    ],
+    'CUSTOM'
+  );
+  await load(page, initial);
+  await expect
+    .poll(async () => parse(await source(page)).meta.studio.setupRevision)
+    .toBe(2);
+  const doc = parse(await source(page));
+  expect(doc.layout.objects.fingers_c1_r1_led.footprints.main.params.P4).toBe(
+    'LED_DATA'
+  );
+  expect(doc.layout.objects.fingers_c2_r1_led.footprints.main.params.P4).toBe(
+    'CUSTOM'
+  );
+  expect(doc.designs.regions.main.envelope).toBe('keycap');
+  await page.reload();
+  await expect(studio(page)).toBeVisible();
+  expect(
+    parse(await source(page)).layout.objects.fingers_c2_r1_led.footprints.main
+      .params.P4
+  ).toBe('CUSTOM');
 });
