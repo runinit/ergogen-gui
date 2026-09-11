@@ -145,6 +145,31 @@ it('does not accept an older revision after editing during generation', () => {
   expect(mocks.workers.at(-1).postMessage).toHaveBeenCalledOnce();
   hook.unmount();
 });
+it('cancels obsolete generation and conversion as soon as the source changes', () => {
+  const hook = renderHook(({ source }) => useCasePreview(source, injections), {
+    initialProps: { source: 'old' },
+  });
+  act(() => hook.result.current.generate());
+  const worker = mocks.workers.at(-1);
+  act(() =>
+    worker.onmessage({
+      data: {
+        type: 'success',
+        results: { cases: { tray: { jscad: 'source' } } },
+      },
+    })
+  );
+  const converter = mocks.conversions.at(-1);
+  expect(hook.result.current.pending).toBe(true);
+
+  act(() => hook.rerender({ source: 'new' }));
+
+  expect(worker.terminate).toHaveBeenCalledOnce();
+  expect(converter.terminate).toHaveBeenCalledOnce();
+  expect(hook.result.current.pending).toBe(false);
+  expect(hook.result.current.stale).toBe(true);
+  hook.unmount();
+});
 it('clears running state on errors and retries without losing the source', () => {
   const hook = renderHook(() => useCasePreview('draft', injections));
   act(() => hook.result.current.generate());

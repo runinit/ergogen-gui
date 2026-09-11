@@ -42,6 +42,7 @@ function useCaseWorker(
   const [pending, setPending] = useState(false);
   const owned = useRef<Worker | null>(null);
   const conversion = useRef<Worker | null>(null);
+  const runningRevision = useRef('');
   const serial = useRef(0);
   const settled = useRef(false);
   const workerInjections = useRef('');
@@ -78,6 +79,7 @@ function useCaseWorker(
       setPending(false);
       return;
     }
+    runningRevision.current = revision;
     setPending(true);
     const requestId = `case-${mode}-${++serial.current}`;
     worker.onerror = (event) => {
@@ -85,6 +87,7 @@ function useCaseWorker(
         return;
       }
       settled.current = false;
+      runningRevision.current = '';
       setPending(false);
       if (latest.current !== revision) {
         return;
@@ -99,6 +102,7 @@ function useCaseWorker(
       error?: string;
       diagnostics?: CaseFinding[];
     }) => {
+      runningRevision.current = '';
       setPending(false);
       if (latest.current !== revision) {
         return;
@@ -190,9 +194,22 @@ function useCaseWorker(
       owned.current = null;
       conversion.current?.terminate();
       conversion.current = null;
+      runningRevision.current = '';
     },
     []
   );
+  useEffect(() => {
+    if (!runningRevision.current || runningRevision.current === revision) {
+      return;
+    }
+    conversion.current?.terminate();
+    conversion.current = null;
+    owned.current?.terminate();
+    owned.current = null;
+    runningRevision.current = '';
+    settled.current = false;
+    setPending(false);
+  }, [revision]);
   useEffect(() => {
     if (mode === 'generate') {
       return;
@@ -200,6 +217,7 @@ function useCaseWorker(
     if (!enabled) {
       owned.current?.terminate();
       owned.current = null;
+      runningRevision.current = '';
       settled.current = false;
       setPending(false);
       return;
@@ -219,6 +237,7 @@ function useCaseWorker(
       conversion.current = null;
       owned.current?.terminate();
       owned.current = null;
+      runningRevision.current = '';
       settled.current = false;
       setPending(false);
     },
