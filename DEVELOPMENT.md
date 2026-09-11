@@ -16,10 +16,25 @@ This document serves as a knowledge base and architectural guide for the project
 
 ## Board Studio and document session
 
-`BoardStudio` is the native workspace: Layout → Components → PCB → Case → Export.
+`BoardStudio` is the native workspace: Design → PCB → Case → Export.
 Its tree and inspector surround a shared physical-layout canvas. Phone panels
 replace the docked columns without removing editing controls. Legacy documents
 retain the existing workspace while native projects use Studio.
+
+Design combines layout and component placement, with one part-library entry.
+Settings opens a modal inside the workspace and restores focus when closed;
+selection, camera and the active stage remain mounted. Advanced library source
+appears only after selecting an entry. Schema routing parses YAML, retains the
+active editor during syntax errors and resets when switching projects.
+
+Board Studio owns native analysis and explicit generation across Case, Code,
+library, sketches and Export. Analysis updates sketch editing; full generation
+supplies assembly meshes and converts JSCAD tray parts before publishing success.
+The legacy context never generates native documents, including
+initial imports and migrated thumbnails. Visiting Case does not modify the source;
+**Create case** is an explicit undoable edit. Export groups portable source, PCB,
+outlines and case files. Manufacturing review belongs to the current generated
+result and resets after edits; case failures do not block valid PCB outputs.
 
 `ConfigContext` owns the source, realtime source reference, project assets,
 custom injections and bounded undo/redo history. Code typing coalesces for 750 ms;
@@ -737,9 +752,10 @@ editors. Documents and values are cloned before exposure; aliases, source ranges
 and independent edits remain covered by regression tests. A different source
 replaces the snapshot, bounding retained configuration data.
 
-While Case is active, Board Studio suspends its layout and board workers; the
-case designer owns draft analysis. Returning to Layout resumes analysis. Explicit
-3D builds reuse a successfully completed worker when injections are unchanged,
+While Case is active, Board Studio suspends its lightweight layout worker and
+keeps board analysis and full generation at workspace level. Standalone legacy
+case drafts retain their own jobs. Explicit 3D builds reuse a successfully
+completed worker when injections are unchanged,
 retaining the initialized CAD runtime. Busy, failed or changed-injection workers
 are replaced. Source, asset and request revisions still reject stale results;
 each build regenerates solids without reducing mesh precision or validation.

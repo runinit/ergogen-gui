@@ -43,7 +43,7 @@ test('loads the BHK example and regenerates it offline', async ({
   }
   await page
     .getByRole('navigation', { name: 'Design workflow' })
-    .getByRole('button', { name: 'Layout', exact: true })
+    .getByRole('button', { name: 'Design', exact: true })
     .click();
   await expect(
     page.getByRole('group', { name: 'Interactive board layout' })

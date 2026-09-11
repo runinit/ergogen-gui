@@ -1,5 +1,7 @@
 import { saveAs } from 'file-saver';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { GeometryJob } from '../hooks/useCasePreview';
+import { caseReadiness } from '../utils/caseReadiness';
 import { Results } from '../types/results';
 import { createZip } from '../utils/zip';
 import { CaseAssets } from '../utils/caseAssets';
@@ -15,6 +17,8 @@ export default function StudioExport({
   stale,
   blockers,
   review,
+  preview,
+  analysis,
 }: {
   source: string;
   injections?: string[][];
@@ -23,16 +27,38 @@ export default function StudioExport({
   stale: boolean;
   blockers: number;
   review: () => void;
+  preview: GeometryJob;
+  analysis: GeometryJob;
 }) {
   const [error, setError] = useState('');
   const [sharing, setSharing] = useState(false);
-  const ready = !!result && !stale && blockers === 0;
+  const hasOutputs =
+    Object.keys(result?.pcbs || {}).length > 0 ||
+    Object.values(result?.outlines || {}).some(
+      (files) => files.svg || files.dxf
+    );
+  const ready = hasOutputs && !stale && blockers === 0;
+  const caseError = caseReadiness(source, preview, analysis);
+  const [reviewed, setReviewed] = useState<Results | null>(null);
+  const confirmed =
+    !caseError && reviewed !== null && reviewed === preview.result;
+  useEffect(() => {
+    if (caseError) {
+      setReviewed(null);
+    }
+  }, [caseError]);
   const download = (name: string, content: string) =>
     saveAs(new Blob([content]), name);
-  const archive = (outputs: Results) => {
-    void createZip(outputs, source, injections, false, false, assets).catch(
-      (error) => setError(String(error))
-    );
+  const archive = (outputs: Results, kind: 'board' | 'case' = 'board') => {
+    setError('');
+    void createZip(
+      outputs,
+      source,
+      injections,
+      false,
+      kind === 'case',
+      assets
+    ).catch((error) => setError(String(error)));
   };
   return (
     <StudioMain style={{ padding: theme.spacing.lg, flex: 1 }}>
@@ -42,7 +68,9 @@ export default function StudioExport({
           ? 'Geometry needs updating. Your source is always available.'
           : blockers
             ? `${blockers} blockers need review before geometry export.`
-            : 'PCB and outline files match the current project.'}
+            : hasOutputs
+              ? 'PCB and outline files match the current project.'
+              : 'This project has no PCB or outline outputs yet.'}
       </p>
       {error && <StudioStatus role="alert">{error}</StudioStatus>}
       <h3>Editable project</h3>
@@ -102,11 +130,28 @@ export default function StudioExport({
           </StudioActions>
         ))}
       <h3>Case parts</h3>
-      <p>
-        Generate the case, review clearances and process checks, then download
-        its STEP, STL and manufacturing package.
-      </p>
+      <p>{caseError || 'Generated case files match the current project.'}</p>
       <button onClick={review}>Review case and manufacturing</button>
+      <label>
+        <input
+          type="checkbox"
+          checked={confirmed}
+          disabled={!!caseError}
+          onChange={(event) =>
+            setReviewed(event.target.checked ? preview.result : null)
+          }
+        />{' '}
+        I reviewed dimensions, hardware and manufacturing findings.
+      </label>
+      <StudioActions>
+        <button
+          disabled={!confirmed}
+          onClick={() => preview.result && archive(preview.result, 'case')}
+        >
+          Download case ZIP
+        </button>
+      </StudioActions>
+      <p>Physical fit requires a fabricated prototype.</p>
       {sharing && (
         <ShareDialog
           config={source}

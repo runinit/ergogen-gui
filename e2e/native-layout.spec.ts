@@ -76,6 +76,9 @@ test('edits local key overrides, preserves arrangements, and enforces locks', as
   await load(page, Columns.value);
   await openLayout(page);
   await page
+    .getByRole('button', { name: 'Select Objects', exact: true })
+    .click();
+  await page
     .getByRole('button', { name: 'Select outer_home', exact: true })
     .click();
   await page.getByLabel('X', { exact: true }).fill('5');
@@ -163,7 +166,7 @@ test('shows independent floor and PCB layers in side view and generates their as
   await expect(page.getByText('= 2.5 mm', { exact: true })).toBeVisible();
   await page
     .getByRole('button', { name: 'Select screen', exact: true })
-    .click();
+    .press('Enter');
   await expect(page.getByLabel('Mounting layer', { exact: true })).toHaveValue(
     'switches'
   );
@@ -174,11 +177,13 @@ test('shows independent floor and PCB layers in side view and generates their as
   await openCase(page);
   const dialog = page.getByRole('region', { name: 'Case designer' });
   await expect(
-    dialog.getByRole('button', { name: 'Generate', exact: true })
+    page.getByRole('button', { name: 'Generate project', exact: true })
   ).toBeEnabled({ timeout: TIMEOUT });
-  await dialog.getByRole('button', { name: 'Generate', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Generate project', exact: true })
+    .click();
   await expect(
-    dialog.getByText('Generated current draft', { exact: true })
+    dialog.getByRole('status').filter({ hasText: /Current geometry/ })
   ).toBeVisible({ timeout: TIMEOUT });
   await dialog.getByRole('button', { name: 'assembled', exact: true }).click();
   await expect(dialog.getByLabel('3D assembly preview')).toHaveAttribute(

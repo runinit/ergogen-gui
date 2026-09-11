@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import JSZip from 'jszip';
 import NativeStack from '../src/examples/physical-stack';
 import { CONFIG_LOCAL_STORAGE_KEY } from '../src/context/constants';
-import { studio, openCode, openCase } from './utils/studio';
+import { studio, openCode, openCase, openExport } from './utils/studio';
 
 const TIMEOUT = 120000;
 test.setTimeout(TIMEOUT);
@@ -69,14 +69,14 @@ test('generates distinct physical stack STL parts and previews them', async ({
       .getByLabel(`${part} process`, { exact: true })
       .selectOption('fdm');
   }
-  const generate = designer.getByRole('button', {
-    name: 'Generate',
+  const generate = page.getByRole('button', {
+    name: 'Generate project',
     exact: true,
   });
   await expect(generate).toBeEnabled({ timeout: TIMEOUT });
   await generate.click();
   await expect(
-    designer.getByText('Generated current draft', { exact: true })
+    designer.getByRole('status').filter({ hasText: /Current geometry/ })
   ).toBeVisible({ timeout: TIMEOUT });
   await designer.getByRole('button', { name: 'part', exact: true }).click();
   for (const name of ['bottom', 'plate']) {
@@ -87,11 +87,12 @@ test('generates distinct physical stack STL parts and previews them', async ({
     );
   }
   await designer.getByRole('button', { name: 'Review', exact: true }).click();
-  await designer
+  const exportView = await openExport(page);
+  await exportView
     .getByRole('checkbox', { name: /I reviewed dimensions/ })
     .check();
-  const download = designer.getByRole('button', {
-    name: 'Download ZIP',
+  const download = exportView.getByRole('button', {
+    name: 'Download case ZIP',
     exact: true,
   });
   await expect(download).toBeEnabled();

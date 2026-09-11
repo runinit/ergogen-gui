@@ -4,12 +4,25 @@ import { parse } from 'yaml';
 import { compileSetup, defaultSetup } from '../utils/designSetup';
 import { setValue } from '../utils/studioSource';
 import BoardStudio from './BoardStudio';
-import { useLayoutAnalysis, useCaseAnalysis } from '../hooks/useCasePreview';
+import {
+  useLayoutAnalysis,
+  useCaseAnalysis,
+  useCasePreview,
+} from '../hooks/useCasePreview';
 
 let current = '';
 const hooks = vi.hoisted(() => ({ useConfigContext: vi.fn() }));
 vi.mock('../context/ConfigContext', () => hooks);
 vi.mock('../hooks/useCasePreview', () => ({
+  useCasePreview: vi.fn(() => ({
+    result: null,
+    stale: true,
+    pending: false,
+    error: '',
+    diagnostics: [],
+    generate: vi.fn(),
+    cancel: vi.fn(),
+  })),
   useLayoutAnalysis: vi.fn(() => ({
     result: null,
     stale: true,
@@ -97,7 +110,36 @@ it('keeps workflow destinations and code accessible', () => {
   expect(screen.getByRole('button', { name: 'Download YAML' })).toBeEnabled();
   expect(
     screen.getByRole('button', { name: 'Download PCB and outlines ZIP' })
-  ).toBeEnabled();
+  ).toBeDisabled();
+});
+
+it('uses the same generation controller across case and export navigation', () => {
+  const generate = vi.fn();
+  vi.mocked(useCasePreview).mockReturnValue({
+    result: null,
+    stale: true,
+    pending: false,
+    error: '',
+    diagnostics: [],
+    generate,
+    cancel: vi.fn(),
+  });
+  vi.mocked(useLayoutAnalysis).mockReturnValue({
+    result: null,
+    stale: false,
+    pending: false,
+    error: '',
+    diagnostics: [],
+    generate: vi.fn(),
+    cancel: vi.fn(),
+  });
+  render(<Harness />);
+  fireEvent.click(screen.getByRole('button', { name: 'Generate project' }));
+  expect(generate).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByRole('button', { name: 'Case' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Generate project' }));
+  expect(generate).toHaveBeenCalledTimes(2);
 });
 it('creates a 5 by 4 matrix and edits a whole column and its individual cells', () => {
   render(<Harness />);
@@ -264,4 +306,70 @@ it('deletes the selected column but leaves Delete in text fields alone', () => {
   expect(parse(current).layout.clusters.main.arrangement.columns).toEqual([
     'c2',
   ]);
+});
+
+it('keeps cancellation available while Case is generating', () => {
+  const cancel = vi.fn();
+  vi.mocked(useCasePreview).mockReturnValue({
+    result: null,
+    stale: true,
+    pending: true,
+    error: '',
+    diagnostics: [],
+    generate: vi.fn(),
+    cancel,
+  });
+  render(<Harness />);
+  fireEvent.click(screen.getByRole('button', { name: 'Case' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel generation' }));
+  expect(cancel).toHaveBeenCalledOnce();
+});
+
+it('retries failed board analysis from Export', () => {
+  const generate = vi.fn();
+  vi.mocked(useCaseAnalysis).mockReturnValue({
+    result: null,
+    stale: true,
+    pending: false,
+    error: 'Worker stopped',
+    diagnostics: [],
+    generate,
+    cancel: vi.fn(),
+  });
+  vi.mocked(useCasePreview).mockReturnValue({
+    result: null,
+    stale: true,
+    pending: false,
+    error: '',
+    diagnostics: [],
+    generate: vi.fn(),
+    cancel: vi.fn(),
+  });
+  render(<Harness />);
+  fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Retry board analysis' }));
+  expect(generate).toHaveBeenCalledOnce();
+});
+
+it('returns to the part library after closing Code', async () => {
+  render(<Harness />);
+  fireEvent.click(screen.getByRole('button', { name: 'Part library' }));
+  expect(
+    await screen.findByRole('button', { name: 'Preview in case' })
+  ).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Code' }));
+  expect(screen.getByText('Code editor')).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Code' }));
+  expect(
+    await screen.findByRole('button', { name: 'Preview in case' })
+  ).toBeVisible();
+});
+
+it('opens case creation from Export when the project has no assembly', () => {
+  render(<Harness />);
+  fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Review case and manufacturing' })
+  );
+  expect(screen.getByText('Case tools')).toBeVisible();
 });

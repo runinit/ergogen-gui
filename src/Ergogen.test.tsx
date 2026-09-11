@@ -16,6 +16,13 @@ vi.mock('react-hotkeys-hook', () => ({
   useHotkeys: vi.fn(),
 }));
 
+vi.mock('./molecules/BoardStudio', () => ({
+  default: function MockBoardStudio() {
+    const [stage, setStage] = React.useState('Design');
+    return <button onClick={() => setStage('Case')}>{stage}</button>;
+  },
+}));
+
 // Mock sub-components
 vi.mock('./molecules/ConfigEditor', () => {
   const MockConfigEditor = () => <div data-testid="mock-config-editor" />;
@@ -93,6 +100,62 @@ describe('Ergogen Subheader Buttons', () => {
     vi.mocked(useConfigContext, { partial: true }).mockReturnValue(
       mockContextValue
     );
+  });
+
+  it('keeps the native workspace mounted while settings are open', () => {
+    const context = {
+      ...mockContextValue,
+      configInput: 'schema: ergogen/v1\nlayout: {}',
+    };
+    vi.mocked(useConfigContext, { partial: true }).mockReturnValue(context);
+    const view = render(<Ergogen />);
+    fireEvent.click(screen.getByRole('button', { name: 'Design' }));
+
+    vi.mocked(useConfigContext, { partial: true }).mockReturnValue({
+      ...context,
+      showSettings: true,
+    });
+    view.rerender(<Ergogen />);
+    vi.mocked(useConfigContext, { partial: true }).mockReturnValue(context);
+    view.rerender(<Ergogen />);
+
+    expect(screen.getByRole('button', { name: 'Case' })).toBeInTheDocument();
+  });
+
+  it('does not mistake a schema mention in a comment for a native project', () => {
+    vi.mocked(useConfigContext, { partial: true }).mockReturnValue({
+      ...mockContextValue,
+      configInput: '# See ergogen/v1 for the new format\npoints: {}',
+    });
+    render(<Ergogen />);
+    expect(screen.getByTestId('mock-config-editor')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Design' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('retains the editor during invalid YAML and resets it for another project', () => {
+    const context = {
+      ...mockContextValue,
+      configInput: 'schema: ergogen/v1\nlayout: {}',
+    };
+    vi.mocked(useConfigContext, { partial: true }).mockReturnValue(context);
+    const view = render(<Ergogen />);
+    fireEvent.click(screen.getByRole('button', { name: 'Design' }));
+    vi.mocked(useConfigContext, { partial: true }).mockReturnValue({
+      ...context,
+      configInput: 'schema: [unfinished',
+    });
+    view.rerender(<Ergogen />);
+    expect(screen.getByRole('button', { name: 'Case' })).toBeInTheDocument();
+
+    vi.mocked(useConfigContext, { partial: true }).mockReturnValue({
+      ...context,
+      activeConfigId: '2',
+      configInput: 'points: [unfinished',
+    });
+    view.rerender(<Ergogen />);
+    expect(screen.getByTestId('mock-config-editor')).toBeInTheDocument();
   });
 
   it('renders mobile share button and triggers share logic on click when showConfig is true', () => {

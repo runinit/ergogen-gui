@@ -64,6 +64,14 @@ beforeEach(() => {
 });
 
 describe('Case wizard', () => {
+  it('opens an embedded case without changing source or history', () => {
+    render(<CaseWizard presentation="embedded" onClose={mocks.close} />);
+    expect(mocks.edit).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Create case' }));
+    expect(mocks.edit).toHaveBeenCalledOnce();
+    expect(parse(mocks.source).designs.assemblies.case).toBeDefined();
+  });
+
   it('can inspect a selected part before an assembly is generated', () => {
     render(<CaseWizard onClose={mocks.close} />);
     fireEvent.click(screen.getByRole('treeitem', { name: 'Case shell' }));
@@ -312,8 +320,9 @@ it('explains automatic CNC relief and chooses a smaller default plate cutter', (
   expect(screen.getByText(/CNC adds corner relief/i)).toBeVisible();
 });
 
-it('initializes an embedded case before reading its regions', () => {
+it('initializes an embedded case when explicitly requested', () => {
   render(<CaseWizard presentation="embedded" onClose={mocks.close} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Create case' }));
   expect(
     screen.getByRole('region', { name: 'Case designer' })
   ).toBeInTheDocument();

@@ -66,7 +66,14 @@ const DRAW_COUNTS: Record<string, number> = {
 const SNAP_RADIUS = 2;
 const ZOOM_STEP = 1.25;
 
-export default function DesignView() {
+export default function DesignView({
+  session,
+}: {
+  session?: {
+    analysis: import('../hooks/useCasePreview').GeometryJob;
+    preview: import('../hooks/useCasePreview').GeometryJob;
+  };
+}) {
   const context = useConfigContext();
   const [selected, setSelected] = useState('');
   const [tool, setTool] = useState('select');
@@ -96,7 +103,15 @@ export default function DesignView() {
   if (!context) {
     return null;
   }
-  const report = context.results?.designs as DesignReport | undefined;
+  const result = session ? session.analysis.result : context.results;
+  const solids = session ? session.preview.result : context.results;
+  const stale = session
+    ? session.analysis.stale ||
+      session.analysis.pending ||
+      (!!assembly && session.preview.stale)
+    : context.resultsStale;
+  const failure = session ? session.analysis.error : context.error;
+  const report = result?.designs as DesignReport | undefined;
   const features = report?.features || {};
   const feature = features[selected];
   const sketch = feature?.sketch;
@@ -107,9 +122,11 @@ export default function DesignView() {
       const after = transform(before);
       applyDesignEdit(before, after);
       setError('');
-      void context.generateNow(after, context.injectionInput, {
-        pointsonly: false,
-      });
+      if (!session) {
+        void context.generateNow(after, context.injectionInput, {
+          pointsonly: false,
+        });
+      }
     } catch (error) {
       setError(String(error));
     }
@@ -167,7 +184,7 @@ export default function DesignView() {
       };
       return;
     }
-    if (tool === 'select' || context.resultsStale) {
+    if (tool === 'select' || stale) {
       return;
     }
     const next = [...clicks, coordinate(event)];
@@ -249,7 +266,8 @@ export default function DesignView() {
       spec
     );
   };
-  const assemblyParts = report?.assemblies[assembly]?.parts || {};
+  const assemblies = solids?.designs?.assemblies || {};
+  const assemblyParts = assemblies[assembly]?.parts || {};
   return (
     <Panel aria-label="Design view">
       <Controls>
@@ -333,9 +351,9 @@ export default function DesignView() {
           </button>
         )}
       </Controls>
-      {(context.resultsStale || context.error) && (
+      {(stale || failure) && (
         <Status role="status">
-          Preview stale — showing the last valid design. {context.error}
+          Preview stale — showing the last valid design. {failure}
         </Status>
       )}
       {error && <Status role="alert">{error}</Status>}
@@ -348,7 +366,7 @@ export default function DesignView() {
       {assembly ? (
         <AssemblyPreview
           parts={assemblyParts}
-          cases={{ ...context.results?.cases, ...context.results?.solids }}
+          cases={{ ...solids?.cases, ...solids?.solids }}
           exploded={exploded}
           selected={part}
           onSelect={setPart}
@@ -440,7 +458,7 @@ export default function DesignView() {
                 fill={theme.colors.accent}
                 aria-label={`Drag ${id}`}
                 onPointerDown={(event) => {
-                  if (context.resultsStale) {
+                  if (stale) {
                     return;
                   }
                   event.stopPropagation();
@@ -638,7 +656,7 @@ export default function DesignView() {
           </Controls>
         </>
       )}
-      {!!Object.keys(report?.assemblies || {}).length && (
+      {!!Object.keys(assemblies).length && (
         <Controls>
           <label>
             Assembly{' '}
@@ -651,7 +669,7 @@ export default function DesignView() {
               }}
             >
               <option value="">None</option>
-              {Object.keys(report!.assemblies).map((id) => (
+              {Object.keys(assemblies).map((id) => (
                 <option key={id}>{id}</option>
               ))}
             </select>

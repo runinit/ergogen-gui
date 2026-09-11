@@ -1246,6 +1246,11 @@ const ConfigContextProvider = ({
       if (!targetInput) {
         return;
       }
+      const [, parsedConfig] = parseConfig(targetInput);
+      // Native projects own analysis and explicit builds in Board Studio.
+      if (parsedConfig?.schema === 'ergogen/v1') {
+        return;
+      }
       if (
         adoptedResult.current?.source === targetInput &&
         adoptedResult.current.injections ===
@@ -1255,7 +1260,6 @@ const ConfigContextProvider = ({
       }
       adoptedResult.current = null;
       const inputInjection = filterInjectionsByFeatureFlags(injectionInput);
-      const [, parsedConfig] = parseConfig(targetInput);
 
       setError(null);
       setDeprecationWarning(null);
@@ -1275,10 +1279,7 @@ const ConfigContextProvider = ({
       }
 
       const inputConfig =
-        (parsedConfig as { schema?: string })?.schema === 'ergogen/v1'
-          ? targetInput
-          : preparePreviewConfig(parsedConfig, options.pointsonly) ||
-            targetInput;
+        preparePreviewConfig(parsedConfig, options.pointsonly) || targetInput;
 
       const requestId = activeRequestRef.current;
       const assetsAtRequest = {
@@ -1916,7 +1917,7 @@ const ConfigContextProvider = ({
    * Effect to handle transition of showSettings from true to false (settings closed).
    */
   useEffect(() => {
-    if (prevShowSettingsRef.current && !showSettings) {
+    if (prevShowSettingsRef.current && !showSettings && !cadActive) {
       console.log(
         'Settings panel closed. Restarting Ergogen worker to clear stale custom libraries...'
       );
@@ -1944,21 +1945,19 @@ const ConfigContextProvider = ({
 
       if (configInputState) {
         generateNow(configInputState, injectionInput, {
-          pointsonly:
-            parseConfig(configInputState)[1]?.schema === 'ergogen/v1' ||
-            !autoGen3D,
+          pointsonly: !autoGen3D,
         });
       }
     }
     prevShowSettingsRef.current = showSettings;
   }, [
     showSettings,
+    cadActive,
     configInputState,
     injectionInput,
     autoGen3D,
     generateNow,
     handleErgogenWorkerMessage,
-    parseConfig,
   ]);
 
   /**
@@ -1971,9 +1970,7 @@ const ConfigContextProvider = ({
     );
     if (autoGen && !showSettings && !cadActive) {
       processInput(configInputState, injectionInput, {
-        pointsonly:
-          parseConfig(configInputState || '')[1]?.schema === 'ergogen/v1' ||
-          !autoGen3D,
+        pointsonly: !autoGen3D,
       });
     }
   }, [
@@ -1984,7 +1981,6 @@ const ConfigContextProvider = ({
     cadActive,
     showSettings,
     processInput,
-    parseConfig,
   ]);
 
   // Trigger background preview generation on mount if loadedVersion is 1 or hadLegacyConfig is true
@@ -2005,7 +2001,10 @@ const ConfigContextProvider = ({
 
       // Loop through all configurations that don't have a previewSvg and generate them
       configsRef.current.forEach((cfg) => {
-        if (!cfg.previewSvg) {
+        if (
+          !cfg.previewSvg &&
+          parseConfig(cfg.config)[1]?.schema !== 'ergogen/v1'
+        ) {
           console.log(
             `Triggering background preview generation for: ${cfg.name}`
           );
@@ -2021,7 +2020,7 @@ const ConfigContextProvider = ({
         }
       });
     }
-  }, [workerReady, loadedVersion, hadLegacyConfig]);
+  }, [workerReady, loadedVersion, hadLegacyConfig, parseConfig]);
 
   const canUndo = history.current.canUndo,
     canRedo = history.current.canRedo;

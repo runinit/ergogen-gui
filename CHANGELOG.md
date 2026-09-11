@@ -1,5 +1,27 @@
 # Changelog
 
+## A simpler design workflow
+
+September 11, 2026
+
+![Design, PCB, Case and Export in one workspace.](./public/images/changelog/studio-workflow.png)
+
+Layout and component placement now share **Design**. Continue through **PCB**,
+**Case** and **Export** without losing generated geometry when opening Code or
+the part library.
+
+**What changed:**
+
+- **One generation action:** Generate 3D and the editor shortcut share a build.
+- **One export destination:** Download source, portable projects, boards and case
+  files from Export. Case review resets when geometry changes.
+- **Settings stays in context:** Keep the current stage, selection and camera.
+  Advanced library code appears when an entry is selected.
+- **Explicit case creation:** Opening Case leaves the source and undo history
+  untouched until you choose Create case.
+- **Reliable editing:** Unfinished YAML keeps its editor, and legacy automatic
+  generation no longer starts extra native builds.
+
 ## Direct layout editing
 
 September 10, 2026

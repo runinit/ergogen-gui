@@ -9,42 +9,11 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import yaml from 'js-yaml';
 import { writeSolids } from './solidExports';
-import type { SolidOutput } from '../types/results';
-import type { DesignReport } from '../types/design';
+import type { Results } from '../types/results';
 import {
   createErgogenWorker,
   createJscadWorker,
 } from '../workers/workerFactory';
-
-type DemoOutput = {
-  dxf?: string;
-  svg?: string;
-};
-
-type OutlineOutput = {
-  dxf?: string;
-  svg?: string;
-};
-
-type CaseOutput = {
-  jscad?: string;
-  stl?: string | ArrayBuffer | Uint8Array;
-};
-
-type PcbsOutput = Record<string, string>;
-
-type Results = {
-  solids?: Record<string, SolidOutput>;
-  designs?: DesignReport;
-  canonical?: unknown;
-  points?: unknown;
-  units?: unknown;
-  demo?: DemoOutput;
-  outlines?: Record<string, OutlineOutput>;
-  cases?: Record<string, CaseOutput>;
-  pcbs?: PcbsOutput;
-  [key: string]: unknown;
-};
 
 const EXPORT_TIMEOUT = 180000;
 async function exportAssets(
