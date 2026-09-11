@@ -6,7 +6,6 @@ import { theme } from '../theme/theme';
 import { useConfigContext } from '../context/ConfigContext';
 import { exampleOptions, ConfigOption } from '../examples';
 import Starter from '../examples/starter';
-import NewDesignWorkspace from '../molecules/NewDesignWorkspace';
 import { fetchConfigFromUrl, GitInjection } from '../utils/github';
 import { ConflictResolutionStrategy } from '../utils/injections';
 import { loadLocalFile } from '../utils/localFiles';
@@ -401,7 +400,6 @@ const allExamples: ConfigOption[] = exampleOptions
 const Welcome = () => {
   const navigate = useNavigate();
   const configContext = useConfigContext();
-  const [setupOpen, setSetupOpen] = useState(false);
   const [repoInput, setRepoInput] = useState('');
   const [provider, setProvider] = useState<'github' | 'codeberg' | 'forgejo'>(
     'github'
@@ -820,45 +818,23 @@ const Welcome = () => {
           injectionType={currentConflict.type}
           onResolve={handleConflictResolution}
           onCancel={handleConflictCancel}
-          data-testid="conflict-resolution-dialog"
-        />
-      )}
-      {setupOpen && (
-        <NewDesignWorkspace
-          onCancel={() => setSetupOpen(false)}
-          onCreate={(source, assets, injections) => {
-            if (!configContext) {
-              return;
-            }
-            configContext.createNewConfig(source);
-            configContext.setProjectAssets(assets);
-            if (injections?.length) {
-              configContext.setInjectionInput((before) => [
-                ...(before || []).filter(
-                  (item) => !injections.some((next) => next[1] === item[1])
-                ),
-                ...injections,
-              ]);
-            }
-            setSetupOpen(false);
-            setShouldNavigate(true);
-          }}
+          data-testid="conflict-dialog"
         />
       )}
       <WelcomeContainer>
-        <Header>Ergogen Web UI</Header>
+        <Header>Import project</Header>
         <SubHeader>
           A web-based interface for Ergogen, the ergonomic keyboard generator.
           <br />
-          Start a new design below.
+          Load a file, repository or example.
         </SubHeader>
 
         <OptionsContainer>
           <OptionBox>
             <h2>Start Fresh</h2>
-            <p>Choose your layout, key assemblies and electronics.</p>
+            <p>Open a new project in Board Studio.</p>
             <Button
-              onClick={() => setSetupOpen(true)}
+              onClick={() => navigate('/new')}
               aria-label="New native design"
               data-testid="empty-config-button"
             >

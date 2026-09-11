@@ -71,9 +71,5 @@ export async function openLibrary(page: Page) {
 }
 
 export async function createDraft(page: Page) {
-  await page
-    .getByRole('button', { name: 'New native design', exact: true })
-    .click();
-  await page.getByRole('button', { name: 'Create draft', exact: true }).click();
   await expect(studio(page)).toBeVisible();
 }

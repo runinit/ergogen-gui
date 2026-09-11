@@ -63,3 +63,11 @@ Selected dependency: `ergogen-studio-b3293ff8a4fe.tgz`. Source matches engine co
 voids during corner relief. This is an uncommitted local snapshot.
 
 SHA-256: `b3293ff8a4feac421449e12a65546723b8890db533fdeddf3233012fa2574491`
+
+## Consolidated Studio engine
+
+Selected dependency: `ergogen-studio-f24848e.tgz` from committed source
+[`runinit/ergogen@f24848e`](https://github.com/runinit/ergogen/commit/f24848e9f408c1c7ad16c68e9689854db8482446).
+Includes corner-relief repair and native SVG outline injection.
+
+SHA-256: `fc1a51a28329c1bbfb82b80d230005582fb580b76f503c695a10557f75f3eaa8`

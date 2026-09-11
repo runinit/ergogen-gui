@@ -27,7 +27,7 @@ test.describe('GitHub Loading', () => {
     });
 
     // Navigate to the welcome page
-    await page.goto('./new');
+    await page.goto('./import');
     await shoot('before-github-input');
 
     // Find the GitHub input and load button
@@ -160,7 +160,7 @@ test.describe('GitHub Loading', () => {
     });
 
     // Navigate to the welcome page
-    await page.goto('./new');
+    await page.goto('./import');
 
     // Find the GitHub input and load button
     const githubInput = page.getByTestId('repo-input');
@@ -197,18 +197,21 @@ test.describe('GitHub Loading', () => {
 
     // Navigate back to welcome page
     const newConfigButton = page.getByRole('button', {
-      name: 'New',
+      name: 'Import',
       exact: true,
     });
     await page.getByRole('button', { name: 'Projects', exact: true }).click();
     await newConfigButton.click();
-    await expect(page).toHaveURL(/.*\/new/, { timeout: 5000 });
+    await expect(page).toHaveURL(/.*\/import/, { timeout: 5000 });
     await shoot('back-to-welcome');
 
     // Load second repository
     await githubInput.fill('ceoloide/mr_useful');
     await loadButton.click();
     await shoot('second-repo-loading');
+
+    await expect(page.getByTestId('conflict-dialog-box')).toBeVisible();
+    await page.getByTestId('conflict-dialog-skip').click();
 
     await expect(page).toHaveURL(/.*\/$/, { timeout: 10000 });
     await shoot('second-repo-loaded');
@@ -226,7 +229,6 @@ test.describe('GitHub Loading', () => {
         exact: true,
       })
     ).toBeVisible();
-    await shoot('both-footprints-present');
     await library
       .getByRole('button', { name: 'Back to design', exact: true })
       .click();
@@ -244,15 +246,13 @@ test.describe('GitHub Loading', () => {
       await newConfigButton.click();
       await githubInput.fill('ceoloide/mr_useful');
       await loadButton.click();
-      const conflict = page.getByTestId('conflict-resolution-dialog-box');
+      const conflict = page.getByTestId('conflict-dialog-box');
       await expect(conflict).toBeVisible();
-      const applyToAll = page.getByTestId(
-        'conflict-resolution-dialog-apply-to-all'
-      );
+      const applyToAll = page.getByTestId('conflict-dialog-apply-to-all');
       await expect(applyToAll).not.toBeChecked();
       await conflict.locator('[role="checkbox"]').click();
       await expect(applyToAll).toBeChecked();
-      await page.getByTestId(`conflict-resolution-dialog-${choice}`).click();
+      await page.getByTestId(`conflict-dialog-${choice}`).click();
       await expect(conflict).toBeHidden();
       await expect(page).toHaveURL(/.*\/$/);
     }

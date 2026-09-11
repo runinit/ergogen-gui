@@ -40,7 +40,7 @@ jobs:
       - run: git diff --exit-code
       - run: pnpm run build
         env:
-          REACT_APP_GTAG_ID: ${{ vars.REACT_APP_GTAG_ID }}
+          VITE_GTAG_ID: ${{ vars.REACT_APP_GTAG_ID || vars.VITE_GTAG_ID }}
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm run test:e2e
       - uses: actions/upload-artifact@v4

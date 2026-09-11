@@ -8,7 +8,9 @@ test('reloads the application offline under the deployment path', async ({
   await page.goto('./new');
   await page.evaluate(() => navigator.serviceWorker.ready);
   await page.reload();
-  await expect(page.getByTestId('welcome-page-wrapper')).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'Board Studio' })
+  ).toBeVisible();
   await expect
     .poll(() =>
       page.evaluate(() => Boolean(navigator.serviceWorker.controller))
@@ -17,7 +19,9 @@ test('reloads the application offline under the deployment path', async ({
   await context.setOffline(true);
   try {
     await page.reload();
-    await expect(page.getByTestId('welcome-page-wrapper')).toBeVisible();
+    await expect(
+      page.getByRole('region', { name: 'Board Studio' })
+    ).toBeVisible();
   } finally {
     await context.setOffline(false);
   }
@@ -125,12 +129,6 @@ test('opens the PCB viewer for the first time offline', async ({
   await page.reload();
   await context.setOffline(true);
   try {
-    await page
-      .getByRole('button', { name: 'New native design', exact: true })
-      .click();
-    await page
-      .getByRole('button', { name: 'Create draft', exact: true })
-      .click();
     await page
       .getByRole('navigation', { name: 'Design workflow' })
       .getByRole('button', { name: 'PCB', exact: true })

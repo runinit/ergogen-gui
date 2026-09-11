@@ -1,11 +1,15 @@
+import type { PwaState } from '../App';
+import OfflineOption from '../atoms/OfflineOption';
 import { useConfigContext } from '../context/ConfigContext';
 import GenOption from '../atoms/GenOption';
 import { SettingsCard, SettingsGroupTitle } from '../atoms/SettingsLayout';
 
 export default function SettingsOptions({
   mode = 'legacy',
+  pwaState,
 }: {
   mode?: 'legacy' | 'native';
+  pwaState?: PwaState;
 }) {
   const context = useConfigContext();
   if (!context) {
@@ -81,6 +85,14 @@ export default function SettingsOptions({
           aria-label="Send usage metrics"
         />
       </SettingsCard>
+      {pwaState && (
+        <>
+          <SettingsGroupTitle>Offline</SettingsGroupTitle>
+          <SettingsCard>
+            <OfflineOption {...pwaState} />
+          </SettingsCard>
+        </>
+      )}
     </>
   );
 }

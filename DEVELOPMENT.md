@@ -894,3 +894,7 @@ Embedded case initialization renders the new case definition before adopting it
 into the project. Key position controls edit local placement overrides. Editing
 a source invalidates pending generation and releases the busy state; late worker
 responses cannot replace the current project.
+
+New and empty sessions open Board Studio with a saved native draft. The `/new`
+route creates a draft directly; `/import` contains file, repository and example
+loading, reached through Projects → Import. Existing projects retain their editor.

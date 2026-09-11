@@ -13,7 +13,7 @@ test('loads the BHK example and regenerates it offline', async ({
   const logs: string[] = [];
   page.on('console', (message) => logs.push(message.text()));
   page.on('pageerror', (error) => logs.push(String(error)));
-  await page.goto('./new');
+  await page.goto('./import');
   await expect(
     page.getByLabel('Load BHK gasket enclosure example', { exact: true })
   ).toHaveCount(0);

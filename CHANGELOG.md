@@ -12,6 +12,9 @@ the part library.
 
 **What changed:**
 
+- **Direct start:** Open Board Studio immediately. New projects skip setup;
+  file, repository and example imports are available from Projects.
+
 - **One generation action:** Generate 3D and the editor shortcut share a build.
 - **One export destination:** Download source, portable projects, boards and case
   files from Export. Case review resets when geometry changes.
@@ -325,6 +328,23 @@ The viewer resolves named nets consistently across pads, tracks, arcs, vias,
 and zones, including empty and numeric-looking names. Preview failures explain
 that the original PCB remains downloadable. Deployment under `/ergogen-gui/`
 supports workers, routing, and offline reload.
+
+## SVG Outlines & Offline PWA Settings Integration
+
+July 16, 2026
+
+![Visual preview of SVG outlines rendering and PWA install settings integration.](./public/images/changelog/placeholder.png)
+
+Previously, custom outline injections were restricted only to JavaScript files, preventing designers from dropping vector SVG files directly into their keyboard configuration folder. Additionally, discovering and trigger-promoting PWA installation on Android and desktop devices depended on browser-specific heuristics, resulting in poor user engagement.
+
+To improve custom drawing support and PWA usability, we implemented native SVG file outline parsing that dynamically wraps vector path definitions in the native `svg_paths_to_outline` helper, allowing `.svg` outlines to load seamlessly alongside other assets. We also added a dedicated **"Offline"** settings group inside the settings panel with an interactive **"Offline App"** button option, utilizing the captured `beforeinstallprompt` event to enable on-demand installation.
+
+**What changed:**
+
+- **Native SVG Outlines**: Dropping or loading ZIPs containing `.svg` outline files now parses them dynamically and integrates them into standard outlines utilizing the `svg_paths_to_outline` wrapper.
+- **Offline Settings Group**: Added an interactive "Offline App" button option under a dedicated Offline settings group, displaying custom states ("Install App", "Installing...", "Installed", "Unavailable") depending on browser and installation status.
+- **Dynamic Require Resolvers**: The worker's custom require resolution now handles relative template requires like `../../packages.json` to prevent runtime crashes.
+- **Thematic Warning Badges**: The share compatibility warning dialog has been enhanced with warning badges, and floating alerts notify users if outline features are gated.
 
 ## Build Stack Modernization Benchmark Report
 

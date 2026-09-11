@@ -48,3 +48,30 @@ it('opens an existing library without recording an edit', () => {
   });
   expect(context.setInjectionInput).toHaveBeenCalledOnce();
 });
+
+it('installs from Settings without editing the project', () => {
+  context.setInjectionInput.mockClear();
+  const onInstall = vi.fn();
+  const pwaState = {
+    onInstall,
+    isAvailable: true,
+    isInstalling: false,
+    isInstalled: false,
+  };
+  const view = render(
+    <StudioSettings onClose={vi.fn()} onLibrary={vi.fn()} pwaState={pwaState} />
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Install App' }));
+  expect(onInstall).toHaveBeenCalledOnce();
+  expect(context.setInjectionInput).not.toHaveBeenCalled();
+
+  view.rerender(
+    <StudioSettings
+      onClose={vi.fn()}
+      onLibrary={vi.fn()}
+      pwaState={{ ...pwaState, isInstalled: true }}
+    />
+  );
+  expect(screen.getByRole('button', { name: 'Installed' })).toBeDisabled();
+});

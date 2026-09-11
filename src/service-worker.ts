@@ -32,7 +32,7 @@ import { initialize as initializeGoogleAnalytics } from 'workbox-google-analytic
 
 declare const self: ServiceWorkerGlobalScope;
 
-const publicUrl = process.env.PUBLIC_URL || '';
+const publicUrl = (import.meta.env.BASE_URL || '').replace(/\/+$/, '');
 
 // --------------------------------------------------------------------------
 // Core: claim clients and set up skip-waiting message handler
@@ -80,7 +80,7 @@ registerRoute(
     if (url.pathname.match(fileExtensionRegexp)) return false;
     return true;
   },
-  createHandlerBoundToURL(process.env.PUBLIC_URL + '/index.html')
+  createHandlerBoundToURL(`${publicUrl}/index.html`)
 );
 
 // --------------------------------------------------------------------------

@@ -198,7 +198,7 @@ test('imports a KiCad bundle, aligns models, links placements, and exports a por
   // A fresh browser profile adopts the ZIP snapshot and can generate without a network.
   const offlineContext = await browser.newContext();
   const offlinePage = await offlineContext.newPage();
-  await offlinePage.goto(new URL('./new', page.url()).href);
+  await offlinePage.goto(new URL('./import', page.url()).href);
   await offlinePage.evaluate(() => navigator.serviceWorker.ready);
   await offlinePage.reload();
   await expect(offlinePage.getByTestId('welcome-page-wrapper')).toBeVisible();

@@ -6,6 +6,7 @@ import styled from 'styled-components';
 
 import Ergogen from './Ergogen';
 import Welcome from './pages/Welcome';
+import { compileSetup, defaultSetup } from './utils/designSetup';
 import Header from './atoms/Header';
 import LoadingBar from './atoms/LoadingBar';
 import Banners from './organisms/Banners';
@@ -209,9 +210,18 @@ interface BeforeInstallPromptEvent extends Event {
  * Captures the 'beforeinstallprompt' event and exposes an install trigger.
  * Gated behind the `?force_install` URL query parameter.
  */
-function usePwaInstallPrompt(): (() => void) | undefined {
+export interface PwaState {
+  onInstall: () => void;
+  isAvailable: boolean;
+  isInstalled: boolean;
+  isInstalling: boolean;
+}
+
+function usePwaInstallPrompt(): PwaState {
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
+  const [isInstalling, setIsInstalling] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
 
   // Check if ?force_install is present in the URL query string
   const isForceInstall = new URLSearchParams(window.location.search).has(
@@ -219,6 +229,19 @@ function usePwaInstallPrompt(): (() => void) | undefined {
   );
 
   useEffect(() => {
+    const checkIsInstalled = () => {
+      const isStandalone =
+        typeof window !== 'undefined' &&
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(display-mode: standalone)').matches;
+      const isIOSStandalone =
+        (window.navigator as unknown as { standalone?: boolean }).standalone ===
+        true;
+      setIsInstalled(isStandalone || isIOSStandalone);
+    };
+
+    checkIsInstalled();
+
     const handleBeforeInstallPrompt = (e: Event) => {
       // Prevent the mini-infobar from appearing on mobile
       e.preventDefault();
@@ -227,20 +250,29 @@ function usePwaInstallPrompt(): (() => void) | undefined {
       console.log('[PWA] beforeinstallprompt event fired and captured.');
     };
 
+    const handleAppInstalled = () => {
+      console.log('[PWA] appinstalled event fired.');
+      setIsInstalled(true);
+      setIsInstalling(false);
+    };
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
       window.removeEventListener(
         'beforeinstallprompt',
         handleBeforeInstallPrompt
       );
+      window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
 
-  // Show the chip ONLY if the ?force_install query parameter is provided
-  if (!isForceInstall) return undefined;
+  const isAvailable = !!deferredPrompt || isForceInstall;
 
-  return () => {
+  const onInstall = () => {
+    trackEvent('pwa_install_click');
+    setIsInstalling(true);
     if (deferredPrompt) {
       // Show the install prompt
       void deferredPrompt.prompt();
@@ -249,10 +281,13 @@ function usePwaInstallPrompt(): (() => void) | undefined {
         (choiceResult: { outcome: string }) => {
           if (choiceResult.outcome === 'accepted') {
             console.log('[PWA] User accepted the install prompt');
+            trackEvent('pwa_install_accepted');
+            setIsInstalled(true);
           } else {
             console.log('[PWA] User dismissed the install prompt');
+            trackEvent('pwa_install_dismissed');
           }
-          // Clear the saved prompt since it can only be used once
+          setIsInstalling(false);
           setDeferredPrompt(null);
         }
       );
@@ -263,9 +298,38 @@ function usePwaInstallPrompt(): (() => void) | undefined {
       alert(
         'PWA installation is not supported by this browser or is restricted on this device. If you are on iOS/iPadOS, please open this site in Safari and select "Add to Home Screen" from the Share menu.'
       );
+      setIsInstalling(false);
     }
   };
+
+  return {
+    onInstall,
+    isAvailable,
+    isInstalled,
+    isInstalling,
+  };
 }
+
+// Create a saved draft once, including under StrictMode, then enter Studio.
+const NewProject = () => {
+  const context = useConfigContext();
+  const location = useLocation();
+  const created = useRef(false);
+  const create = context?.createNewConfig;
+
+  useEffect(() => {
+    if (!create || created.current) {
+      return;
+    }
+    created.current = true;
+    create(compileSetup(defaultSetup()));
+  }, [create]);
+
+  if (!created.current) {
+    return null;
+  }
+  return <Navigate to={{ pathname: '/', search: location.search }} replace />;
+};
 
 /**
  * Inner component that has access to the config context.
@@ -286,7 +350,7 @@ const AppContent = ({
   const mode = useProjectMode(configInput, configContext?.activeConfigId);
   const location = useLocation();
   const onUpdate = useServiceWorkerUpdate();
-  const onInstall = usePwaInstallPrompt();
+  const pwaState = usePwaInstallPrompt();
 
   // Store configs count in a ref to safely read it in useEffect without lint dependencies
   const configsCountRef = useRef(0);
@@ -349,7 +413,7 @@ const AppContent = ({
   ): VersionCompatibilityReport => {
     const currentGui = guiPkg.version;
     const currentErgogen = getFullErgogenVersion(
-      process.env.REACT_APP_ERGOGEN_VERSION
+      import.meta.env.VITE_ERGOGEN_VERSION
     );
 
     let isCompatible = true;
@@ -578,7 +642,7 @@ const AppContent = ({
           injectionType={currentConflict.type}
           onResolve={handleConflictResolution}
           onCancel={handleConflictCancel}
-          data-testid="conflict-resolution-dialog"
+          data-testid="conflict-dialog"
         />
       )}
       {configContext?.isBulkDownloadOpen && (
@@ -592,8 +656,8 @@ const AppContent = ({
           data-testid="bulk-download-dialog"
         />
       )}
-      {(mode === 'legacy' || location.pathname === '/new') && (
-        <Header onUpdate={onUpdate} onInstall={onInstall} />
+      {(mode === 'legacy' || location.pathname === '/import') && (
+        <Header onUpdate={onUpdate} />
       )}
       <LoadingBar
         visible={configContext?.isGenerating ?? false}
@@ -609,16 +673,17 @@ const AppContent = ({
         <Routes>
           <Route
             path="/"
-            // The routing decision is now based on the reactive `configInput` state.
+            // Resume saved work or create a native draft directly.
             element={
               configInput ? (
-                <Ergogen onUpdate={onUpdate} onInstall={onInstall} />
+                <Ergogen onUpdate={onUpdate} pwaState={pwaState} />
               ) : (
-                <Navigate to="/new" replace />
+                <NewProject />
               )
             }
           />
-          <Route path="/new" element={<Welcome />} />
+          <Route path="/new" element={<NewProject />} />
+          <Route path="/import" element={<Welcome />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </PageWrapper>

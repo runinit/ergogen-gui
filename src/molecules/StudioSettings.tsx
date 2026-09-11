@@ -1,3 +1,4 @@
+import type { PwaState } from '../App';
 import { useEffect, useRef, useState, type SetStateAction } from 'react';
 import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';
@@ -38,8 +39,10 @@ const EMPTY: Injection = { key: -1, type: '', name: '', content: '' };
 
 export default function StudioSettings({
   onClose,
+  pwaState,
   onLibrary,
 }: {
+  pwaState?: PwaState;
   onClose: () => void;
   onLibrary: () => void;
 }) {
@@ -109,7 +112,7 @@ export default function StudioSettings({
         <button onClick={onClose}>Close settings</button>
       </header>
       <p>Layout updates automatically. Generate builds 3D outputs.</p>
-      <SettingsOptions mode="native" />
+      <SettingsOptions mode="native" pwaState={pwaState} />
       <details>
         <summary>Advanced libraries</summary>
         <Injections

@@ -1,3 +1,4 @@
+import type { PwaState } from '../App';
 import { removeSelection, isDeleteShortcut } from '../utils/studioDelete';
 import { ResizeReview, type ResizeProposal } from '../utils/resizeReview';
 import { repairSetup } from '../utils/setupRepair';
@@ -50,7 +51,6 @@ import StudioExport from './StudioExport';
 import StudioSettings from './StudioSettings';
 import ConfigEditor from './ConfigEditor';
 import UpdateChip from '../atoms/UpdateChip';
-import InstallChip from '../atoms/InstallChip';
 import CaseWizard from './CaseWizard';
 import FilePreview from './FilePreview';
 import StudioCanvas, { StudioSelection } from './StudioCanvas';
@@ -92,8 +92,8 @@ const EMPTY_ASSETS = {};
 
 export default function BoardStudio({
   onUpdate,
-  onInstall,
-}: { onUpdate?: () => void; onInstall?: () => void } = {}) {
+  pwaState,
+}: { onUpdate?: () => void; pwaState?: PwaState } = {}) {
   const context = useConfigContext();
   const source = context?.configInput || '';
   const parsed = useMemo(() => {
@@ -542,6 +542,7 @@ export default function BoardStudio({
       )}
       {context.showSettings && (
         <StudioSettings
+          pwaState={pwaState}
           onClose={() => context.setShowSettings(false)}
           onLibrary={() => {
             context.setShowSettings(false);
@@ -564,7 +565,6 @@ export default function BoardStudio({
           {context.error ? 'Needs attention' : 'Autosaved'}
         </small>
         {onUpdate && <UpdateChip onClick={onUpdate} />}
-        {onInstall && <InstallChip onClick={onInstall} />}
         <div className="project-actions">
           <button
             aria-label="Undo project edit"

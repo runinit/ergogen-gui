@@ -86,9 +86,6 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
   }, [configs, searchQuery]);
 
   const handleNewConfig = () => {
-    if (selectConfig) {
-      selectConfig(null);
-    }
     navigate('/new');
     onClose();
   };
@@ -257,7 +254,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
   }, [isOpen, onClose]);
 
   const versionInfo = useMemo(
-    () => getErgogenVersionInfo(process.env.REACT_APP_ERGOGEN_VERSION),
+    () => getErgogenVersionInfo(import.meta.env.VITE_ERGOGEN_VERSION),
     []
   );
 
@@ -303,7 +300,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
               data-testid="side-nav-logo-button"
             >
               <LogoImage
-                src={`${process.env.PUBLIC_URL}/ergogen.png`}
+                src={`${import.meta.env.BASE_URL}ergogen.png`}
                 alt="Ergogen logo"
               />
             </LogoButton>
@@ -317,6 +314,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
               )}
             </AppName>
           </LogoSection>
+
           <CloseButton
             onClick={onClose}
             data-testid={dataTestId && `${dataTestId}-close`}
@@ -334,6 +332,16 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
             >
               <Icon className="material-symbols-outlined">add</Icon>
               <span>New</span>
+            </NewConfigButton>
+            <NewConfigButton
+              onClick={() => {
+                navigate('/import');
+                onClose();
+              }}
+              aria-label="Import"
+            >
+              <Icon className="material-symbols-outlined">upload_file</Icon>
+              <span>Import</span>
             </NewConfigButton>
             {configs && configs.length > 0 && (
               <DownloadAllButton

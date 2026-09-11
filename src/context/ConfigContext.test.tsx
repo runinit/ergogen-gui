@@ -302,6 +302,7 @@ describe('ConfigContextProvider', () => {
               {
                 type: 'file',
                 name: 'test_footprint.js',
+                path: 'footprints/test_footprint.js',
                 download_url:
                   'https://raw.githubusercontent.com/ceoloide/test-repo/main/footprints/test_footprint.js',
               },

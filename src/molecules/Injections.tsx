@@ -13,6 +13,7 @@ import ConflictResolutionDialog from './ConflictResolutionDialog';
 import Title from '../atoms/Title';
 import { trackEvent } from '../utils/analytics';
 import { isFeatureEnabled } from '../utils/featureFlags';
+import { parseSvgToMakerJsOutline } from '../utils/svgParser';
 
 const bundledFootprints = { ...coreFootprints, ...componentFootprints };
 
@@ -233,6 +234,11 @@ const Injections = ({
         const content = await file.text();
         const name = file.name.replace(/\.js$/, '');
         newInjections.push([activeUploadType, name, content]);
+      } else if (activeUploadType === 'outline' && file.name.endsWith('.svg')) {
+        const svgContent = await file.text();
+        const content = parseSvgToMakerJsOutline(svgContent);
+        const name = file.name.replace(/\.svg$/, '');
+        newInjections.push([activeUploadType, name, content]);
       }
     }
 
@@ -267,6 +273,13 @@ const Injections = ({
         const pathParts = file.webkitRelativePath.split('/');
         pathParts.shift(); // Remove the top-level folder
         const name = pathParts.join('/').replace(/\.js$/, '');
+        newInjections.push([activeUploadType, name, content]);
+      } else if (activeUploadType === 'outline' && file.name.endsWith('.svg')) {
+        const svgContent = await file.text();
+        const pathParts = file.webkitRelativePath.split('/');
+        pathParts.shift(); // Remove the top-level folder
+        const name = pathParts.join('/').replace(/\.svg$/, '');
+        const content = parseSvgToMakerJsOutline(svgContent);
         newInjections.push([activeUploadType, name, content]);
       }
     }
@@ -564,7 +577,7 @@ const Injections = ({
         type="file"
         ref={fileInputRef}
         onChange={handleLoadFiles}
-        accept=".js"
+        accept={activeUploadType === 'outline' ? '.js,.svg' : '.js'}
         multiple
         style={{ display: 'none' }}
       />
@@ -572,7 +585,7 @@ const Injections = ({
         type="file"
         ref={folderInputRef}
         onChange={handleLoadFolder}
-        accept=".js"
+        accept={activeUploadType === 'outline' ? '.js,.svg' : '.js'}
         style={{ display: 'none' }}
         /* eslint-disable-next-line */
         {...({ webkitdirectory: '', directory: '' } as any)}

@@ -1,3 +1,4 @@
+import type { PwaState } from './App';
 import { useProjectMode } from './hooks/useProjectMode';
 import Icon from './atoms/Icon';
 import {
@@ -276,7 +277,7 @@ const FlexContainer = styled.div`
  *
  * @returns {JSX.Element | null} The rendered Ergogen application UI, or null if the config context is not available.
  */
-const Ergogen = () => {
+const Ergogen = ({ pwaState }: { pwaState?: PwaState }) => {
   const [showDesign, setShowDesign] = useState(false);
   const [showCaseWizard, setShowCaseWizard] = useState(false);
   const [workspaceView, setWorkspaceView] = useState<'case' | 'library'>(
@@ -805,7 +806,7 @@ const Ergogen = () => {
                 }}
               >
                 <SettingsPaneContainer>
-                  <SettingsOptions />
+                  <SettingsOptions pwaState={pwaState} />
                   <Injections
                     onOpenLibrary={openLibrary}
                     setInjectionToEdit={setInjectionToEdit}
@@ -884,10 +885,10 @@ const Ergogen = () => {
 
 export default function ProjectWorkspace({
   onUpdate,
-  onInstall,
+  pwaState,
 }: {
   onUpdate?: () => void;
-  onInstall?: () => void;
+  pwaState?: PwaState;
 }) {
   const context = useConfigContext();
   const mode = useProjectMode(context?.configInput, context?.activeConfigId);
@@ -896,9 +897,9 @@ export default function ProjectWorkspace({
       <BoardStudio
         key={context?.activeConfigId || 'preview'}
         onUpdate={onUpdate}
-        onInstall={onInstall}
+        pwaState={pwaState}
       />
     );
   }
-  return <Ergogen />;
+  return <Ergogen pwaState={pwaState} />;
 }
