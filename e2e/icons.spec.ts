@@ -1,3 +1,4 @@
+import { createDraft, studio } from './utils/studio';
 import { expect, test } from '@playwright/test';
 
 test('hosts fonts locally, including the PCB viewer', async ({ page }) => {
@@ -8,7 +9,10 @@ test('hosts fonts locally, including the PCB viewer', async ({ page }) => {
     }
   });
 
-  await page.goto('./new');
+  await page.goto('./import');
+  await page.addScriptTag({
+    url: new URL('dependencies/kicanvas.js', page.url()).href,
+  });
   await page.evaluate(() => customElements.whenDefined('kicanvas-embed'));
   await page.evaluate(() => document.fonts.ready);
   expect(externalFonts).toEqual([]);
@@ -21,7 +25,7 @@ test('renders icons when the browser cannot use web fonts', async ({
     /fonts\.(googleapis|gstatic)\.com|\.(woff2?|ttf)(\?|$)/,
     (route) => route.abort()
   );
-  await page.goto('./new');
+  await page.goto('./import');
   const navigation = page.getByRole('button', {
     name: 'Show navigation panel',
   });
@@ -41,7 +45,7 @@ test('renders menu icons with external fonts blocked', async ({ page }) => {
   await page.route(/https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) =>
     route.abort()
   );
-  await page.goto('./new');
+  await page.goto('./import');
   await page.evaluate(() => document.fonts.ready);
 
   const navigation = page.getByRole('button', {
@@ -61,9 +65,12 @@ test('renders menu icons with external fonts blocked', async ({ page }) => {
     path: test.info().outputPath('welcome.png'),
     animations: 'disabled',
   });
-  await page.getByText('Empty Configuration', { exact: true }).click();
-  await expect(page.getByTestId('config-editor')).toBeVisible();
-  await navigation.click();
+  await page
+    .getByRole('button', { name: 'New native design', exact: true })
+    .click();
+  await createDraft(page);
+  await expect(studio(page)).toBeVisible();
+  await page.getByRole('button', { name: 'Projects', exact: true }).click();
   const icons = page.locator('.material-symbols-outlined:visible');
   for (const item of await icons.all()) {
     const bounds = await item.boundingBox();
@@ -78,7 +85,7 @@ test('renders menu icons with external fonts blocked', async ({ page }) => {
 });
 
 test('loads the bundled icon font offline', async ({ page, context }) => {
-  await page.goto('./new');
+  await page.goto('./import');
   await page.evaluate(() => navigator.serviceWorker.ready);
   await page.reload();
   const icon = page

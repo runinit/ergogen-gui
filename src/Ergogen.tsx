@@ -1,3 +1,5 @@
+import type { PwaState } from './App';
+import { useProjectMode } from './hooks/useProjectMode';
 import Icon from './atoms/Icon';
 import {
   useEffect,
@@ -15,6 +17,9 @@ import InjectionEditor from './molecules/InjectionEditor';
 import Downloads from './molecules/Downloads';
 import Injections from './molecules/Injections';
 import FilePreview from './molecules/FilePreview';
+import DesignWorkspace from './molecules/DesignWorkspace';
+import BoardStudio from './molecules/BoardStudio';
+import CaseWizard from './molecules/CaseWizard';
 import ResizablePanel from './molecules/ResizablePanel';
 import { Preview } from './atoms/DownloadRow';
 
@@ -23,12 +28,11 @@ import { findResult } from './utils/object';
 import { isMacOS } from './utils/platform';
 import Input from './atoms/Input';
 import { Injection } from './atoms/InjectionRow';
-import GenOption from './atoms/GenOption';
+import SettingsOptions from './molecules/SettingsOptions';
 import OutlineIconButton from './atoms/OutlineIconButton';
 import GrowButton from './atoms/GrowButton';
 import Title from './atoms/Title';
 import { theme } from './theme/theme';
-import { SettingsCard, SettingsGroupTitle } from './atoms/SettingsLayout';
 
 import { trackEvent } from './utils/analytics';
 import ShareDialog from './molecules/ShareDialog';
@@ -182,13 +186,6 @@ const StyledConfigEditor = styled(ConfigEditor)`
   min-height: 0;
 `;
 
-const OptionContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  width: 100%;
-`;
-
 const SettingsPaneContainer = styled.div`
   height: 100%;
   overflow-y: auto;
@@ -280,7 +277,16 @@ const FlexContainer = styled.div`
  *
  * @returns {JSX.Element | null} The rendered Ergogen application UI, or null if the config context is not available.
  */
-const Ergogen = () => {
+const Ergogen = ({ pwaState }: { pwaState?: PwaState }) => {
+  const [showDesign, setShowDesign] = useState(false);
+  const [showCaseWizard, setShowCaseWizard] = useState(false);
+  const [workspaceView, setWorkspaceView] = useState<'case' | 'library'>(
+    'case'
+  );
+  const openLibrary = () => {
+    setWorkspaceView('library');
+    setShowCaseWizard(true);
+  };
   // Calculate initial widths based on viewport
   const getInitialLeftWidth = () => Math.max(200, window.innerWidth * 0.33);
   const getInitialRightWidth = () => Math.max(150, window.innerWidth * 0.15);
@@ -533,7 +539,8 @@ const Ergogen = () => {
       !configContext.results ||
       !configContext.configInput ||
       configContext.isGenerating ||
-      configContext.isJscadConverting
+      configContext.isJscadConverting ||
+      configContext.resultsStale
     ) {
       return;
     }
@@ -554,6 +561,15 @@ const Ergogen = () => {
 
   return (
     <>
+      {showCaseWizard && (
+        <CaseWizard
+          initialView={workspaceView}
+          onClose={() => {
+            setShowCaseWizard(false);
+            setWorkspaceView('case');
+          }}
+        />
+      )}
       {showShareDialog && (
         <ShareDialog
           config={configContext.configInput || ''}
@@ -579,6 +595,23 @@ const Ergogen = () => {
               data-testid="mobile-outputs-button"
             >
               Outputs
+            </OutlineIconButton>
+            <OutlineIconButton
+              onClick={() => {
+                setShowDesign(!showDesign);
+                configContext.setShowConfig(true);
+              }}
+              aria-label="Toggle design view"
+            >
+              Design
+            </OutlineIconButton>
+            <OutlineIconButton
+              onClick={() => {
+                configContext.setShowConfig(true);
+                setShowCaseWizard(true);
+              }}
+            >
+              Create / edit case
             </OutlineIconButton>
             <Spacer />
             {configContext.showConfig && (
@@ -619,7 +652,8 @@ const Ergogen = () => {
                   onClick={handleDownloadArchive}
                   disabled={
                     configContext.isGenerating ||
-                    configContext.isJscadConverting
+                    configContext.isJscadConverting ||
+                    configContext.resultsStale
                   }
                   aria-label="Download archive of all generated files"
                   data-testid="mobile-download-outputs-button"
@@ -661,6 +695,20 @@ const Ergogen = () => {
                   <EditorContainer>
                     <StyledConfigEditor data-testid="config-editor" />
                     <ButtonContainer>
+                      <OutlineIconButton
+                        onClick={() => setShowCaseWizard(true)}
+                      >
+                        Create / edit case
+                      </OutlineIconButton>
+                      <OutlineIconButton onClick={openLibrary}>
+                        Footprint library
+                      </OutlineIconButton>
+                      <OutlineIconButton
+                        onClick={() => setShowDesign(!showDesign)}
+                        aria-label="Open design editor"
+                      >
+                        Design
+                      </OutlineIconButton>
                       <GrowButton
                         onClick={() =>
                           configContext.generateNow(
@@ -697,8 +745,17 @@ const Ergogen = () => {
                   </EditorContainer>
                 </ResizablePanel>
               )}
-              <RightPane $hideOnMobile={configContext.showConfig}>
-                {configContext.showDownloads ? (
+              <RightPane
+                $hideOnMobile={configContext.showConfig && !showDesign}
+              >
+                {configContext.resultsStale && (
+                  <p role="status">
+                    Preview stale: generate a valid design to enable exports.
+                  </p>
+                )}
+                {showDesign ? (
+                  <DesignWorkspace />
+                ) : configContext.showDownloads ? (
                   <>
                     <NestedRightPane>
                       <StyledFilePreview
@@ -749,78 +806,9 @@ const Ergogen = () => {
                 }}
               >
                 <SettingsPaneContainer>
-                  <OptionContainer>
-                    <SettingsGroupTitle>General</SettingsGroupTitle>
-                    <SettingsCard>
-                      <GenOption
-                        optionId={'autogen'}
-                        label={'Auto-generate'}
-                        description={
-                          'Automatically generate new outputs and update previews on changes.'
-                        }
-                        setSelected={configContext.setAutoGen}
-                        checked={configContext.autoGen}
-                        aria-label="Enable auto-generate"
-                      />
-                      <GenOption
-                        optionId={'autogen3d'}
-                        label={'Auto-generate PCB & 3D'}
-                        description={
-                          'Build 3D models and PCB files during generation (can be slow).'
-                        }
-                        setSelected={configContext.setAutoGen3D}
-                        checked={configContext.autoGen3D}
-                        aria-label="Enable auto-generate PCB and 3D (slow)"
-                      />
-                      <GenOption
-                        optionId={'debug'}
-                        label={'Debug'}
-                        description={'Include debug files in the outputs.'}
-                        setSelected={configContext.setDebug}
-                        checked={configContext.debug}
-                        aria-label="Enable debug mode"
-                      />
-                    </SettingsCard>
-
-                    <SettingsGroupTitle>
-                      Previews (Experimental)
-                    </SettingsGroupTitle>
-                    <SettingsCard>
-                      <GenOption
-                        optionId={'kicanvasPreview'}
-                        label={'KiCad Preview'}
-                        description={
-                          'Render interactive PCB layouts using KiCanvas.'
-                        }
-                        setSelected={configContext.setKicanvasPreview}
-                        checked={configContext.kicanvasPreview}
-                        aria-label="Enable KiCad preview (experimental)"
-                      />
-                      <GenOption
-                        optionId={'stlPreview'}
-                        label={'STL Preview'}
-                        description={'Render 3D preview of generated cases.'}
-                        setSelected={configContext.setStlPreview}
-                        checked={configContext.stlPreview}
-                        aria-label="Enable STL preview (experimental)"
-                      />
-                    </SettingsCard>
-
-                    <SettingsGroupTitle>Privacy</SettingsGroupTitle>
-                    <SettingsCard>
-                      <GenOption
-                        optionId={'sendUsageMetrics'}
-                        label={'Send Usage Metrics'}
-                        description={
-                          'Help improve Ergogen Web UI by sharing anonymous usage statistics.'
-                        }
-                        setSelected={configContext.setSendUsageMetrics}
-                        checked={configContext.sendUsageMetrics}
-                        aria-label="Send usage metrics"
-                      />
-                    </SettingsCard>
-                  </OptionContainer>
+                  <SettingsOptions pwaState={pwaState} />
                   <Injections
+                    onOpenLibrary={openLibrary}
                     setInjectionToEdit={setInjectionToEdit}
                     deleteInjection={handleDeleteInjection}
                     injectionToEdit={injectionToEdit}
@@ -895,4 +883,23 @@ const Ergogen = () => {
   );
 };
 
-export default Ergogen;
+export default function ProjectWorkspace({
+  onUpdate,
+  pwaState,
+}: {
+  onUpdate?: () => void;
+  pwaState?: PwaState;
+}) {
+  const context = useConfigContext();
+  const mode = useProjectMode(context?.configInput, context?.activeConfigId);
+  if (mode === 'native') {
+    return (
+      <BoardStudio
+        key={context?.activeConfigId || 'preview'}
+        onUpdate={onUpdate}
+        pwaState={pwaState}
+      />
+    );
+  }
+  return <Ergogen pwaState={pwaState} />;
+}

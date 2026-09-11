@@ -1,0 +1,20 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const engine = require('ergogen');
+const root = path.resolve(__dirname, '..');
+const gpio = [1,2,4,5,6,7,9,10,11,12,14,15,16,17,19,20,21,22,24,25,26,27,29,31,32,34];
+const mapping = Object.fromEntries(gpio.map((pad,i) => [pad, `GP${i < 23 ? i : i + 3}`]));
+for (const pad of [3,8,13,18,23,28,33,38,42]) { mapping[pad] = `GROUND_${pad}`; }
+Object.assign(mapping, {35:'ADC_VREF',36:'POWER_3V3',37:'ENABLE',39:'POWER_VSYS',40:'POWER_VBUS'});
+const source = fs.readFileSync(path.join(root,'public/components/footprints/pico.kicad_mod'),'utf8');
+const converted = engine.footprints.convert(source, {name:'catalogue/pico',mapping});
+fs.writeFileSync(path.join(root,'src/catalogue/footprints.json'), JSON.stringify({'catalogue/pico':engine.footprints.bind(converted.source, [{path:'${KIPRJMOD}/models/RaspberryPi_Pico.step',offset:[0,0,0],rotate:[0,0,0],scale:[1,1,1]}]),promicro:fs.readFileSync(require.resolve('ergogen/src/footprints/promicro.js'),'utf8')},null,2)+'\n');
+console.log(converted.diagnostics);
+const xiaoMapping = Object.fromEntries(Array.from({length:11},(_,i)=>[i+1,`D${i}`]));
+Object.assign(xiaoMapping,{12:'POWER_3V3',13:'GROUND',14:'POWER_VBUS'});
+const xiao = engine.footprints.convert(fs.readFileSync(path.join(root,'public/components/footprints/xiao_rp2040.kicad_mod'),'utf8'),{name:'catalogue/xiao_rp2040',mapping:xiaoMapping});
+const extraPath = path.join(root,'src/catalogue/footprints.json');
+const extra = JSON.parse(fs.readFileSync(extraPath,'utf8'));
+extra['catalogue/xiao_rp2040'] = engine.footprints.bind(xiao.source,[{path:'${KIPRJMOD}/models/seeeduino_xiao_rp2040.step',offset:[0,0,0],rotate:[0,0,0],scale:[1,1,1]}]);
+fs.writeFileSync(extraPath,JSON.stringify(extra,null,2)+'\n');
+console.log(xiao.diagnostics);

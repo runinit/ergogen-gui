@@ -3,8 +3,8 @@
 import { JscadWorkerRequest, JscadWorkerResponse } from './jscad.worker.types';
 import { Results } from '../types/results';
 
-// @ts-expect-error: Loading openjscad.js UMD module statically
-import '../../public/dependencies/openjscad.js';
+// Load the existing OpenJSCAD converter in the worker.
+import * as converterModule from '../../public/dependencies/openjscad.js';
 
 console.log('<-> JSCAD worker module starting...');
 
@@ -22,12 +22,6 @@ type ConvertResult = {
 
 type ConvertFunction = (options: ConvertOptions) => ConvertResult;
 
-type ArrayBufferViewLike = {
-  buffer: ArrayBuffer;
-  byteOffset: number;
-  byteLength: number;
-};
-
 interface JscadConvertModule {
   convert: ConvertFunction;
 }
@@ -42,7 +36,14 @@ let convertFn: ConvertFunction | null = null;
 let initializationError: Error | null = null;
 
 try {
-  const module = workerScope.JscadConvert;
+  // Vite exposes UMD exports in production and a worker global in development.
+  const imported = converterModule as unknown as {
+    default?: JscadConvertModule;
+    convert?: ConvertFunction;
+  };
+  const module =
+    imported.default ||
+    (imported.convert ? imported : workerScope.JscadConvert);
   if (!module || typeof module.convert !== 'function') {
     throw new Error('openjscad.js did not expose a convert function.');
   }
@@ -186,6 +187,9 @@ self.onmessage = async (event: MessageEvent<JscadWorkerRequest>) => {
         }
 
         if (!stlContent || stlContent.byteLength === 0) {
+          if (originalResults.designs) {
+            throw new Error(`Generated STL content is empty for case: ${name}`);
+          }
           console.warn(`Generated STL content is empty for case: ${name}`);
           continue;
         }
@@ -198,6 +202,9 @@ self.onmessage = async (event: MessageEvent<JscadWorkerRequest>) => {
         const errorMessage =
           caseError instanceof Error ? caseError.message : String(caseError);
         console.error(`Failed to convert case ${name}: ${errorMessage}`);
+        if (originalResults.designs) {
+          throw new Error(`Invalid design part ${name}: ${errorMessage}`);
+        }
         // Continue with other cases even if one fails
       }
     }

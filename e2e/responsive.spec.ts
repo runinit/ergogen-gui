@@ -1,30 +1,34 @@
 import { test, expect } from '@playwright/test';
-import { makeShooter } from './utils/screenshots';
+import { createDraft, openCode } from './utils/studio';
 
-test.describe('Responsive Layout', () => {
-  test('should show/hide panels correctly on mobile', async ({ page }) => {
-    const shoot = makeShooter(page, test.info());
-    // Set viewport to a mobile size
-    await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto('./');
-    await page.getByTestId('empty-config-button').click();
-
-    const configEditor = page.getByTestId('config-editor');
-    const outputPanel = page.getByTestId('downloads-container');
-
-    // 1. On mobile, "Config" is active, editor is visible, output is hidden
-    await shoot('before-mobile-config-visible-output-hidden');
-    await expect(configEditor).toBeVisible();
-    await expect(outputPanel).toBeHidden();
-    await shoot('after-mobile-config-visible-output-hidden');
-
-    // 2. Click "Outputs" button
-    await page.getByTestId('mobile-outputs-button').click();
-
-    // 3. "Outputs" is active, editor is hidden, output is visible
-    await shoot('before-mobile-output-visible-config-hidden');
-    await expect(configEditor).toBeHidden();
-    await expect(outputPanel).toBeVisible();
-    await shoot('after-mobile-output-visible-config-hidden');
-  });
+test('switches mobile layout panels and opens YAML', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.goto('./new');
+  await createDraft(page);
+  await expect(
+    page.getByRole('group', { name: 'Interactive board layout' })
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Objects', exact: true }).click();
+  await expect(
+    page.getByRole('complementary', { name: 'Object tree' })
+  ).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Close objects', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Inspector', exact: true }).click();
+  await expect(
+    page.getByRole('complementary', { name: 'Design inspector' })
+  ).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Close inspector', exact: true })
+    .click();
+  await openCode(page);
+  await page
+    .getByRole('navigation', { name: 'Design workflow' })
+    .getByRole('button', { name: 'Export', exact: true })
+    .click();
+  await expect(
+    page.getByRole('button', { name: 'Download YAML', exact: true })
+  ).toBeVisible();
+  await expect(page.getByLabel('Project YAML', { exact: true })).toHaveCount(0);
 });

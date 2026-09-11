@@ -6,21 +6,21 @@ import { useConfigContext } from './ConfigContext';
 
 // Mock the worker factory to prevent worker creation in tests
 const mockErgogenWorker = {
-  postMessage: jest.fn(),
-  terminate: jest.fn(),
+  postMessage: vi.fn(),
+  terminate: vi.fn(),
   onmessage: (_e: any) => {},
 };
 
 const mockJscadWorker = {
-  postMessage: jest.fn(),
-  terminate: jest.fn(),
+  postMessage: vi.fn(),
+  terminate: vi.fn(),
   onmessage: (_e: any) => {},
 };
 
 import { isFeatureEnabled } from '../utils/featureFlags';
 
 vi.mock('../utils/featureFlags', () => ({
-  isFeatureEnabled: jest.fn(() => true),
+  isFeatureEnabled: vi.fn(() => true),
 }));
 
 vi.mock('../workers/workerFactory', () => ({
@@ -30,19 +30,50 @@ vi.mock('../workers/workerFactory', () => ({
 
 import { trackEvent } from '../utils/analytics';
 vi.mock('../utils/analytics', () => ({
-  trackEvent: jest.fn(),
-  initAnalytics: jest.fn(),
+  trackEvent: vi.fn(),
+  initAnalytics: vi.fn(),
   getSendUsageMetricsEnabled: () => true,
   checkIsPWA: () => false,
 }));
 
 // Mock ergogen globally
 global.window.ergogen = {
-  process: jest.fn(),
-  inject: jest.fn(),
+  process: vi.fn(),
+  inject: vi.fn(),
 };
 
 import { ConfigContextProvider } from './ConfigContext';
+import { applyDesignEdit } from '../utils/designSource';
+
+it('edits and undoes a design without a mounted code editor', async () => {
+  let session: ReturnType<typeof useConfigContext>;
+  const Capture = () => {
+    session = useConfigContext();
+    return null;
+  };
+  render(
+    <ConfigContextProvider>
+      <Capture />
+    </ConfigContextProvider>
+  );
+  act(() => {
+    session!.createNewConfig('schema: ergogen/v1\nlayout: {}\n', 'History');
+  });
+  const before = session!.configInput!;
+  const after = before + 'units: {pitch: 19}\n';
+  act(() => {
+    applyDesignEdit(before, after);
+  });
+  expect(session!.configInput).toBe(after);
+  act(() => {
+    session!.undo();
+  });
+  expect(session!.configInput).toBe(before);
+  act(() => {
+    session!.redo();
+  });
+  expect(session!.configInput).toBe(after);
+});
 
 const mockConfig = 'points: {}';
 
@@ -97,18 +128,78 @@ const mockInitialConfig = (config: string) => {
   );
 };
 
+it('uses the native project title when creating an unnamed project', () => {
+  let session: ReturnType<typeof useConfigContext>;
+  const Read = () => {
+    session = useConfigContext();
+    return null;
+  };
+  render(
+    <ConfigContextProvider>
+      <Read />
+    </ConfigContextProvider>
+  );
+  act(() => {
+    session!.createNewConfig(
+      'schema: ergogen/v1\nmeta: {name: Studio board}\nlayout: {}\n'
+    );
+  });
+  expect(session!.activeConfigName).toBe('Studio board');
+});
+
 describe('ConfigContextProvider', () => {
   beforeEach(() => {
     // Clear the URL for each test
     window.history.replaceState({}, 'Test page', '/');
     mockErgogenWorker.postMessage.mockClear();
     mockJscadWorker.postMessage.mockClear();
-    (isFeatureEnabled as jest.Mock).mockReturnValue(true);
+    vi.mocked(isFeatureEnabled).mockReturnValue(true);
     localStorage.clear();
   });
 
+  it('leaves native generation to the workspace on load, import and settings close', async () => {
+    const source = 'schema: ergogen/v1\nlayout: {}';
+    mockInitialConfig(source);
+    let session: ReturnType<typeof useConfigContext>;
+    const Capture = () => {
+      session = useConfigContext();
+      return null;
+    };
+    render(
+      <ConfigContextProvider>
+        <Capture />
+      </ConfigContextProvider>
+    );
+    await act(async () => {});
+    expect(mockErgogenWorker.postMessage).not.toHaveBeenCalled();
+
+    await act(async () => {
+      session!.setCadActive(true);
+      await session!.generateNow(source, []);
+      session!.setShowSettings(true);
+    });
+    mockErgogenWorker.terminate.mockClear();
+    act(() => session!.setShowSettings(false));
+    expect(mockErgogenWorker.postMessage).not.toHaveBeenCalled();
+    expect(mockErgogenWorker.terminate).not.toHaveBeenCalled();
+  });
+
+  it('does not generate solids for native thumbnails during storage migration', async () => {
+    localStorage.setItem(
+      'ergogen:config',
+      JSON.stringify('schema: ergogen/v1\nlayout: {}')
+    );
+    render(
+      <ConfigContextProvider>
+        <TestComponent />
+      </ConfigContextProvider>
+    );
+    await act(async () => {});
+    expect(mockErgogenWorker.postMessage).not.toHaveBeenCalled();
+  });
+
   it('should fetch config from github url parameter and update the config', async () => {
-    const fetchSpy = jest.spyOn(window, 'fetch').mockImplementation((url) => {
+    const fetchSpy = vi.spyOn(window, 'fetch').mockImplementation((url) => {
       if (
         url ===
         'https://raw.githubusercontent.com/ceoloide/corney-island/main/ergogen/config.yaml'
@@ -150,7 +241,7 @@ describe('ConfigContextProvider', () => {
   });
 
   it('should fetch config from github url parameter without protocol and update the config', async () => {
-    const fetchSpy = jest.spyOn(window, 'fetch').mockImplementation((url) => {
+    const fetchSpy = vi.spyOn(window, 'fetch').mockImplementation((url) => {
       if (
         url ===
         'https://raw.githubusercontent.com/ceoloide/corney-island/main/ergogen/config.yaml'
@@ -192,7 +283,7 @@ describe('ConfigContextProvider', () => {
   });
 
   it('should load footprints from github url parameter and merge them', async () => {
-    const fetchSpy = jest.spyOn(window, 'fetch').mockImplementation((url) => {
+    const fetchSpy = vi.spyOn(window, 'fetch').mockImplementation((url) => {
       if (
         url ===
         'https://raw.githubusercontent.com/ceoloide/test-repo/main/config.yaml'
@@ -211,6 +302,7 @@ describe('ConfigContextProvider', () => {
               {
                 type: 'file',
                 name: 'test_footprint.js',
+                path: 'footprints/test_footprint.js',
                 download_url:
                   'https://raw.githubusercontent.com/ceoloide/test-repo/main/footprints/test_footprint.js',
               },
@@ -969,9 +1061,10 @@ describe('ConfigContextProvider', () => {
       expect(mockJscadWorker.postMessage).not.toHaveBeenCalled();
     });
 
-    it('should save formatted previewSvg to the active configuration when user-initiated generation completes successfully', () => {
+    it('should save formatted previewSvg to the active configuration when user-initiated generation completes successfully', async () => {
+      let context: ReturnType<typeof useConfigContext>;
       const TestComponent = () => {
-        useConfigContext();
+        context = useConfigContext();
         return null;
       };
 
@@ -998,12 +1091,19 @@ describe('ConfigContextProvider', () => {
         </ConfigContextProvider>
       );
 
+      await act(async () => {
+        await context!.generateNow('points: {A: {}}', [], {
+          pointsonly: false,
+        });
+      });
+      const requestId =
+        mockErgogenWorker.postMessage.mock.calls.at(-1)![0].requestId;
       // Simulate worker success callback for normal generation
       act(() => {
         mockErgogenWorker.onmessage({
           data: {
             type: 'success',
-            requestId: 'ergogen-generate-12345',
+            requestId,
             results: {
               demo: {
                 svg: '<svg><path stroke="#000" /></svg>',
@@ -1063,7 +1163,7 @@ describe('ConfigContextProvider', () => {
       };
 
       // Disable outlines and templates
-      (isFeatureEnabled as jest.Mock).mockImplementation((feature) => {
+      vi.mocked(isFeatureEnabled).mockImplementation((feature) => {
         if (feature === 'outlines' || feature === 'templates') return false;
         return true;
       });
@@ -1084,7 +1184,9 @@ describe('ConfigContextProvider', () => {
       ];
 
       await act(async () => {
-        await capturedContext.generateNow('points: {}', testInjections);
+        await capturedContext.generateNow('points: {}', testInjections, {
+          pointsonly: false,
+        });
       });
 
       // It should trigger postMessage, but only with footprint injection
@@ -1099,25 +1201,24 @@ describe('ConfigContextProvider', () => {
 
   describe('GA4 Keyboard Generation Tracking & Debouncing', () => {
     const getKeyboardGeneratedCalls = () => {
-      return (trackEvent as jest.Mock).mock.calls.filter(
-        (call) => call[0] === 'keyboard_generated'
-      );
+      return vi
+        .mocked(trackEvent)
+        .mock.calls.filter((call) => call[0] === 'keyboard_generated');
     };
 
     beforeEach(() => {
-      jest.useFakeTimers();
-      (trackEvent as jest.Mock).mockClear();
+      vi.useFakeTimers();
+      vi.mocked(trackEvent).mockClear();
       mockInitialConfig('points: {}');
     });
 
     afterEach(() => {
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
 
     it('should debounce tracking by 5 seconds and only send the latest event', async () => {
-      let capturedContext: any = null;
       const TestComponent = () => {
-        capturedContext = useConfigContext();
+        useConfigContext();
         return null;
       };
 
@@ -1144,7 +1245,7 @@ describe('ConfigContextProvider', () => {
 
       // Advance time slightly (e.g., 2 seconds) - event should not be tracked yet
       act(() => {
-        jest.advanceTimersByTime(2000);
+        vi.advanceTimersByTime(2000);
       });
       expect(getKeyboardGeneratedCalls().length).toBe(0);
 
@@ -1165,13 +1266,13 @@ describe('ConfigContextProvider', () => {
 
       // Advance time by 4 seconds - still shouldn't fire because timer reset
       act(() => {
-        jest.advanceTimersByTime(4000);
+        vi.advanceTimersByTime(4000);
       });
       expect(getKeyboardGeneratedCalls().length).toBe(0);
 
       // Advance time by 1 more second to reach 5 seconds of total delay for B
       act(() => {
-        jest.advanceTimersByTime(1000);
+        vi.advanceTimersByTime(1000);
       });
 
       // It should have tracked B, with previous_config_id of undefined (root)
@@ -1185,9 +1286,8 @@ describe('ConfigContextProvider', () => {
     });
 
     it('should correctly chain lineages across multiple distinct generations', async () => {
-      let capturedContext: any = null;
       const TestComponent = () => {
-        capturedContext = useConfigContext();
+        useConfigContext();
         return null;
       };
 
@@ -1214,10 +1314,13 @@ describe('ConfigContextProvider', () => {
 
       // Let debounce run and complete
       act(() => {
-        jest.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(5000);
       });
       expect(getKeyboardGeneratedCalls().length).toBe(1);
       const firstPayload = getKeyboardGeneratedCalls()[0][1];
+      if (!firstPayload) {
+        throw new Error('Missing first analytics payload');
+      }
       const firstConfigId = firstPayload.config_id;
       expect(firstPayload.previous_config_id).toBeUndefined();
 
@@ -1238,17 +1341,19 @@ describe('ConfigContextProvider', () => {
 
       // Let debounce run
       act(() => {
-        jest.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(5000);
       });
       expect(getKeyboardGeneratedCalls().length).toBe(2);
       const secondPayload = getKeyboardGeneratedCalls()[1][1];
+      if (!secondPayload) {
+        throw new Error('Missing second analytics payload');
+      }
       expect(secondPayload.previous_config_id).toBe(firstConfigId);
     });
 
     it('should ignore duplicate compilation results with identical layout geometries', async () => {
-      let capturedContext: any = null;
       const TestComponent = () => {
-        capturedContext = useConfigContext();
+        useConfigContext();
         return null;
       };
 
@@ -1275,7 +1380,7 @@ describe('ConfigContextProvider', () => {
 
       // Let debounce run
       act(() => {
-        jest.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(5000);
       });
       expect(getKeyboardGeneratedCalls().length).toBe(1);
 
@@ -1295,7 +1400,7 @@ describe('ConfigContextProvider', () => {
       });
 
       act(() => {
-        jest.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(5000);
       });
       // Should still be called only once!
       expect(getKeyboardGeneratedCalls().length).toBe(1);
@@ -1330,7 +1435,7 @@ describe('ConfigContextProvider', () => {
       });
 
       act(() => {
-        jest.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(5000);
       });
       expect(getKeyboardGeneratedCalls().length).toBe(1);
 
@@ -1355,11 +1460,14 @@ describe('ConfigContextProvider', () => {
       });
 
       act(() => {
-        jest.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(5000);
       });
 
       expect(getKeyboardGeneratedCalls().length).toBe(2);
       const secondPayload = getKeyboardGeneratedCalls()[1][1];
+      if (!secondPayload) {
+        throw new Error('Missing second analytics payload');
+      }
       expect(secondPayload.previous_config_id).toBeUndefined();
     });
 
@@ -1454,4 +1562,239 @@ pcbs:
       expect(capturedContext.deprecationWarning).toBeNull();
     });
   });
+});
+
+describe('Design generation revisions', () => {
+  it('keeps library updates from starting a full build while the CAD workspace is open', async () => {
+    vi.useFakeTimers();
+    try {
+      localStorage.clear();
+      mockInitialConfig(mockConfig);
+      let context: ReturnType<typeof useConfigContext>;
+      const Capture = () => {
+        context = useConfigContext();
+        return null;
+      };
+      render(
+        <ConfigContextProvider>
+          <Capture />
+        </ConfigContextProvider>
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(500);
+      });
+      act(() => context!.setCadActive(true));
+      mockErgogenWorker.postMessage.mockClear();
+      act(() =>
+        context!.setInjectionInput([
+          [
+            'footprint',
+            'library/owned',
+            'module.exports = {params:{},body:()=>""}',
+          ],
+        ])
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(500);
+      });
+      expect(mockErgogenWorker.postMessage).not.toHaveBeenCalled();
+      await act(async () => {
+        await context!.generateNow(mockConfig, [], { pointsonly: false });
+      });
+      expect(mockErgogenWorker.postMessage).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('keeps the newest preview when workers finish out of order', async () => {
+    localStorage.clear();
+    mockInitialConfig(mockConfig);
+    let context: ReturnType<typeof useConfigContext>;
+    const Capture = () => {
+      context = useConfigContext();
+      return null;
+    };
+    render(
+      <ConfigContextProvider>
+        <Capture />
+      </ConfigContextProvider>
+    );
+    await act(async () => {
+      await context!.generateNow(mockConfig, [], { pointsonly: false });
+    });
+    const first = mockErgogenWorker.postMessage.mock.calls.at(-1)![0];
+    await act(async () => {
+      await context!.generateNow('points: {zones: {new: {}}}', [], {
+        pointsonly: false,
+      });
+    });
+    const second = mockErgogenWorker.postMessage.mock.calls.at(-1)![0];
+    act(() =>
+      mockErgogenWorker.onmessage({
+        data: {
+          type: 'success',
+          requestId: second.requestId,
+          results: { outlines: { newest: { svg: 'new' } } },
+        },
+      })
+    );
+    act(() =>
+      mockErgogenWorker.onmessage({
+        data: {
+          type: 'success',
+          requestId: first.requestId,
+          results: { outlines: { old: { svg: 'old' } } },
+        },
+      })
+    );
+    expect(context!.results?.outlines).toHaveProperty('newest');
+    act(() =>
+      mockErgogenWorker.onmessage({
+        data: { type: 'error', requestId: first.requestId, error: 'old error' },
+      })
+    );
+    expect(context!.error).toBeNull();
+  });
+});
+
+it('accepts a current result after the editor saves its debounced value', async () => {
+  localStorage.clear();
+  mockInitialConfig(mockConfig);
+  let context: ReturnType<typeof useConfigContext>;
+  const Capture = () => {
+    context = useConfigContext();
+    return null;
+  };
+  render(
+    <ConfigContextProvider>
+      <Capture />
+    </ConfigContextProvider>
+  );
+  const edited = 'points: {zones: {edited: {}}}';
+  act(() => context!.updateRealtimeConfigInput(edited));
+  await act(async () => {
+    await context!.generateNow(edited, [], { pointsonly: false });
+  });
+  const request = mockErgogenWorker.postMessage.mock.calls.at(-1)![0];
+  act(() => context!.setConfigInput(edited));
+  act(() =>
+    mockErgogenWorker.onmessage({
+      data: {
+        type: 'success',
+        requestId: request.requestId,
+        results: { outlines: { edited: { svg: 'new' } } },
+      },
+    })
+  );
+  expect(context!.results?.outlines).toHaveProperty('edited');
+});
+
+it('publishes a design only after every STL part succeeds', async () => {
+  localStorage.clear();
+  mockInitialConfig(mockConfig);
+  let context: ReturnType<typeof useConfigContext>;
+  const Capture = () => {
+    context = useConfigContext();
+    return null;
+  };
+  render(
+    <ConfigContextProvider>
+      <Capture />
+    </ConfigContextProvider>
+  );
+  await act(async () => {
+    await context!.generateNow(mockConfig, [], { pointsonly: false });
+  });
+  const first = mockErgogenWorker.postMessage.mock.calls.at(-1)![0];
+  const valid = {
+    outlines: { old: { svg: 'old' } },
+    designs: { features: {} },
+  };
+  act(() =>
+    mockErgogenWorker.onmessage({
+      data: { type: 'success', requestId: first.requestId, results: valid },
+    })
+  );
+  await act(async () => {
+    await context!.generateNow(mockConfig, [], { pointsonly: false });
+  });
+  const request = mockErgogenWorker.postMessage.mock.calls.at(-1)![0];
+  const pending = {
+    outlines: { new: { svg: 'new' } },
+    cases: { tray: { jscad: 'broken' } },
+    designs: { features: {} },
+  };
+  act(() =>
+    mockErgogenWorker.onmessage({
+      data: { type: 'success', requestId: request.requestId, results: pending },
+    })
+  );
+  expect(context!.results).toEqual(valid);
+  expect(context!.resultsStale).toBe(true);
+  const batch = mockJscadWorker.postMessage.mock.calls.at(-1)![0];
+  act(() =>
+    mockJscadWorker.onmessage({
+      data: {
+        type: 'error',
+        error: 'Invalid tray mesh',
+        configVersion: batch.configVersion,
+      },
+    })
+  );
+  expect(context!.results).toEqual(valid);
+  expect(context!.error).toContain('Invalid tray mesh');
+  expect(context!.resultsStale).toBe(true);
+});
+
+it('adopts the case result without rebuilding the same captured draft', async () => {
+  localStorage.clear();
+  mockInitialConfig(mockConfig);
+  let context: ReturnType<typeof useConfigContext>;
+  const Capture = () => {
+    context = useConfigContext();
+    return null;
+  };
+  render(
+    <ConfigContextProvider>
+      <Capture />
+    </ConfigContextProvider>
+  );
+  const edited = 'points: {zones: {caseDraft: {}}}';
+  const result = { outlines: { generated: { svg: 'captured' } } };
+  act(() => {
+    context!.updateRealtimeConfigInput(edited);
+    context!.setConfigInput(edited);
+    context!.adoptGenerated(edited, result as never, {});
+  });
+  const count = mockErgogenWorker.postMessage.mock.calls.length;
+  await act(async () => {
+    await context!.generateNow(edited, [], { pointsonly: false });
+  });
+  expect(mockErgogenWorker.postMessage.mock.calls.length).toBe(count);
+  expect(context!.results?.outlines).toHaveProperty('generated');
+  await act(async () => {
+    await context!.generateNow(edited + '\n# changed', [], {
+      pointsonly: false,
+    });
+  });
+  expect(mockErgogenWorker.postMessage.mock.calls.length).toBe(count + 1);
+});
+it('clears a previous generation error when creating another project', () => {
+  let session: ReturnType<typeof useConfigContext>;
+  const Read = () => {
+    session = useConfigContext();
+    return null;
+  };
+  render(
+    <ConfigContextProvider>
+      <Read />
+    </ConfigContextProvider>
+  );
+  act(() => {
+    session!.setError('Previous project failed');
+  });
+  act(() => {
+    session!.createNewConfig('schema: ergogen/v1\nlayout: {}\n', 'Next');
+  });
+  expect(session!.error).toBeNull();
 });

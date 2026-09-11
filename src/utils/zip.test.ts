@@ -25,8 +25,8 @@ describe('createZip', () => {
 
   const createMockFolder = () => {
     const folder: any = {
-      file: jest.fn().mockReturnThis(),
-      folder: jest.fn(),
+      file: vi.fn().mockReturnThis(),
+      folder: vi.fn(),
     };
     folder.folder.mockImplementation((name: string) => {
       if (!mockFolders[name]) {
@@ -38,23 +38,21 @@ describe('createZip', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockFolders = {};
 
     mockZip = {
-      file: jest.fn().mockReturnThis(),
-      folder: jest.fn().mockImplementation((name: string) => {
+      file: vi.fn().mockReturnThis(),
+      folder: vi.fn().mockImplementation((name: string) => {
         if (!mockFolders[name]) {
           mockFolders[name] = createMockFolder();
         }
         return mockFolders[name];
       }),
-      generateAsync: jest
-        .fn()
-        .mockResolvedValue(new Blob(['mock zip content'])),
+      generateAsync: vi.fn().mockResolvedValue(new Blob(['mock zip content'])),
     };
 
-    (JSZip as unknown as jest.Mock).mockImplementation(() => mockZip);
+    vi.mocked(JSZip).mockImplementation(() => mockZip);
   });
 
   it('should include root files: config.yaml and demo.svg', async () => {
@@ -167,7 +165,7 @@ describe('createZip', () => {
     );
 
     // Reset mocks for next run
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockFolders = {};
 
     // stlPreview = true
@@ -265,8 +263,8 @@ describe('downloadAllConfigs', () => {
 
   const createMockFolder = () => {
     const folder: any = {
-      file: jest.fn().mockReturnThis(),
-      folder: jest.fn(),
+      file: vi.fn().mockReturnThis(),
+      folder: vi.fn(),
     };
     folder.folder.mockImplementation((name: string) => {
       if (!mockFolders[name]) {
@@ -278,23 +276,23 @@ describe('downloadAllConfigs', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockFolders = {};
 
     mockZip = {
-      file: jest.fn().mockReturnThis(),
-      folder: jest.fn().mockImplementation((name: string) => {
+      file: vi.fn().mockReturnThis(),
+      folder: vi.fn().mockImplementation((name: string) => {
         if (!mockFolders[name]) {
           mockFolders[name] = createMockFolder();
         }
         return mockFolders[name];
       }),
-      generateAsync: jest
+      generateAsync: vi
         .fn()
         .mockResolvedValue(new Blob(['mock config zip content'])),
     };
 
-    (JSZip as unknown as jest.Mock).mockImplementation(() => mockZip);
+    vi.mocked(JSZip).mockImplementation(() => mockZip);
   });
 
   it('should include configs in root and package injections', async () => {

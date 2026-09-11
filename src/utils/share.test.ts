@@ -794,3 +794,24 @@ describe('share utilities', () => {
     });
   });
 });
+
+it('packages injections used by native parts and instance bindings', () => {
+  const used = extractUsedInjectionsFromCanonical({
+    schema: 'ergogen/v1',
+    parts: {
+      mx: { revision: '1', footprints: { switch: { what: 'custom/switch' } } },
+    },
+    layout: {
+      objects: {
+        display: {
+          kind: 'component',
+          footprints: { connector: { what: 'custom/connector' } },
+        },
+      },
+    },
+  });
+  expect(Array.from(used.footprints).sort()).toEqual([
+    'custom/connector',
+    'custom/switch',
+  ]);
+});

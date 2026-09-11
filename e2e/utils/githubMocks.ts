@@ -28,10 +28,10 @@ export const mockGitHubNetworkRequests = async (page: Page) => {
           headers: rateLimitHeaders,
           contentType: 'text/yaml',
           body: `
-points:
-  key: 1
-footprints:
-  ceoloide/logo_mr_useful: {}
+schema: ergogen/v1
+layout:
+  objects:
+    logo: {kind: component, footprints: {logo: {what: ceoloide/logo_mr_useful}}}
 `,
         });
         return;
@@ -55,7 +55,8 @@ footprints:
       // ceoloide/mr_useful_footprints submodule files
       if (
         url.includes('mr_useful_footprints') &&
-        url.includes('logo_mr_useful.js')
+        (url.includes('logo_mr_useful.js') ||
+          url.includes('logo_mr_useful_2.js'))
       ) {
         await route.fulfill({
           status: 200,
@@ -76,10 +77,10 @@ footprints:
           headers: rateLimitHeaders,
           contentType: 'text/yaml',
           body: `
-points:
-  key: 2
-footprints:
-  unspecworks/pico_oneside: {}
+schema: ergogen/v1
+layout:
+  objects:
+    mcu: {kind: component, footprints: {mcu: {what: unspecworks/pico_oneside}}}
 `,
         });
         return;
@@ -95,6 +96,24 @@ footprints:
           headers: rateLimitHeaders,
           contentType: 'application/javascript',
           body: 'module.exports = { params: { designator: "MCU" }, body: "" };',
+        });
+        return;
+      }
+
+      // unspecworks/gamma-omega .gitmodules
+      if (
+        url.includes('unspecworks/gamma-omega') &&
+        url.endsWith('.gitmodules')
+      ) {
+        await route.fulfill({
+          status: 200,
+          headers: rateLimitHeaders,
+          contentType: 'text/plain',
+          body: `
+[submodule "original/ergogen/footprints/ceoloide"]
+\tpath = original/ergogen/footprints/ceoloide
+\turl = https://github.com/ceoloide/mr_useful_footprints.git
+`,
         });
         return;
       }
@@ -151,8 +170,22 @@ footprints:
     }
 
     // Mock Trees/Contents requests
-    if (url.includes('/git/trees/') || url.includes('/contents/')) {
-      if (url.includes('ceoloide/mr_useful')) {
+    if (url.includes('/git/trees/') || url.includes('/contents')) {
+      if (
+        url.includes('ceoloide/mr_useful') &&
+        !url.includes('mr_useful_footprints')
+      ) {
+        if (
+          url.includes('/contents/footprints') ||
+          url.includes('/contents/outlines') ||
+          url.includes('/contents/templates')
+        ) {
+          await route.fulfill({
+            status: 404,
+            body: 'Not found in E2E mock',
+          });
+          return;
+        }
         await route.fulfill({
           status: 200,
           headers: rateLimitHeaders,
@@ -201,6 +234,12 @@ footprints:
                 size: 100,
                 url: 'https://api.github.com/repos/ceoloide/mr_useful_footprints/git/blobs/3',
               },
+              {
+                path: 'logo_mr_useful_2.js',
+                type: 'blob',
+                size: 100,
+                url: 'https://api.github.com/repos/ceoloide/mr_useful_footprints/git/blobs/6',
+              },
             ],
             truncated: false,
           }),
@@ -224,7 +263,7 @@ footprints:
                 url: 'https://api.github.com/repos/unspecworks/gamma-omega/git/blobs/4',
               },
               {
-                path: 'footprints/pico_oneside.js',
+                path: 'original/ergogen/footprints/unspecworks/pico_oneside.js',
                 type: 'blob',
                 size: 100,
                 url: 'https://api.github.com/repos/unspecworks/gamma-omega/git/blobs/5',

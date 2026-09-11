@@ -65,9 +65,10 @@ export default tseslint.config(
   {
     files: ['src/**/*.test.{ts,tsx}', 'src/setupTests.tsx'],
     ...jest.configs['flat/recommended'],
+    settings: { jest: { globalAliases: { jest: ['vi'] } } },
     languageOptions: {
       globals: {
-        ...globals.jest,
+        ...globals.vitest,
         ...globals.browser,
         ...globals.node,
       },
@@ -87,9 +88,9 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': 'off',
     },
   },
-  // Workers interface with external code and often require 'any'
+  // Workers and service workers configurations
   {
-    files: ['src/workers/**/*.ts'],
+    files: ['src/workers/**/*.ts', 'src/service-worker.ts'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': 'warn',
@@ -97,6 +98,7 @@ export default tseslint.config(
     languageOptions: {
       globals: {
         ...globals.worker,
+        ...globals.serviceworker,
       },
     },
   }

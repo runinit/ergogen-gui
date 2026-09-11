@@ -1,0 +1,50 @@
+{
+  "id": "jlccnc-6061-2026-09",
+  "revision": 1,
+  "retrieved": "2026-09-08",
+  "units": "mm",
+  "sources": {
+    "cnc": "https://jlccnc.com/help/article/cnc-machining-design-guideline",
+    "pcb": "https://jlcpcb.com/capabilities/pcb-capabilities"
+  },
+  "supplier": {
+    "metalWallRecommended": 0.8,
+    "metalWallMinimum": 0.5,
+    "standardToleranceAtLeast": 0.1,
+    "shallowCorner": { "depth": 3, "radius": 0.5 },
+    "tools": [
+      [2, 8, 1.5],
+      [3, 12, 2],
+      [4, 15, 2.5],
+      [6, 25, 3.5],
+      [8, 35, 4.5],
+      [10, 45, 5.5],
+      [12, 55, 6.5],
+      [16, 75, 8.5],
+      [20, 95, 10.5],
+      [25, 120, 13],
+      [32, 155, 17],
+      [50, 240, 27],
+      [63, 305, 35]
+    ],
+    "pcbRegularOutlineTolerance": 0.2,
+    "pcbThicknessFractionAtLeast1mm": 0.1,
+    "pcbThicknessToleranceBelow1mm": 0.1,
+    "m3x05PilotDiameter": 2.5
+  },
+  "application": {
+    "material": "Aluminium 6061",
+    "wall": 3,
+    "floor": 2,
+    "cavityClearance": 0.5,
+    "shellMinimumWall": 2,
+    "pcbFallbackThickness": 1.6,
+    "gasketThickness": 2,
+    "gasketCompression": 0.2,
+    "verticalTravel": 0.2,
+    "lateralTravel": 0.1,
+    "previewDisplacement": 0,
+    "mountSpacing": 40,
+    "shallowCutterDiameter": 1
+  }
+}

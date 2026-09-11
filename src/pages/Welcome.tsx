@@ -5,7 +5,7 @@ import styled from 'styled-components';
 import { theme } from '../theme/theme';
 import { useConfigContext } from '../context/ConfigContext';
 import { exampleOptions, ConfigOption } from '../examples';
-import EmptyYAML from '../examples/empty_yaml';
+import Starter from '../examples/starter';
 import { fetchConfigFromUrl, GitInjection } from '../utils/github';
 import { ConflictResolutionStrategy } from '../utils/injections';
 import { loadLocalFile } from '../utils/localFiles';
@@ -490,7 +490,7 @@ const Welcome = () => {
   const handleSelectExample = async (configValue: string) => {
     if (configContext) {
       // Determine if this is the empty config
-      const isEmptyConfig = configValue === EmptyYAML.value;
+      const isEmptyConfig = configValue === Starter.value;
 
       // Find the example name by searching through all examples
       let exampleName = 'unknown';
@@ -818,27 +818,27 @@ const Welcome = () => {
           injectionType={currentConflict.type}
           onResolve={handleConflictResolution}
           onCancel={handleConflictCancel}
-          data-testid="conflict-resolution-dialog"
+          data-testid="conflict-dialog"
         />
       )}
       <WelcomeContainer>
-        <Header>Ergogen Web UI</Header>
+        <Header>Import project</Header>
         <SubHeader>
           A web-based interface for Ergogen, the ergonomic keyboard generator.
           <br />
-          Start a new design below.
+          Load a file, repository or example.
         </SubHeader>
 
         <OptionsContainer>
           <OptionBox>
             <h2>Start Fresh</h2>
-            <p>Begin with a completely blank slate.</p>
+            <p>Open a new project in Board Studio.</p>
             <Button
-              onClick={() => handleSelectExample(EmptyYAML.value)}
-              aria-label="Start with empty configuration"
+              onClick={() => navigate('/new')}
+              aria-label="New native design"
               data-testid="empty-config-button"
             >
-              Empty Configuration
+              New native design
             </Button>
           </OptionBox>
           <OptionBox>

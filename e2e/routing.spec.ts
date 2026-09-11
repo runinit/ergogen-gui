@@ -1,105 +1,73 @@
-import { test, expect } from '@playwright/test';
-import { makeShooter } from './utils/screenshots';
-import Absolem from '../src/examples/absolem';
-import { CONFIG_LOCAL_STORAGE_KEY } from '../src/context/constants';
+import { expect, test } from '@playwright/test';
+import { createDraft, readSource, studio } from './utils/studio';
+import { MULTI_CONFIG_STORAGE_KEY } from '../src/context/constants';
 
-test.describe('Routing and Welcome Page', () => {
-  test('new user is redirected to /new', async ({ page }) => {
-    const shoot = makeShooter(page, test.info());
-    await page.goto('./');
-    await shoot('before-redirect-to-new');
-    await expect(page).toHaveURL(/.*\/new/);
-    await expect(page.getByText('Ergogen Web UI')).toBeVisible();
-    await shoot('after-redirect-to-new');
-  });
+test('opens native Board Studio on a fresh root route', async ({ page }) => {
+  await page.goto('./');
+  await createDraft(page);
+  await expect(page).toHaveURL(/.*\/$/);
+});
 
-  test('existing user is routed to /', async ({ page }) => {
-    const shoot = makeShooter(page, test.info());
-    // Simulate existing user by setting a value in local storage
-    await page.addInitScript((CONFIG_LOCAL_STORAGE_KEY) => {
-      localStorage.setItem(
-        CONFIG_LOCAL_STORAGE_KEY,
-        JSON.stringify('some config')
-      );
-    }, CONFIG_LOCAL_STORAGE_KEY);
-    await page.goto('./');
-    await shoot('before-existing-user-routed-home');
-    await expect(page).toHaveURL(/.*\/$/);
-    await expect(page.getByTestId('config-editor')).toBeVisible();
-    await shoot('after-existing-user-routed-home');
-  });
+test('opens native Board Studio directly at /new', async ({ page }) => {
+  await page.goto('./new');
+  await createDraft(page);
+  await expect(page).toHaveURL(/.*\/$/);
+});
 
-  test('"Add" (new config) button requires existing config', async ({
-    page,
-  }) => {
-    const shoot = makeShooter(page, test.info());
-    await page.goto('./');
-    // With no config, the "New Design" button should not be visible on the main page
-    const btn = page.getByTestId('new-config-button');
-    await shoot('before-new-config-btn-not-visible');
-    await expect(btn).not.toBeVisible();
-    await shoot('after-new-config-btn-not-visible');
-  });
-
-  test('"Add" (new config) button navigates to /new', async ({ page }) => {
-    const shoot = makeShooter(page, test.info());
-    // The header button that starts a new config on the home page
-    const newConfigButton = page.getByTestId('new-config-button');
-
-    // 1. Set a valid config in local storage
-    await page.addInitScript(
-      ({ config, key }) => {
-        localStorage.setItem(key, JSON.stringify(config));
-      },
-      { config: Absolem.value, key: CONFIG_LOCAL_STORAGE_KEY }
+test('restores a saved native project at the root route', async ({ page }) => {
+  await page.addInitScript((key) => {
+    localStorage.setItem(
+      key,
+      JSON.stringify({
+        version: 2,
+        activeConfigId: 'saved',
+        configs: [
+          {
+            id: 'saved',
+            name: 'Saved',
+            config: 'schema: ergogen/v1\nlayout: {}',
+          },
+        ],
+      })
     );
-    await page.goto('./');
+  }, MULTI_CONFIG_STORAGE_KEY);
+  await page.goto('./');
+  await expect(studio(page)).toBeVisible();
+  await expect(readSource(page)).resolves.toContain('layout:');
+});
 
-    // 2. Now the button should be visible, click it
-    await shoot('before-new-config-button-visible');
-    await expect(newConfigButton).toBeVisible();
-    await shoot('after-new-config-button-visible');
-    await newConfigButton.click();
+test('creates a second project while retaining the first', async ({ page }) => {
+  await page.goto('./');
+  await createDraft(page);
+  const first = await readSource(page);
+  await page.getByRole('button', { name: 'Projects', exact: true }).click();
+  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await createDraft(page);
+  await expect(page).toHaveURL(/.*\/$/);
+  await page.reload();
+  await expect(studio(page)).toBeVisible();
+  expect(await readSource(page)).toBe(first);
+  const saved = await page.evaluate(
+    (key) => JSON.parse(localStorage.getItem(key)!),
+    MULTI_CONFIG_STORAGE_KEY
+  );
+  expect(saved.configs).toHaveLength(2);
+  expect(
+    new Set(saved.configs.map((item: { id: string }) => item.id)).size
+  ).toBe(2);
+});
 
-    // 3. Assert navigation to the /new page
-    await shoot('before-url-new-and-welcome');
-    await expect(page).toHaveURL(/.*\/new/);
-    await expect(page.getByText('Ergogen Web UI')).toBeVisible();
-    await shoot('after-url-new-and-welcome');
+test('keeps legacy points sources in the legacy editor', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('ergogen:config', JSON.stringify('points: {}'));
   });
+  await page.goto('./');
+  await expect(page.getByTestId('config-editor')).toBeVisible();
+});
 
-  test('clicking "Empty Configuration" creates an empty config and navigates to /', async ({
-    page,
-  }) => {
-    const shoot = makeShooter(page, test.info());
-    await page.goto('./new');
-    await page.getByRole('button', { name: 'Empty Configuration' }).click();
-    await shoot('before-empty-config-url-and-editor');
-    await expect(page).toHaveURL(/.*\/$/);
-    await expect(page.getByTestId('config-editor')).toBeVisible();
-    await shoot('after-empty-config-url-and-editor');
-
-    await expect(async () => {
-      const editorContent = await page.locator('.monaco-editor').textContent();
-      expect(editorContent).toContain('points:');
-    }).toPass();
-  });
-
-  test('clicking an example loads the config and navigates to /', async ({
-    page,
-  }) => {
-    const shoot = makeShooter(page, test.info());
-    await page.goto('./new');
-    await page.getByText(Absolem.label).click();
-    await shoot('before-example-url-and-editor');
-    await expect(page).toHaveURL(/.*\/$/);
-    await expect(page.getByTestId('config-editor')).toBeVisible();
-    await shoot('after-example-url-and-editor');
-
-    // Verify the config was stored by checking localStorage rather than Monaco's DOM text,
-    // which renders whitespace differently and is flaky to assert on.
-    await page.reload();
-    await expect(page.getByTestId('config-editor')).toContainText('meta:');
-    await expect(page.getByTestId('config-editor')).toContainText('points:');
-  });
+test('loads examples from /import into native Studio', async ({ page }) => {
+  await page.goto('./import');
+  await page.getByText('Starter', { exact: true }).click();
+  await expect(page).toHaveURL(/.*\/$/);
+  await expect(studio(page)).toBeVisible();
 });

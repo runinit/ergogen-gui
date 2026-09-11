@@ -6,7 +6,7 @@ import { useConfigContext } from '../context/ConfigContext';
 import { getErgogenVersionInfo } from '../utils/version';
 import { DevChip } from './DevChip';
 import UpdateChip from './UpdateChip';
-import InstallChip from './InstallChip';
+
 import { theme } from '../theme/theme';
 import { createZip } from '../utils/zip';
 import { trackEvent } from '../utils/analytics';
@@ -175,10 +175,9 @@ const LogoImage = styled.img`
  */
 type HeaderProps = {
   onUpdate?: () => void;
-  onInstall?: () => void;
 };
 
-const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
+const Header = ({ onUpdate }: HeaderProps): JSX.Element => {
   const configContext = useConfigContext();
   const navigate = useNavigate();
   const location = useLocation();
@@ -263,7 +262,6 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
 
   const handleNewClick = () => {
     configContext?.setShowSettings(false);
-    configContext?.selectConfig(null);
     navigate('/new');
   };
 
@@ -272,7 +270,8 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
       !configContext?.results ||
       !configContext?.configInput ||
       configContext?.isGenerating ||
-      configContext?.isJscadConverting
+      configContext?.isJscadConverting ||
+      configContext?.resultsStale
     ) {
       return;
     }
@@ -313,7 +312,7 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
   };
 
   const versionInfo = useMemo(
-    () => getErgogenVersionInfo(process.env.REACT_APP_ERGOGEN_VERSION),
+    () => getErgogenVersionInfo(import.meta.env.VITE_ERGOGEN_VERSION),
     []
   );
 
@@ -340,6 +339,11 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
           >
             <Icon className="material-symbols-outlined">side_navigation</Icon>
           </SideNavButton>
+          {process.env.REACT_APP_DEPLOYMENT_CHANNEL === 'preview' && (
+            <span>
+              Preview {process.env.REACT_APP_BUILD_REVISION?.slice(0, 7)}
+            </span>
+          )}
           <ErgogenLogo>
             <LogoButton
               to="/"
@@ -347,7 +351,7 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
               data-testid="logo-button"
             >
               <LogoImage
-                src={`${process.env.PUBLIC_URL}/ergogen.png`}
+                src={`${import.meta.env.BASE_URL}ergogen.png`}
                 alt="Ergogen logo"
               />
             </LogoButton>
@@ -473,12 +477,7 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
           {onUpdate && (
             <UpdateChip onClick={onUpdate} data-testid="header-update-chip" />
           )}
-          {onInstall && (
-            <InstallChip
-              onClick={onInstall}
-              data-testid="header-install-chip"
-            />
-          )}
+
           {location.pathname === '/' && (
             <>
               <AccentIconButton
@@ -493,7 +492,8 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
                 onClick={handleDownloadArchive}
                 disabled={
                   configContext?.isGenerating ||
-                  configContext?.isJscadConverting
+                  configContext?.isJscadConverting ||
+                  configContext?.resultsStale
                 }
                 aria-label="Download archive of all generated files"
                 data-testid="header-download-outputs-button"

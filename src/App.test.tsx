@@ -81,13 +81,13 @@ vi.mock('./molecules/SideNavigation', () => {
 // Mock worker Factory
 vi.mock('./workers/workerFactory', () => ({
   createErgogenWorker: () => ({
-    postMessage: jest.fn(),
-    terminate: jest.fn(),
+    postMessage: vi.fn(),
+    terminate: vi.fn(),
     onmessage: null,
   }),
   createJscadWorker: () => ({
-    postMessage: jest.fn(),
-    terminate: jest.fn(),
+    postMessage: vi.fn(),
+    terminate: vi.fn(),
     onmessage: null,
   }),
 }));
@@ -104,12 +104,12 @@ vi.mock('./utils/share', async () => {
 
 describe('App shared version compatibility checks', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('verifies version checking workflow during mount and subsequent hash changes', () => {
     // 1. Initial mount with compatible configuration
-    (getConfigFromHash as jest.Mock).mockReturnValue({
+    vi.mocked(getConfigFromHash).mockReturnValue({
       success: true,
       config: {
         config: 'points: {}',
@@ -126,7 +126,7 @@ describe('App shared version compatibility checks', () => {
     ).not.toBeInTheDocument();
 
     // 2. Simulate hash change to a warning configuration (newer GUI version)
-    (getConfigFromHash as jest.Mock).mockReturnValue({
+    vi.mocked(getConfigFromHash).mockReturnValue({
       success: true,
       config: {
         config: 'points: {}',
@@ -152,7 +152,7 @@ describe('App shared version compatibility checks', () => {
     ).not.toBeInTheDocument();
 
     // 4. Simulate another hash change to a custom Ergogen version
-    (getConfigFromHash as jest.Mock).mockReturnValue({
+    vi.mocked(getConfigFromHash).mockReturnValue({
       success: true,
       config: {
         config: 'points: {}',

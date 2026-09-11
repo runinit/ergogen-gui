@@ -329,10 +329,28 @@ index c21bc7c..b2c2f14 100644
 -);
 +// The embedding app supplies locally bundled Material Symbols and Nunito fonts.
 diff --git a/src/viewers/board/painter.ts b/src/viewers/board/painter.ts
-index 2323302..dc46207 100644
+index 2323302..b18fc98 100644
 --- a/src/viewers/board/painter.ts
 +++ b/src/viewers/board/painter.ts
-@@ -113,7 +113,9 @@ class LinePainter extends GraphicItemPainter {
+@@ -65,12 +65,16 @@ abstract class GraphicItemPainter extends BoardItemPainter {
+ abstract class NetNameItemPainter extends BoardItemPainter {
+     // Drawing the netname on `center` in region `region`
+     protected draw_net_name(
+-        net_name: string,
++        net_name: string | undefined,
+         center: Vec2,
+         text_width: number,
+         max_font_size: number,
+         color: Color,
+     ) {
++        if (!net_name) {
++            return;
++        }
++
+         const text_attr = new TextAttributes();
+ 
+         const text_center = center.copy().multiply(10000);
+@@ -113,7 +117,9 @@ class LinePainter extends GraphicItemPainter {
      }
  
      paint(layer: ViewLayer, s: board_items.GrLine | board_items.FpLine) {
@@ -343,7 +361,7 @@ index 2323302..dc46207 100644
  
          const points = [s.start, s.end];
          this.styled_line(points, s.width, layer.color, s.stroke_params);
-@@ -128,7 +130,9 @@ class RectPainter extends GraphicItemPainter {
+@@ -128,7 +134,9 @@ class RectPainter extends GraphicItemPainter {
      }
  
      paint(layer: ViewLayer, r: board_items.GrRect | board_items.FpRect) {
@@ -354,7 +372,7 @@ index 2323302..dc46207 100644
  
          const color = layer.color;
  
-@@ -163,7 +167,9 @@ class PolyPainter extends GraphicItemPainter {
+@@ -163,7 +171,9 @@ class PolyPainter extends GraphicItemPainter {
          layer: ViewLayer,
          p: board_items.Poly | board_items.GrPoly | board_items.FpPoly,
      ) {
@@ -365,7 +383,7 @@ index 2323302..dc46207 100644
  
          const color = layer.color;
  
-@@ -190,7 +196,9 @@ class ArcPainter extends GraphicItemPainter {
+@@ -190,7 +200,9 @@ class ArcPainter extends GraphicItemPainter {
      }
  
      paint(layer: ViewLayer, a: board_items.GrArc | board_items.FpArc) {
@@ -376,7 +394,7 @@ index 2323302..dc46207 100644
  
          const arc = a.arc;
          const points = arc.to_polyline();
-@@ -207,7 +215,9 @@ class CirclePainter extends GraphicItemPainter {
+@@ -207,7 +219,9 @@ class CirclePainter extends GraphicItemPainter {
      }
  
      paint(layer: ViewLayer, c: board_items.GrCircle | board_items.FpCircle) {
@@ -387,7 +405,7 @@ index 2323302..dc46207 100644
  
          const color = layer.color;
  
-@@ -240,7 +250,7 @@ class TraceSegmentPainter extends NetNameItemPainter {
+@@ -240,7 +254,7 @@ class TraceSegmentPainter extends NetNameItemPainter {
      }
  
      paint(layer: ViewLayer, s: board_items.LineSegment) {
@@ -396,7 +414,7 @@ index 2323302..dc46207 100644
              return;
          }
  
-@@ -257,7 +267,7 @@ class TraceArcPainter extends NetNameItemPainter {
+@@ -257,7 +271,7 @@ class TraceArcPainter extends NetNameItemPainter {
      }
  
      paint(layer: ViewLayer, a: board_items.ArcSegment) {
@@ -405,7 +423,7 @@ index 2323302..dc46207 100644
              return;
          }
  
-@@ -300,7 +310,7 @@ class ViaPainter extends NetNameItemPainter {
+@@ -300,7 +314,7 @@ class ViaPainter extends NetNameItemPainter {
      }
  
      paint(layer: ViewLayer, v: board_items.Via) {
@@ -414,7 +432,7 @@ index 2323302..dc46207 100644
              return;
          }
  
-@@ -363,7 +373,7 @@ class ZonePainter extends BoardItemPainter {
+@@ -363,7 +377,7 @@ class ZonePainter extends BoardItemPainter {
              return;
          }
  
@@ -423,7 +441,7 @@ index 2323302..dc46207 100644
              return;
          }
  
-@@ -435,7 +445,7 @@ class PadPainter extends NetNameItemPainter {
+@@ -435,7 +449,7 @@ class PadPainter extends NetNameItemPainter {
      }
  
      paint(layer: ViewLayer, pad: board_items.Pad) {
@@ -432,7 +450,7 @@ index 2323302..dc46207 100644
              return;
          }
  
-@@ -734,7 +744,9 @@ class GrTextPainter extends BoardItemPainter {
+@@ -734,7 +748,9 @@ class GrTextPainter extends BoardItemPainter {
      }
  
      paint(layer: ViewLayer, t: board_items.GrText) {
@@ -443,7 +461,7 @@ index 2323302..dc46207 100644
  
          if (t.hide || !t.shown_text) {
              return;
-@@ -781,7 +793,9 @@ class FpTextPainter extends BoardItemPainter {
+@@ -781,7 +797,9 @@ class FpTextPainter extends BoardItemPainter {
      }
  
      paint(layer: ViewLayer, t: board_items.FpText) {
@@ -454,7 +472,7 @@ index 2323302..dc46207 100644
  
          if (t.hide || !t.shown_text) {
              return;
-@@ -843,7 +857,9 @@ class PropertyTextPainter extends BoardItemPainter {
+@@ -843,7 +861,9 @@ class PropertyTextPainter extends BoardItemPainter {
      }
  
      paint(layer: ViewLayer, t: board_items.SymbolProperty) {

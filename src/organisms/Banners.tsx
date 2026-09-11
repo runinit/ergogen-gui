@@ -90,9 +90,11 @@ const Banners = () => {
   const {
     error,
     deprecationWarning,
+    skippedWarning,
     info,
     clearError,
     clearWarning,
+    clearSkippedWarning,
     clearInfo,
   } = configContext;
 
@@ -123,6 +125,21 @@ const Banners = () => {
             onClick={clearWarning}
             aria-label="Close warning message"
             data-testid="close-warning-banner"
+          >
+            &times;
+          </CloseButton>
+        </Banner>
+      )}
+      {skippedWarning && (
+        <Banner type="warning" data-testid="skipped-injections-banner">
+          <BannerContent>
+            <BannerIcon>warning</BannerIcon>
+            <BannerText>{skippedWarning}</BannerText>
+          </BannerContent>
+          <CloseButton
+            onClick={clearSkippedWarning}
+            aria-label="Close feature warning message"
+            data-testid="close-skipped-banner"
           >
             &times;
           </CloseButton>

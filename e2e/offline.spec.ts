@@ -4,10 +4,13 @@ test('reloads the application offline under the deployment path', async ({
   page,
   context,
 }) => {
+  test.setTimeout(60000);
   await page.goto('./new');
   await page.evaluate(() => navigator.serviceWorker.ready);
   await page.reload();
-  await expect(page.getByTestId('welcome-page-wrapper')).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'Board Studio' })
+  ).toBeVisible();
   await expect
     .poll(() =>
       page.evaluate(() => Boolean(navigator.serviceWorker.controller))
@@ -16,7 +19,9 @@ test('reloads the application offline under the deployment path', async ({
   await context.setOffline(true);
   try {
     await page.reload();
-    await expect(page.getByTestId('welcome-page-wrapper')).toBeVisible();
+    await expect(
+      page.getByRole('region', { name: 'Board Studio' })
+    ).toBeVisible();
   } finally {
     await context.setOffline(false);
   }
@@ -33,6 +38,12 @@ test('ignores a stale dependency cache after upgrading', async ({ page }) => {
     await navigator.serviceWorker.ready;
   });
   await page.reload();
+  await page.addScriptTag({
+    url: new URL(
+      'dependencies/kicanvas.js?v=kicad10-unconnected-pads-1',
+      page.url()
+    ).href,
+  });
   const viewer = await page.evaluate(async () => {
     await customElements.whenDefined('kicanvas-embed');
     return {
@@ -65,8 +76,18 @@ if (process.env.BHK_INPUT) {
     await page.evaluate(
       ({ config, injection }) => {
         localStorage.clear();
-        localStorage.setItem('ergogen:config', JSON.stringify(config));
-        localStorage.setItem('ergogen:injection', JSON.stringify(injection));
+        localStorage.setItem(
+          location.pathname.startsWith('/ergogen-gui-preview/')
+            ? 'preview:ergogen:config'
+            : 'ergogen:config',
+          JSON.stringify(config)
+        );
+        localStorage.setItem(
+          location.pathname.startsWith('/ergogen-gui-preview/')
+            ? 'preview:ergogen:injection'
+            : 'ergogen:injection',
+          JSON.stringify(injection)
+        );
       },
       { config, injection }
     );
@@ -97,3 +118,27 @@ if (process.env.BHK_INPUT) {
     }
   });
 }
+
+test('opens the PCB viewer for the first time offline', async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(60000);
+  await page.goto('./new');
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.reload();
+  await context.setOffline(true);
+  try {
+    await page
+      .getByRole('navigation', { name: 'Design workflow' })
+      .getByRole('button', { name: 'PCB', exact: true })
+      .click();
+    await page.getByRole('button', { name: 'KiCad PCB', exact: true }).click();
+    await expect(page.locator('kicanvas-embed canvas').first()).toBeVisible({
+      timeout: 30000,
+    });
+    await expect(page.getByText(/PCB preview unavailable/)).toHaveCount(0);
+  } finally {
+    await context.setOffline(false);
+  }
+});
