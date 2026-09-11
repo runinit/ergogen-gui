@@ -1,5 +1,8 @@
+import { targets } from '../utils/studioTargets';
 import type { LayoutReport } from 'ergogen/src/native';
-import { StudioActions, StudioField } from './StudioStyles';
+import styled from 'styled-components';
+import { theme } from '../theme/theme';
+import { StudioField } from './StudioStyles';
 import type { StudioSelection } from './StudioCanvas';
 import { KEY_SIZES } from '../utils/keySizes';
 import {
@@ -17,6 +20,19 @@ import {
 import type { KeyAlignment } from '../utils/keyResize';
 import { setLayout } from '../utils/layoutSource';
 
+const RelativeFields = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: ${theme.spacing.sm};
+  margin: ${theme.spacing.sm} 0;
+  label {
+    grid-template-columns: minmax(0, 1fr);
+    margin: 0;
+  }
+  input {
+    width: 100%;
+  }
+`;
 type Props = {
   source: string;
   selection: StudioSelection;
@@ -37,6 +53,12 @@ export default function SelectionControls({
       ? selection.id
       : selection.cluster || item?.cluster;
   const locked =
+    targets(selection).some((target) =>
+      target.section === 'objects'
+        ? report?.objects[target.id]?.locked ||
+          data.layout.objects?.[target.id]?.locked
+        : data.layout.clusters?.[target.cluster || target.id]?.locked
+    ) ||
     !!data.layout.clusters?.[cluster || '']?.locked ||
     keys.some((id) => data.layout.objects?.[id]?.locked);
   const size = item?.envelopes?.keycap?.size ||
@@ -99,7 +121,7 @@ export default function SelectionControls({
       {!!keys.length && (
         <>
           <StudioField>
-            <span>Selection key size</span>
+            <span>Key size</span>
             <select
               aria-label="Selection key size"
               value={
@@ -134,7 +156,7 @@ export default function SelectionControls({
             </select>
           </StudioField>
           <StudioField>
-            <span>Horizontal alignment</span>
+            <span>Align X</span>
             <select
               aria-label="Horizontal alignment"
               value={alignment.x}
@@ -157,7 +179,7 @@ export default function SelectionControls({
             </select>
           </StudioField>
           <StudioField>
-            <span>Vertical alignment</span>
+            <span>Align Y</span>
             <select
               aria-label="Vertical alignment"
               value={alignment.y}
@@ -198,7 +220,7 @@ export default function SelectionControls({
         }}
       >
         <small>Relative to current placement, in the parent’s axes.</small>
-        <StudioActions>
+        <RelativeFields>
           {[
             'x',
             'y',
@@ -208,8 +230,10 @@ export default function SelectionControls({
             <StudioField key={name}>
               <span>
                 {name === 'rotation'
-                  ? 'Rotate Δ°'
-                  : `${name.toUpperCase()} Δ mm`}
+                  ? selection.section === 'columns'
+                    ? 'Splay Δ°'
+                    : 'Rotate Δ°'
+                  : `${name === 'stagger' ? 'Stagger' : name.toUpperCase()} Δ mm`}
               </span>
               <input
                 aria-label={`Relative ${name}`}
@@ -220,7 +244,7 @@ export default function SelectionControls({
               />
             </StudioField>
           ))}
-        </StudioActions>
+        </RelativeFields>
         <button type="submit">Apply relative adjustment</button>
       </form>
       {!!keys.length && (

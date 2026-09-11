@@ -192,3 +192,19 @@ it('stops unused analysis and resumes it when enabled again', () => {
   expect(mocks.workers).toHaveLength(2);
   hook.unmount();
 });
+
+it('does not apply a failed placement result to a new drag candidate', () => {
+  const hook = renderHook(({ source }) => useCaseAnalysis(source, injections), {
+    initialProps: { source: 'bad drop' },
+  });
+  act(() => vi.advanceTimersByTime(1000));
+  respond(mocks.workers.at(-1), 'error');
+  expect(hook.result.current.error).toContain('Invalid seam');
+  hook.rerender({ source: 'corrected drop' });
+  expect(hook.result.current.error).toBe('');
+  expect(hook.result.current.diagnostics).toEqual([]);
+  act(() => vi.advanceTimersByTime(1000));
+  respond(mocks.workers.at(-1));
+  expect(hook.result.current.stale).toBe(false);
+  hook.unmount();
+});

@@ -33,6 +33,7 @@ function useCaseWorker(
   const [result, setResult] = useState<Results | null>(null);
   const [completed, setCompleted] = useState('');
   const [error, setError] = useState('');
+  const [attempted, setAttempted] = useState('');
   const [diagnostics, setDiagnostics] = useState<CaseFinding[]>([]);
   const [pending, setPending] = useState(false);
   const owned = useRef<Worker | null>(null);
@@ -47,6 +48,7 @@ function useCaseWorker(
   const latest = useRef(revision);
   latest.current = revision;
   const generate = useCallback(() => {
+    setAttempted(revision);
     // Completed workers retain WASM modules; busy or changed-injection workers are replaced.
     const reusable =
       owned.current &&
@@ -144,8 +146,8 @@ function useCaseWorker(
   }, [generate, mode, enabled]);
   return {
     result,
-    error,
-    diagnostics,
+    error: attempted === revision ? error : '',
+    diagnostics: attempted === revision ? diagnostics : [],
     pending,
     stale: completed !== revision,
     generate,

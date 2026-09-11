@@ -1,5 +1,10 @@
 import type { LayoutReport } from 'ergogen/src/native';
-import type { StudioSelection } from '../molecules/StudioCanvas';
+import {
+  includesObject,
+  targets,
+  movingTargets,
+  type StudioSelection,
+} from './studioTargets';
 import { readStudio, getValue, setValue, moveColumn } from './studioSource';
 import { moveLayout, setLayout } from './layoutSource';
 import { resizeKey, KeyAlignment } from './keyResize';
@@ -12,13 +17,11 @@ export function selectedKeys(
     .filter(
       ([id, item]) =>
         item.kind === 'key' &&
-        (selection.section === 'objects'
-          ? id === selection.id
-          : selection.section === 'clusters'
-            ? item.cluster === selection.id
-            : selection.section === 'columns' &&
-              item.cluster === selection.cluster &&
-              item.cell?.[0] === selection.id)
+        includesObject(selection, {
+          id,
+          cluster: item.cluster,
+          cell: item.cell,
+        })
     )
     .map(([id]) => id);
 }
@@ -47,26 +50,21 @@ export function sizeSelection(
       alignment ? { ...prior, ...alignment } : undefined
     );
   }
-  if (size && selection.section === 'clusters') {
-    result = setValue(
-      result,
-      ['meta', 'studio', 'layouts', selection.id, 'size'],
-      size
-    );
-  }
-  if (size && selection.section === 'columns') {
-    result = setValue(
-      result,
-      [
-        'meta',
-        'studio',
-        'columns',
-        selection.cluster || '',
-        selection.id,
-        'size',
-      ],
-      size
-    );
+  for (const target of targets(selection)) {
+    if (size && target.section === 'clusters') {
+      result = setValue(
+        result,
+        ['meta', 'studio', 'layouts', target.id, 'size'],
+        size
+      );
+    }
+    if (size && target.section === 'columns') {
+      result = setValue(
+        result,
+        ['meta', 'studio', 'columns', target.cluster || '', target.id, 'size'],
+        size
+      );
+    }
   }
   return result;
 }
@@ -84,6 +82,14 @@ export function adjustSelection(
 ): string {
   if (![...offset, rotation, stagger].every(Number.isFinite)) {
     throw new Error('Enter numeric relative adjustments.');
+  }
+  const members = movingTargets(source, selection);
+  if (members.length > 1 || selection.members) {
+    return members.reduce(
+      (current, member) =>
+        adjustSelection(current, member, offset, rotation, stagger),
+      source
+    );
   }
   let result = source;
   const column = selection.section === 'columns';

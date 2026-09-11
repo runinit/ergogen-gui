@@ -1,5 +1,22 @@
 # Changelog
 
+## Direct layout editing
+
+September 10, 2026
+
+The canvas now has a floating tool pill with Objects, Columns and Matrices at the
+top. Selection opens the relevant quick controls; owned electronics fold beneath
+keys in a smaller tree.
+
+Drag components directly, use Ctrl/Cmd to toggle selections and Shift to select a
+range. Snapping preserves layout spacing and checks nearby envelopes. Components
+can keep a snapped target and offset. Drops retain their visible position while
+validation finishes, without refitting the camera.
+
+Delete removes the selection as one undoable edit, including owned components.
+Locks and external references remain protected; text fields retain normal Delete
+behavior. Phone controls fit the screen and quick edits stay above the zoom pill.
+
 ## Reliable setup and assembly edits
 
 September 10, 2026

@@ -51,6 +51,15 @@ export const StudioShell = styled.section`
     outline: 2px solid ${theme.colors.accent};
     outline-offset: 2px;
   }
+  [data-object]:focus {
+    outline: none;
+  }
+  [data-object]:focus-visible polygon {
+    stroke: ${theme.colors.accent};
+    stroke-width: 2px;
+    stroke-dasharray: 4px 2px;
+    vector-effect: non-scaling-stroke;
+  }
   input,
   select,
   textarea {
@@ -164,12 +173,14 @@ export const StudioHeader = styled(StudioBar)`
     .project-actions {
       order: 1;
       width: 100%;
+      min-width: 0;
+      flex-wrap: wrap;
+      button {
+        padding: ${theme.spacing.sm};
+      }
     }
     .project-actions button[data-primary] {
       margin-left: auto;
-    }
-    .project-actions .desktop {
-      display: inline;
     }
   }
 `;
@@ -194,6 +205,12 @@ export const StudioPane = styled.aside<{
 }>`
   min-height: 0; overflow: auto; padding: ${theme.spacing.md}; border-${(p) => (p.$side === 'left' ? 'right' : 'left')}: 1px solid ${theme.colors.border}; background: ${theme.colors.backgroundLight};
   grid-column: ${(p) => (p.$side === 'left' ? 1 : 3)}; grid-row: 1;
+  &[aria-label='Object tree'] {
+    padding: ${theme.spacing.sm};
+    summary { padding: ${theme.spacing.sm} 0; font-size: ${theme.fontSizes.bodySmall}; }
+    > button:not(.close-pane), details > button { min-height: ${theme.studio.treeRow}; padding: ${theme.spacing.xs} ${theme.spacing.sm}; margin-bottom:0; font-size:${theme.fontSizes.bodySmall}; }
+    @media(pointer:coarse) { button { min-height: ${theme.studio.touchSize}; } }
+  }
   .close-pane { display: none; }
   @media(max-width: ${theme.studio.breakpoint}) { display: ${(p) => (p.$open ? 'block' : 'none')}; position: relative; grid-row: 2; border-top: 1px solid ${theme.colors.border}; z-index: ${theme.studio.panelLayer}; grid-column: 1; .close-pane { display: inline-flex; margin-bottom: ${theme.spacing.md}; } }
 `;

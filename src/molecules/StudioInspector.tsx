@@ -19,6 +19,7 @@ import LayoutDefaults from './LayoutDefaults';
 import { KEY_SIZES } from '../utils/keySizes';
 import { resizeKey } from '../utils/keyResize';
 import { matrixNames } from '../utils/studioSource';
+import { targets } from '../utils/studioTargets';
 import { setLayout } from '../utils/layoutSource';
 import type { SourcePath } from '../utils/designSource';
 
@@ -42,6 +43,23 @@ export default function StudioInspector({
   const { section, id } = selection;
   const [newName, setNewName] = useState('');
   const [resizeAttempt, setResizeAttempt] = useState(0);
+  if (selection.members && targets(selection).length > 1) {
+    return (
+      <>
+        <h2>{targets(selection).length} selected</h2>
+        <SelectionControls
+          source={source}
+          selection={selection}
+          report={report}
+          edit={edit}
+        />
+        <p>
+          Ctrl/Cmd toggles items. Shift selects a range. Drag any selected item
+          to move the set.
+        </p>
+      </>
+    );
+  }
   const objectSection = section === 'objects' || section === 'clusters';
   const item = objectSection ? data.layout[section]?.[id] : undefined;
   const resolved = objectSection ? report?.[section]?.[id] : undefined;

@@ -122,7 +122,11 @@ test('edits local key overrides, preserves arrangements, and enforces locks', as
   await expect(
     page.getByRole('status').filter({ hasText: /Layout resolved/ })
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Move', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Select Objects', exact: true })
+    .click();
+  // This test exercises free placement, independent of spacing constraints.
+  await page.keyboard.down('Alt');
   const box = (await key.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
@@ -132,6 +136,7 @@ test('edits local key overrides, preserves arrangements, and enforces locks', as
     { steps: 4 }
   );
   await page.mouse.up();
+  await page.keyboard.up('Alt');
   await expect.poll(() => source(page)).not.toBe(beforeMove);
   const movedX = parse(await source(page)).layout.objects.outer_home.placement
     .override.at[0];

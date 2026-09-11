@@ -38,7 +38,8 @@ referenced objects instead of leaving broken attachments.
 New projects start from numeric matrix dimensions (5 columns × 4 rows by default).
 Their keys mount on the PCB top surface; new thumb clusters and loose keys reuse
 that layer. Case-height changes therefore move the electronics with the PCB.
-Selection scope—Keys, Columns or Clusters—is separate from Select, Move and Pan.
+The floating canvas pill exposes Objects, Columns and Matrices directly, alongside
+Pan and snapping. Selecting a tree item also updates the canvas selection scope.
 `ColumnInspector` edits a whole column's splay, stagger and offsets, and exposes
 its occupied and empty cells. Resizing preserves deleted holes; Add key restores
 a chosen cell. The engine assigns shared column/row nets; individual overrides
@@ -46,12 +47,36 @@ remain available under Wiring. This interaction draws inspiration from the
 [Cosmos editor](https://ryanis.cool/cosmos/beta), using our existing theme,
 native YAML and physical geometry.
 
-`StudioCanvas` renders resolved engine envelopes. A move has an ephemeral source
-candidate, resolved through the layout worker before it is committed to history.
-Cancelled pointers and failed solutions discard that candidate. Dimensions and
-arrangement formulas remain authored expressions; movement changes local overrides.
-Camera state is independent of source history. Fit, wheel zoom, pan and pinch
-operate on the drawing; drag feedback is an absolute overlay that never resizes the canvas.
+`StudioCanvas` renders resolved engine envelopes. Pointer motion translates SVG
+objects immediately; only a released drag creates a YAML candidate and invokes the
+layout worker. The accepted pose stays visible until normal analysis catches up.
+The camera freezes at drag start; Fit alone reframes the changed geometry. Cancelled
+pointers, changed source and rejected solutions leave source history unchanged.
+A solved constraint that prevents the requested motion produces a visible error.
+
+`studioTargets` owns Ctrl/Cmd toggling, Shift ranges and containment-aware selection.
+`studioMove` applies world deltas through local edit frames. Selected descendants
+move once with their ancestor, including owned electronics and mirrored members.
+`studioDelete` assembles a single undoable edit, removes owned components, and
+preserves lock and external-reference checks. Delete in text fields or dialogs
+keeps its normal editing behavior.
+
+`snapSpacing` resolves pitch expressions through the native unit evaluator and
+caches scoped defaults. Keys retain their pitch-derived edge gaps, including
+oversized caps and unequal row/column pitch. Independent components use the gap
+chosen in Canvas options. Snapping compares actual rotated envelope edges and
+rejects candidates that crowd another object on the same PCB and mounting layer.
+Owned key electronics retain their intentionally overlapping assembly placements.
+Alt or the Snap toggle explicitly bypasses these placement rules. A same-layer
+component can keep its snapped target and relative offset; stacked, solved and
+key-owned placements keep their existing relationships.
+
+Quick controls open after selection or a completed move, dismiss before another
+drag, and use free canvas space when possible. The panel respects reduced motion;
+phones use a bottom sheet. Objects show relative translation and rotation, keys add
+size/alignment, columns add splay/stagger, and matrices add row/column spacing.
+The compact tree groups owned electronics beneath keys. Pan, pinch, wheel zoom,
+arrow nudges and explicit Fit remain available.
 
 `StudioInspector` edits parameters, arrangements, placement, solver freedoms,
 constraints, layers, physical envelopes and outline finishing. For a profile that

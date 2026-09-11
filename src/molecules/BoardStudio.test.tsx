@@ -237,3 +237,31 @@ it('reviews an edited column removal and preserves the source on Cancel', () => 
     'c1',
   ]);
 });
+
+it('deletes the selected column but leaves Delete in text fields alone', () => {
+  vi.mocked(useLayoutAnalysis).mockReturnValue({
+    result: { layout: { objects: {}, clusters: {}, findings: [] } },
+    pending: false,
+    stale: false,
+    error: '',
+    diagnostics: [],
+  } as unknown as ReturnType<typeof useLayoutAnalysis>);
+  render(
+    <Harness
+      initial={
+        'schema: ergogen/v1\nlayout: {clusters: {main: {arrangement: {type: columns, columns: [c1,c2], rows: [r1]}}}, objects: {a: {kind: key, cluster: main, cell: [c1,r1]}, b: {kind: key, cluster: main, cell: [c2,r1]}}}'
+      }
+    />
+  );
+  fireEvent.click(screen.getAllByRole('button', { name: 'Column 1 · c1' })[0]);
+  const before = current;
+  fireEvent.keyDown(screen.getByLabelText('Column splay'), { key: 'Delete' });
+  expect(current).toBe(before);
+  fireEvent.keyDown(screen.getByRole('region', { name: 'Board Studio' }), {
+    key: 'Delete',
+  });
+  expect(Object.keys(parse(current).layout.objects)).toEqual(['b']);
+  expect(parse(current).layout.clusters.main.arrangement.columns).toEqual([
+    'c2',
+  ]);
+});

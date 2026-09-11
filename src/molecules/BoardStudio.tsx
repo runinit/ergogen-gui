@@ -1,3 +1,4 @@
+import { removeSelection, isDeleteShortcut } from '../utils/studioDelete';
 import { ResizeReview, type ResizeProposal } from '../utils/resizeReview';
 import { repairSetup } from '../utils/setupRepair';
 import { keySetup } from '../utils/keyOptions';
@@ -27,14 +28,20 @@ import {
   getValue,
   readStudio,
   addCluster,
-  moveColumn,
   addObject,
   addOutline,
   nextId,
   setValue,
   StudioDoc,
 } from '../utils/studioSource';
-import { moveLayout } from '../utils/layoutSource';
+import { moveTargets } from '../utils/studioMove';
+import {
+  selectTargets,
+  selectionMode,
+  includesObject,
+  type SelectionMode,
+  type StudioTarget,
+} from '../utils/studioTargets';
 import StudioExport from './StudioExport';
 import ConfigEditor from './ConfigEditor';
 import UpdateChip from '../atoms/UpdateChip';
@@ -138,6 +145,7 @@ export default function BoardStudio({
     }
   }, [source, parsed.error, editSource]);
   const [quickRequest, setQuickRequest] = useState(0);
+  const [quickIntent, setQuickIntent] = useState<'select' | 'focus'>('select');
   const treeTrigger = useRef<HTMLButtonElement>(null),
     inspectorTrigger = useRef<HTMLButtonElement>(null);
   const treePane = useRef<HTMLElement>(null),
@@ -183,55 +191,55 @@ export default function BoardStudio({
       const next = transform(before);
       finish(next);
       setError('');
+      return true;
     } catch (caught) {
       if (caught instanceof ResizeReview) {
         setResizeReview({ proposal: caught.proposal, finish });
-        return;
+        return false;
       }
       setError(String(caught));
+      return false;
     }
+  };
+  const deleteSelected = () => {
+    if (stale || !selection.id) {
+      return;
+    }
+    edit(
+      (before) => removeSelection(before, selection),
+      (next) => {
+        context?.editSource(next);
+        setSelection({ section: 'objects', id: '' });
+      }
+    );
   };
   const choose = (
     value: StudioSelection,
-    panel: 'inspect' | 'keep' = 'inspect'
+    panel: 'inspect' | 'keep' = 'inspect',
+    mode: SelectionMode = 'replace',
+    order: StudioTarget[] = []
   ) => {
-    setSelection(value);
+    setSelection((current) => selectTargets(current, value, mode, order));
     setReview(false);
     if (panel === 'inspect') {
       setSheet('inspector');
     }
   };
-  const move = (target: StudioSelection, delta: number[], before: string) => {
+  const move = (
+    target: StudioSelection,
+    delta: number[],
+    before: string,
+    candidate?: string
+  ) => {
     if (before !== context?.getRealtimeConfigInput()) {
       setError('The source changed during this move. Retry.');
-      return;
+      return false;
     }
-    if (target.section === 'columns') {
-      const cluster = target.cluster || '',
-        frame = report?.clusters[cluster];
-      if (!frame || frame.locked || stale) {
-        return;
-      }
-      edit((current) =>
-        moveColumn(current, cluster, target.id, delta, frame.matrix)
-      );
-      return;
+    if (!report || stale) {
+      return false;
     }
-    if (target.section !== 'objects' && target.section !== 'clusters') {
-      return;
-    }
-    const frame = report?.[target.section]?.[target.id];
-    if (!frame || frame.locked || stale) {
-      return;
-    }
-    edit((current) =>
-      moveLayout(
-        current,
-        target.section as 'objects' | 'clusters',
-        target.id,
-        delta,
-        frame.editMatrix
-      )
+    return edit(
+      (current) => candidate || moveTargets(current, target, delta, report)
     );
   };
   const changeStage = (next: Stage) => {
@@ -423,6 +431,16 @@ export default function BoardStudio({
     <StudioShell
       aria-label="Board Studio"
       onKeyDown={(event) => {
+        if (
+          ['layout', 'components'].includes(stage) &&
+          isDeleteShortcut(event.key, event.target) &&
+          !event.ctrlKey &&
+          !event.metaKey &&
+          !event.altKey
+        ) {
+          event.preventDefault();
+          deleteSelected();
+        }
         if (event.key === 'Escape') {
           setAdding(false);
           setLibrary(false);
@@ -810,7 +828,11 @@ export default function BoardStudio({
                 data={data}
                 report={report}
                 selection={selection}
-                choose={choose}
+                choose={(value, mode, order) => {
+                  choose(value, 'keep', mode, order);
+                  setQuickIntent('select');
+                  setQuickRequest((current) => current + 1);
+                }}
               />
               <details open={stage === 'components'}>
                 <summary>Components and free objects</summary>
@@ -819,10 +841,19 @@ export default function BoardStudio({
                   .map(([id, item]) => (
                     <TreeButton
                       key={id}
-                      aria-pressed={
-                        selection.section === 'objects' && selection.id === id
-                      }
-                      onClick={() => choose({ section: 'objects', id })}
+                      aria-pressed={includesObject(selection, { id })}
+                      onClick={(event) => {
+                        choose(
+                          { section: 'objects', id },
+                          'keep',
+                          selectionMode(event),
+                          Object.entries(data.layout.objects || {})
+                            .filter(([, item]) => !item.cluster)
+                            .map(([id]) => ({ section: 'objects', id }))
+                        );
+                        setQuickIntent('select');
+                        setQuickRequest((current) => current + 1);
+                      }}
                     >
                       <Component size={18} />
                       <span>
@@ -832,91 +863,94 @@ export default function BoardStudio({
                     </TreeButton>
                   ))}
               </details>
-              <h3>Design</h3>
-              <TreeButton
-                aria-pressed={selection.section === 'parameters'}
-                onClick={() => choose({ section: 'parameters', id: '' })}
-              >
-                <Variable size={18} />
-                Parameters
-              </TreeButton>
-              <TreeButton
-                aria-pressed={selection.section === 'constraints'}
-                onClick={() =>
-                  choose({
-                    section: 'constraints',
-                    id: Object.keys(data.layout.constraints || {})[0] || '',
-                  })
-                }
-              >
-                <GitBranch size={18} />
-                Constraints
-              </TreeButton>
-              {Object.entries(data.layout.constraints || {}).map(
-                ([id, item]) => (
-                  <TreeButton
-                    key={id}
-                    aria-pressed={
-                      selection.section === 'constraints' && selection.id === id
-                    }
-                    onClick={() => choose({ section: 'constraints', id })}
-                  >
-                    {item.label || id}
-                  </TreeButton>
-                )
-              )}
               <details>
-                <summary>Mounting layers</summary>
-                {Object.keys(data.layout.layers || {}).map((id) => (
+                <summary>Design</summary>
+                <TreeButton
+                  aria-pressed={selection.section === 'parameters'}
+                  onClick={() => choose({ section: 'parameters', id: '' })}
+                >
+                  <Variable size={18} />
+                  Parameters
+                </TreeButton>
+                <TreeButton
+                  aria-pressed={selection.section === 'constraints'}
+                  onClick={() =>
+                    choose({
+                      section: 'constraints',
+                      id: Object.keys(data.layout.constraints || {})[0] || '',
+                    })
+                  }
+                >
+                  <GitBranch size={18} />
+                  Constraints
+                </TreeButton>
+                {Object.entries(data.layout.constraints || {}).map(
+                  ([id, item]) => (
+                    <TreeButton
+                      key={id}
+                      aria-pressed={
+                        selection.section === 'constraints' &&
+                        selection.id === id
+                      }
+                      onClick={() => choose({ section: 'constraints', id })}
+                    >
+                      {item.label || id}
+                    </TreeButton>
+                  )
+                )}
+                <details>
+                  <summary>Mounting layers</summary>
+                  {Object.keys(data.layout.layers || {}).map((id) => (
+                    <TreeButton
+                      key={id}
+                      aria-pressed={
+                        selection.section === 'layers' && selection.id === id
+                      }
+                      onClick={() => choose({ section: 'layers', id })}
+                    >
+                      {id}
+                      <small>Layer</small>
+                    </TreeButton>
+                  ))}
+                </details>
+                {Object.keys(data.designs?.profiles || {}).map((id) => (
                   <TreeButton
                     key={id}
                     aria-pressed={
-                      selection.section === 'layers' && selection.id === id
+                      selection.section === 'outline' && selection.id === id
                     }
-                    onClick={() => choose({ section: 'layers', id })}
+                    onClick={() => choose({ section: 'outline', id })}
                   >
                     {id}
-                    <small>Layer</small>
+                    <small>Outline</small>
                   </TreeButton>
                 ))}
-              </details>
-              {Object.keys(data.designs?.profiles || {}).map((id) => (
-                <TreeButton
-                  key={id}
-                  aria-pressed={
-                    selection.section === 'outline' && selection.id === id
-                  }
-                  onClick={() => choose({ section: 'outline', id })}
-                >
-                  {id}
-                  <small>Outline</small>
-                </TreeButton>
-              ))}
-              <button
-                onClick={() =>
-                  edit((before) =>
-                    addOutline(
-                      before,
-                      Object.keys(data.pcbs || {})[0] || 'main',
-                      report,
-                      'replace'
-                    )
-                  )
-                }
-              >
-                Rebuild board outline
-              </button>
-              <StudioActions>
                 <button
-                  onClick={() => {
-                    setSketch(!sketch);
-                    setSheet('');
-                  }}
+                  onClick={() =>
+                    edit((before) =>
+                      addOutline(
+                        before,
+                        Object.keys(data.pcbs || {})[0] || 'main',
+                        report,
+                        'replace'
+                      )
+                    )
+                  }
                 >
-                  Sketches
+                  Rebuild board outline
                 </button>
-                <button onClick={() => setLibrary(true)}>Part library</button>
-              </StudioActions>
+                <StudioActions>
+                  <button
+                    onClick={() => {
+                      setSketch(!sketch);
+                      setSheet('');
+                    }}
+                  >
+                    Sketches
+                  </button>
+                  <button onClick={() => setLibrary(true)}>Part library</button>
+                </StudioActions>
+              </details>
             </StudioPane>
             <StudioMain>
               {!stale && analysis.error && (
@@ -951,25 +985,30 @@ export default function BoardStudio({
                 )
               ) : (
                 <>
-                  <SelectionPopover
-                    source={source}
-                    selection={selection}
-                    report={report}
-                    edit={edit}
-                    request={quickRequest}
-                  />
                   <StudioCanvas
+                    quickEdit={
+                      <SelectionPopover
+                        source={source}
+                        selection={selection}
+                        report={report}
+                        edit={edit}
+                        request={quickRequest}
+                        intent={quickIntent}
+                      />
+                    }
                     report={report}
                     injections={context.injectionInput}
                     source={source}
                     stale={stale}
                     selection={selection}
                     onSelect={choose}
-                    onQuickEdit={(value) => {
+                    onQuickEdit={(value, intent = 'select') => {
                       choose(value, 'keep');
+                      setQuickIntent(intent);
                       setQuickRequest((current) => current + 1);
                     }}
                     onMove={move}
+                    onDelete={deleteSelected}
                     model={model}
                     side={side}
                     onSide={setSide}
