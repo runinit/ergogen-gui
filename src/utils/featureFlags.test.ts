@@ -43,7 +43,7 @@ describe('featureFlags utilities', () => {
     const originalEnv = process.env;
 
     beforeEach(() => {
-      jest.resetModules();
+      vi.resetModules();
       process.env = { ...originalEnv };
       mockState.version = '4.2.1';
       // Delete any specific feature env vars to keep test sandbox clean

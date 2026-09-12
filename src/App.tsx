@@ -1,3 +1,5 @@
+import { useProjectMode } from './hooks/useProjectMode';
+import { storageKey } from './utils/storageKey';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
@@ -281,6 +283,7 @@ const AppContent = ({
   const configContext = useConfigContext();
   // Get configInput from context to ensure we have the latest value
   const configInput = configContext?.configInput;
+  const mode = useProjectMode(configInput, configContext?.activeConfigId);
   const location = useLocation();
   const onUpdate = useServiceWorkerUpdate();
   const onInstall = usePwaInstallPrompt();
@@ -325,7 +328,10 @@ const AppContent = ({
     getCurrentInjections: () => configContext?.injectionInput || [],
     onComplete: async (config, injections) => {
       // Store merged result in localStorage to persist
-      localStorage.setItem('ergogen:injection', JSON.stringify(injections));
+      localStorage.setItem(
+        storageKey('ergogen:injection'),
+        JSON.stringify(injections)
+      );
       configContext?.loadPreview(config);
     },
     setError: (error) => configContext?.setError(error),
@@ -586,7 +592,9 @@ const AppContent = ({
           data-testid="bulk-download-dialog"
         />
       )}
-      <Header onUpdate={onUpdate} onInstall={onInstall} />
+      {(mode === 'legacy' || location.pathname === '/new') && (
+        <Header onUpdate={onUpdate} onInstall={onInstall} />
+      )}
       <LoadingBar
         visible={configContext?.isGenerating ?? false}
         data-testid="loading-bar"
@@ -602,7 +610,13 @@ const AppContent = ({
           <Route
             path="/"
             // The routing decision is now based on the reactive `configInput` state.
-            element={configInput ? <Ergogen /> : <Navigate to="/new" replace />}
+            element={
+              configInput ? (
+                <Ergogen onUpdate={onUpdate} onInstall={onInstall} />
+              ) : (
+                <Navigate to="/new" replace />
+              )
+            }
           />
           <Route path="/new" element={<Welcome />} />
           <Route path="*" element={<Navigate to="/" replace />} />

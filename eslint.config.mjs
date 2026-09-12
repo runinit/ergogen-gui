@@ -65,9 +65,10 @@ export default tseslint.config(
   {
     files: ['src/**/*.test.{ts,tsx}', 'src/setupTests.tsx'],
     ...jest.configs['flat/recommended'],
+    settings: { jest: { globalAliases: { jest: ['vi'] } } },
     languageOptions: {
       globals: {
-        ...globals.jest,
+        ...globals.vitest,
         ...globals.browser,
         ...globals.node,
       },

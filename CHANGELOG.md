@@ -1,5 +1,365 @@
 # Changelog
 
+## Units, alignment and in-place setup
+
+September 12, 2026
+
+Enter stagger and spacing as `0.5u` or `0.25v`, with millimetres shown beside the
+value. Quarter-unit snapping is the default; switch increments in the canvas pill.
+Drag to key, component, row or column centers, then choose **Keep aligned** to
+retain the relationship. The Inspector also exposes alignment, distance and equal
+spacing controls.
+
+New boards start empty. **Design setup** stays beside the workspace and groups
+spacing, topology, per-key electronics and mechanical layers. Preview the real
+switch/diode/LED footprints and generate a separate KiCad sample. Add matrices,
+MCUs, encoders and other hardware directly in Layout.
+
+Foam, silicone and gasket layers occupy existing assembly gaps. Thickness and
+compression show fit without moving the stack. Export fitting layers separately
+as DXF files, with material metadata and nominal 3D references.
+
+## A consistent CAD workspace
+
+September 11, 2026
+
+![Docked object browser, drawing and properties.](./public/images/changelog/cad-redesign/desktop.png)
+
+Board design and part editing now share a compact graphite interface with blue
+selection, aligned controls, and consistent panes. Desktop starts with the object
+browser and properties beside the canvas. Mobile uses a focused inspector drawer.
+
+Part save and undo stay visible while editing models. Browsing other parts or
+returning from board editing preserves unsaved drafts. Model number fields accept
+replacement values without snapping back mid-edit; Enter commits and Escape
+cancels.
+
+## Clear canvas and key resizing
+
+September 11, 2026
+
+Open **Inspector** beside the canvas tools for Objects, Selection and Design.
+Both sidebars and automatic selection popups are replaced by this manually opened
+panel. Sections remember their expanded state during the session.
+
+**Auto (make room)** grows outside keys outward. Interior resizing adjusts native
+spacing in one undoable edit, preserving authored offsets. Unresolved clearance
+is reported and blocks fabrication exports.
+
+## A simpler design workflow
+
+September 11, 2026
+
+![Design, PCB, Case and Export in one workspace.](./public/images/changelog/studio-workflow.png)
+
+Layout and component placement now share **Design**. Continue through **PCB**,
+**Case** and **Export** without losing generated geometry when opening Code or
+the part library.
+
+**What changed:**
+
+- **One generation action:** Generate 3D and the editor shortcut share a build.
+- **One export destination:** Download source, portable projects, boards and case
+  files from Export. Case review resets when geometry changes.
+- **Settings stays in context:** Keep the current stage, selection and camera.
+  Advanced library code appears when an entry is selected.
+- **Explicit case creation:** Opening Case leaves the source and undo history
+  untouched until you choose Create case.
+- **Reliable editing:** Unfinished YAML keeps its editor, and legacy automatic
+  generation no longer starts extra native builds.
+
+## Direct layout editing
+
+September 10, 2026
+
+The canvas now has a floating tool pill with Objects, Columns and Matrices at the
+top. Selection opens the relevant quick controls; owned electronics fold beneath
+keys in a smaller tree.
+
+Drag components directly, use Ctrl/Cmd to toggle selections and Shift to select a
+range. Snapping preserves layout spacing and checks nearby envelopes. Components
+can keep a snapped target and offset. Drops retain their visible position while
+validation finishes, without refitting the camera.
+
+Delete removes the selection as one undoable edit, including owned components.
+Locks and external references remain protected; text fields retain normal Delete
+behavior. Phone controls fit the screen and quick edits stay above the zoom pill.
+
+## Reliable setup and assembly edits
+
+September 10, 2026
+
+Growing a new design now adds complete switch, diode and LED assemblies. New keys
+inherit matrix nets and scoped templates; linked halves retain separate wiring.
+Assembly offsets move the switch clearance body with its footprint and preserve
+manual model and wiring overrides.
+
+Saved setup drafts receive the corrected LED input/output mapping and keycap-based
+outline where their generated definitions are unchanged. Custom wiring remains
+visible for review. Shrinking a matrix asks before removing edited keys, and Undo
+restores setup source, models and footprint overrides together.
+
+## PCB viewer recovery
+
+September 10, 2026
+
+Load KiCanvas on demand with a revisioned asset URL. Keep PCB source hidden
+during startup and offer retry when loading fails. Unconnected pads no longer
+crash net-label rendering. Downloaded PCB data remains unchanged.
+
+Studio now initializes new cases safely, preserves key offsets, and opens the
+case from the footprint preview action. Editing during generation releases the
+Generate button while keeping old results marked stale.
+
+Bundled component assets and the PCB viewer now load offline after the app installs, including the first new design.
+
+## WRL preview recovery and nice! models
+
+September 10, 2026
+
+Resolve locally packaged WRL models without downloading a project-relative path.
+Cached previews now follow portable model paths even when an imported binding
+has no asset identifier.
+
+The model editor includes bundled nice!nano v2 and nice!view STEP models, with
+source attribution and noncommercial licensing shown. New-design nice!nano
+previews and exports include its model. Confirm alignment and socket height.
+
+## New-design setup workspace
+
+September 10, 2026
+
+Start with a matrix, optional thumbs and key assembly settings in one workspace.
+Edit switch, diode and LED positions with numeric controls, dragging or keyboard
+nudging. Named templates retain embedded project snapshots when the personal
+library changes.
+
+- Reopen setup while preserving manual layout edits.
+- Generate native owned diode/LED objects and deterministic matrix nets.
+- Preview bundled switch and selected controller STEP models locally.
+- Keep unresolved catalogue and electrical choices visible as draft blockers.
+
+The initial catalogue remains under verification. See
+[component coverage](./public/components/README.md) for missing models and
+unverified split-link and wireless combinations.
+
+## Parametric Board Studio
+
+September 10, 2026
+
+![Select a matrix column to change every key together.](./public/images/changelog/studio-matrix-desktop.png)
+
+Designing a keyboard previously required switching between source edits, layout
+previews and a separate case draft. Native projects now share one editable
+workspace from layout through manufacturing review.
+
+**What changed:**
+
+- Create a matrix by row and column count, then select keys, columns or clusters.
+- Add clusters beside existing keys and keep editing when an outline needs repair.
+- Navigate nested cluster, column and key branches; delete clusters with Undo.
+- Choose MX keycap size presets or enter custom width and depth.
+- Keep outside edges aligned, or choose explicit horizontal/vertical alignment.
+- Quick-edit keys, columns and matrices with relative movement and rotation.
+- Save layout spacing, key size and optional diode/LED defaults for new keys.
+- Rebuild the current outline after placement, preserving its finishing settings.
+- Adjust whole-column splay and offsets; add, remove or rotate individual keys.
+- Assign row and column nets automatically while retaining explicit overrides.
+- Edit thumb arcs, linked mirrors and named dimensions.
+- Apply alignment, distance, angle, equal-spacing and symmetry constraints.
+- Place components on physical layers and inspect their height and stacking.
+- Share autosave and undo between the canvas, inspector, Code and case tools.
+- Pan and zoom the canvas, with full editing panels on phones.
+- Download current PCB files and outlines; review case checks before exporting solids.
+
+## CNC corners adapt to the cutter
+
+September 09, 2026
+
+![BHK CNC generation reports zero blockers and applied corner relief.](./public/images/changelog/bhk-cnc-relief.png)
+
+Choosing CNC now adds cutter-sized corner relief during case generation. Each
+part uses its own cutter; switch openings keep their required clearance.
+
+Relief is checked against walls, plate webs and mounting posts before cutting.
+Findings identify pockets that need a smaller cutter or more surrounding
+material. Rotated relief arcs no longer produce false sharp-corner warnings.
+
+## Gasket mounting and direct plan editing
+
+September 09, 2026
+
+![Native BHK gaskets follow the thumb edges.](./public/images/changelog/bhk-gaskets-1280.png)
+
+Gasket mounting removes incompatible rigid supports. Saved conflicts have a
+Remove rigid supports action that keeps existing contacts in place.
+
+Automatic contacts avoid short corner spans and use the actual rotated component
+contours, restoring space beside thumb clusters. BHK's nine old gasket anchors
+and six Corne screw-hole objects are removed from the native example.
+
+The 2D plan supports wheel and pinch zoom, panning, and Fit. Dragging preserves
+the grab offset; the contact editor sits below the canvas and hints dismiss during
+manipulation. Inline YAML mounting edits remain valid and undoable.
+
+Reload BHK from Examples to use the cleaned configuration.
+[Phone preview](./public/images/changelog/bhk-gaskets-412.png).
+
+## Reliable native analysis and imported enclosures
+
+September 09, 2026
+
+![Imported enclosure with its native service opening.](./public/images/changelog/imported-native-opening.png)
+
+Mounting edits retain clearance blockers and standalone PCB downloads.
+Imported-board enclosures include native batteries and service openings.
+Moving an aliased key adds to its existing offset and preserves undo.
+
+## Simpler transitions and configurable inside corners
+
+September 09, 2026
+
+![Simplified BHK thumb transitions and inside fillets.](./public/images/changelog/bhk-fillet-corners.png)
+
+BHK now extends the neighboring thumb edges to meet, removing the short jogs.
+Inside corners use 3 mm fillets, including the shallow column steps.
+
+Set `simplify: 8` to bound local edge simplification. Choose
+`corners: {fillet: 3}` or `corners: {chamfer: 3}` for corner relief.
+Chamfer mode converts both inside and outside corners to straight segments.
+Shallow column steps now use one clean diagonal instead of several small facets.
+[Chamfer preview](./public/images/changelog/bhk-chamfer-corners.png).
+Required key/component support and pad containment remain checked.
+
+Reload the BHK example to apply these settings to an existing workspace.
+
+## BHK follows the outside key edges
+
+September 09, 2026
+
+![BHK perimeter follows the two thumb-key angles.](./public/images/changelog/bhk-key-edges.png)
+
+The BHK outline now follows the exposed key edges, including the change in thumb
+angle. Default tight wrapping closes local key gaps; the inward bottom bridge
+fills the enclosed sliver. Component support and pad containment remain checked.
+
+Reload the BHK example to use the updated outline.
+
+## Straight outline transitions and control support
+
+September 09, 2026
+
+![Straight BHK transitions with power and reset controls included.](./public/images/changelog/bhk-straight-transitions.png)
+
+BHK now includes its power switch and reset button as independent components.
+Their board-support areas contribute to the electronics boundary, preserving
+all existing electrical placements. A pad-area check reports off-board pads
+with their footprint reference and source binding.
+
+Choose tight, hull or box wrapping per cluster. BHK uses key-cluster hulls, a
+rectangular electronics bay and bridges aligned to shared top, bottom and right
+edges. These remove the remaining notches and follow later layout changes.
+
+Reload the BHK example to apply the new source to an existing workspace.
+
+## BHK outline and configuration repair
+
+September 09, 2026
+
+![Repaired BHK perimeter and keycap shapes.](./public/images/changelog/bhk-outline-repair.png)
+
+BHK now wraps each cluster and uses flat bridge ends, removing the accidental
+interior sliver and round electronics lobes. Its 1.5u keycaps are tall, while
+switch openings and electrical placements retain their original geometry.
+
+Shared part bindings reduce the example from 4,317 to 1,044 lines. Keys carry
+placement, wiring and reference overrides. Reload the BHK example to use the
+repair; existing saved YAML retains its authored boundaries.
+
+## Native layout and physical layers
+
+September 09, 2026
+
+![Native side view with the display above its controller and a separate floor-mounted battery.](./public/images/changelog/native-layout.png)
+
+Native designs use `schema: ergogen/v1`. Keys, components, mounts, and reference
+anchors have distinct roles. Automatic boundaries consume named physical
+envelopes and explicit cluster bridges.
+
+**What changed:**
+
+- Layout editing with top/side views, local overrides, mounting layers, and locks.
+- Physical stacking: displays can sit above controllers while batteries follow
+  the case floor. Clearance findings retain missing measurements.
+- Native examples, including BHK with preserved footprint/pad placement and a
+  new automatic perimeter.
+- Legacy saved sources remain readable and downloadable; generation requires
+  the native schema.
+
+## CAD workspace and reusable footprints
+
+September 8, 2026
+
+![CAD workspace with BHK geometry.](./public/images/changelog/cad-workspace.png)
+
+Case design now uses an assembly tree, central canvas and contextual inspector.
+Case tools, a searchable footprint library and YAML share one workspace.
+
+Import KiCad footprints in batches, map pads to nets and align multiple models.
+Saved library revisions update explicitly linked projects while retaining instance
+parameters and model overrides. Generation stays explicit; failed builds preserve
+the last valid preview. Portable ZIPs retain library snapshots and cached assets.
+
+## Quieter setup and faster mounting edits
+
+September 8, 2026
+
+Repeated component findings now live in grouped Review entries. Optional
+footprint setup applies measured dimensions or models to matching placements;
+missing dimensions warn about unchecked clearance without blocking generation.
+Enter a mount/gasket count to distribute contacts, then tweak individual ones.
+Mount edits reuse resolved outlines and batch YAML updates.
+
+## Guided mounting and explicit case generation
+
+September 8, 2026
+
+![Interactive case mounting plan.](./public/images/changelog/guided-case.png)
+
+Choose mounting and manufacturing up front. The case designer now creates
+mounting drafts from a 2D analysis, with direct placement editing, keyboard
+movement, undo and preserved manual positions. Settings include accessible help.
+
+Generate builds an explicit revision. Changes retain the last successful 3D
+result and disable Apply/export until regenerated. Imported KiCad boards supply
+component placements and thickness; guided model association packages STEP,
+STL and VRML assets with exported projects. A separate middle frame can conceal
+gaskets while retaining the switch plate.
+
+The JLCCNC aluminium preset records supplier sources, depth-dependent tooling
+and explicit switch corner relief. Missing dimensions and invalid combinations
+produce repair guidance before or during generation.
+
+## Full enclosure designer
+
+September 8, 2026
+
+![Original BHK outline and outputs.](./public/images/changelog/enclosure-wizard.png)
+
+Create cases with continuous walls, separate shells and a switch plate. The
+guided designer supports tray, top, bottom and floating gasket mounts, with
+pad or sleeve interfaces and independent case screws.
+
+Choose FDM or CNC per part, review declared manufacturing limits, and export
+STEP/STL from the same solids. Draft previews stay separate until Apply; Cancel
+discards edits. The original BHK design remains available with its complete
+outlines and PCB. The migrated enclosure example was removed because it changed
+the board boundary and omitted PCB generation.
+
+Point checkboxes now preserve the remaining selections and valid YAML. Failed
+previews retain profile choices, and existing board outlines can resolve a
+disconnected boundary.
+
 ## KiCad 10 support
 
 September 7, 2026

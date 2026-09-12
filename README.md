@@ -1,5 +1,7 @@
 # Ergogen GUI
 
+Native configuration and physical-layer architecture: [living reference](../ergogen/docs/architecture.md).
+
 Welcome to the Ergogen GUI, a powerful web-based interface for the [Ergogen](https://github.com/mrzealot/ergogen) keyboard generation tool by [@MrZealot](https://github.com/MrZealot). This project, originally created by [@MvEerd](https://github.com/MvEerd) and enhanced by [@ceoloide](https://github.com/ceoloide) and the community, provides a user-friendly environment to design, preview, and export custom ergonomic keyboards.
 
 With this GUI, you can write Ergogen configurations in YAML, see live 2D (SVG) previews of your design, and export the necessary files for manufacturing your own keyboard.

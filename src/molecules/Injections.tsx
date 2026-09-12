@@ -1,4 +1,6 @@
 import Icon from '../atoms/Icon';
+import coreFootprints from '../../.generated/footprints.json';
+import componentFootprints from '../catalogue/footprints.json';
 import InjectionRow from '../atoms/InjectionRow';
 import { Injection } from '../atoms/InjectionRow';
 import styled from 'styled-components';
@@ -11,6 +13,8 @@ import ConflictResolutionDialog from './ConflictResolutionDialog';
 import Title from '../atoms/Title';
 import { trackEvent } from '../utils/analytics';
 import { isFeatureEnabled } from '../utils/featureFlags';
+
+const bundledFootprints = { ...coreFootprints, ...componentFootprints };
 
 const ActionsContainer = styled.div`
   display: flex;
@@ -76,6 +80,7 @@ type Props = {
   deleteInjection: (injection: Injection) => void;
   injectionToEdit: Injection;
   onInjectionSelect?: () => void;
+  onOpenLibrary?: () => void;
   'data-testid'?: string;
 };
 
@@ -97,6 +102,7 @@ const Injections = ({
   deleteInjection,
   injectionToEdit,
   onInjectionSelect,
+  onOpenLibrary,
   'data-testid': dataTestId,
 }: Props) => {
   const footprints: InjectionArr = [];
@@ -107,10 +113,10 @@ const Injections = ({
   const configContext = useConfigContext();
   const [activeUploadType, setActiveUploadType] = useState<
     'footprint' | 'outline' | 'template'
-  >('footprint');
+  >(onOpenLibrary ? 'template' : 'footprint');
   const [activeTab, setActiveTab] = useState<
     'footprints' | 'outlines' | 'templates'
-  >('footprints');
+  >(onOpenLibrary ? 'templates' : 'footprints');
 
   // Use the injection conflict resolution hook
   const {
@@ -291,18 +297,27 @@ const Injections = ({
           data-testid="conflict-resolution-dialog"
         />
       )}
-      <Title>Custom Libraries</Title>
+      {onOpenLibrary && (
+        <GrowButton onClick={onOpenLibrary}>Open footprint library</GrowButton>
+      )}
+      <Title>
+        {onOpenLibrary ? 'Advanced injections' : 'Custom Libraries'}
+      </Title>
       <TabsContainer>
-        <TabButton
-          $active={activeTab === 'footprints'}
-          onClick={() => {
-            setActiveTab('footprints');
-            setActiveUploadType('footprint');
-          }}
-          data-testid="tab-footprints"
-        >
-          Footprints
-        </TabButton>
+        {!onOpenLibrary && (
+          <>
+            <TabButton
+              $active={activeTab === 'footprints'}
+              onClick={() => {
+                setActiveTab('footprints');
+                setActiveUploadType('footprint');
+              }}
+              data-testid="tab-footprints"
+            >
+              Footprints
+            </TabButton>
+          </>
+        )}
         {isFeatureEnabled('outlines') && (
           <TabButton
             $active={activeTab === 'outlines'}
@@ -329,7 +344,7 @@ const Injections = ({
         )}
       </TabsContainer>
 
-      {activeTab === 'footprints' && (
+      {!onOpenLibrary && activeTab === 'footprints' && (
         <>
           {footprints.map((footprint) => {
             return (
@@ -352,6 +367,40 @@ const Injections = ({
               />
             );
           })}
+
+          <details>
+            <summary>
+              Bundled footprints ({Object.keys(bundledFootprints).length})
+            </summary>
+            <p>
+              Already available to every design. Customize to create a saved
+              override.
+            </p>
+            {Object.entries(bundledFootprints).map(([name, content]) => {
+              if (footprints.some((footprint) => footprint.name === name)) {
+                return null;
+              }
+
+              return (
+                <GrowButton
+                  key={name}
+                  aria-label={`Customize ${name}`}
+                  onClick={() => {
+                    // Save through the existing editor, leaving bundled sources intact.
+                    setInjectionToEdit({
+                      key: injectionInput?.length || 0,
+                      type: 'footprint',
+                      name,
+                      content,
+                    });
+                    onInjectionSelect?.();
+                  }}
+                >
+                  {name}
+                </GrowButton>
+              );
+            })}
+          </details>
 
           <ActionsContainer>
             <GrowButton

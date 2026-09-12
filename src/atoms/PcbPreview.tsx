@@ -1,4 +1,5 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { loadPcbViewer } from '../utils/pcbViewer';
 
 /**
  * Props for the PcbPreview component.
@@ -31,6 +32,27 @@ const PcbPreview = ({
   const ref = useRef<HTMLElement>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [ready, setReady] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setError(null);
+    void loadPcbViewer()
+      .then(() => {
+        if (active) {
+          setReady(true);
+        }
+      })
+      .catch((reason: unknown) => {
+        if (active) {
+          setError(`Viewer startup failed: ${String(reason)}`);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [attempt]);
+
   // Listen before the custom element loads; regeneration clears stale failures.
   useLayoutEffect(() => {
     const viewer = ref.current;
@@ -58,9 +80,16 @@ const PcbPreview = ({
       {error && (
         <p role="alert">
           PCB preview unavailable: {error}. Download remains available.
+          {!ready && (
+            <button onClick={() => setAttempt((value) => value + 1)}>
+              Retry viewer
+            </button>
+          )}
         </p>
       )}
+      {!ready && !error && <p role="status">Loading PCB viewer…</p>}
       <kicanvas-embed
+        hidden={!ready}
         ref={ref}
         key={previewKey}
         controls="full"
@@ -69,7 +98,9 @@ const PcbPreview = ({
         aria-label={ariaLabel}
         data-testid={dataTestId}
       >
-        <kicanvas-source type="board">{pcb}</kicanvas-source>
+        <kicanvas-source type="board" hidden style={{ display: 'none' }}>
+          {pcb}
+        </kicanvas-source>
       </kicanvas-embed>
     </>
   );

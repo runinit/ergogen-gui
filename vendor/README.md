@@ -1,16 +1,74 @@
 # Local Ergogen source
 
-`runinit-ergogen-5.0.0.tgz` contains generator source from
-[`runinit/ergogen@6140bd12828e035b5fd375e83be0edc073a02301`](https://github.com/runinit/ergogen/commit/6140bd12828e035b5fd375e83be0edc073a02301).
-It retains the upstream MIT license and attribution inside the archive.
+`ergogen-415fd3a.tgz` contains generator source from
+[`runinit/ergogen@415fd3a`](https://github.com/runinit/ergogen/commit/415fd3ae1895a7ccc5ed5a3a28e90b2dd6846b41).
+It retains the upstream MIT license and attribution.
 
-SHA-256: `c1c65aeda48d01d346a9c24743184eac23dcb726e0cb8764a9dccc04f9968994`
+SHA-256: `fdc593ebf31d0c51ae92d260fc51ace88498e9d4ae12aa9826f70bd8de79e30b`
 
-pnpm installs this local archive through `file:vendor/runinit-ergogen-5.0.0.tgz`.
-The GUI builds the generator in a temporary directory using its existing patch
-recipe. No generator npm publication or version override is required.
+The archive supplies the full enclosure and parametric design pipeline. pnpm
+installs it locally; the patch recipe builds it in a temporary directory.
+No npm publication or version override is required.
 
-To update it, pack a validated generator checkout into this directory, update
-the source revision and hash here, refresh the pnpm lockfile, then run the
-release checks and production build. Commit the archive and generated assets
-together. Do not edit the archive by hand.
+To update: validate and commit the engine, pack that exact checkout, replace
+the archive, record its commit and hash, then refresh the lockfile and build.
+The older 5.0.0 archive records the production baseline.
+
+## Guided mounting follow-up
+
+`ergogen-guided-d8de34fdf6bb.tgz` is the local enclosure-work source snapshot
+for optional component envelopes, requested contact counts and cached analysis.
+It retains the upstream license and attribution.
+
+SHA-256: `d8de34fdf6bb70a1d1c7c45bcf2af4c8f23bb919dc69313d16f2756e10ade6e1`
+
+## CAD workspace snapshot
+
+`ergogen-cad-e2d947209f40.tgz` contains the earlier `enclosure-work/ergogen`
+source, including the guided mounting work and reusable footprint/model helpers.
+This is a local source snapshot, not a published release.
+
+SHA-256: `e2d947209f4023d15ebeeb1582b6dedce72762b227f202b4f319b29a95b9fdd7`
+
+The normal build repackages the selected engine into
+`public/dependencies/ergogen.js` before Vite builds the GUI.
+
+## Native configuration snapshot
+
+The previous dependency `ergogen-native-78485e1ac8c1.tgz` was built from the
+local enclosure checkout at engine commit `a9d1cc4`, including
+CNC plate-hole, post-height and relief-bound fixes. This snapshot includes `schema: ergogen/v1`,
+physical layers, typed objects, and native PCB inventory. It is not a published
+release; the historical archives above are inactive.
+
+SHA-256: `78485e1ac8c13ab799501787fc196a123f3107b5e9f67392c0741026ed75c73f`
+
+Installed engine sources match the enclosure checkout byte for byte. The package
+excludes the historical test harness. Keep the upstream license and attribution.
+
+## Board Studio snapshot
+
+The selected dependency is `ergogen-studio-7f774f2566c3.tgz`, a local source snapshot
+of engine commit `44bbc26`. It includes planar layout constraints,
+column transforms, automatic matrix nets, validated corner rounding and
+sub-tolerance offset repair during solid conversion.
+The source is committed; this is not an npm release.
+
+SHA-256: `7f774f2566c399d658ffc2662937b2190c8eb0f00bd200339848c3ffe3ba8f39`
+
+## Corner relief repair
+
+Previous dependency: `ergogen-studio-b3293ff8a4fe.tgz`. Source matches engine commit
+`44bbc26` plus the local `src/designs/finishing.js` repair for newly enclosed
+voids during corner relief. This is an uncommitted local snapshot.
+
+SHA-256: `b3293ff8a4feac421449e12a65546723b8890db533fdeddf3233012fa2574491`
+
+## Layout units and mechanical layers
+
+Selected dependency: `ergogen-layout-944c5d0dff46.tgz`. Includes native center guides,
+frame-based alignment constraints, mechanical stack references, and independent
+material DXFs with reference solids. Engine source: `2a0754a`, including the
+outline repair in `41184ef`. This is a local snapshot, not an npm release.
+
+SHA-256: `944c5d0dff46c99013d77a225115f3f602292a34211ae6df416767238ed642ea`

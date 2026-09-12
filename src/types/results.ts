@@ -1,3 +1,4 @@
+import type { StackupReport } from './stackup';
 /**
  * Shared result structures and case output definitions.
  */
@@ -21,7 +22,19 @@ export interface PcbsOutput {
   [key: string]: string;
 }
 
+export interface SolidOutput {
+  step: string;
+  stl: Uint8Array;
+  volume: number;
+  bounds: [number[], number[]];
+  reference?: boolean;
+}
+
 export interface Results {
+  stackups?: Record<string, StackupReport>;
+  layout?: import('ergogen/src/native').LayoutReport;
+  solids?: Record<string, SolidOutput>;
+  designs?: import('./design').DesignReport;
   canonical?: unknown;
   points?: unknown;
   units?: unknown;

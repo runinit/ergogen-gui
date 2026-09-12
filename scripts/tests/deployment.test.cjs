@@ -28,6 +28,16 @@ test('production assets and router share the Pages path', () => {
   assert.equal(JSON.parse(config.define['process.env.PUBLIC_URL']), deploymentPath.slice(0, -1));
 });
 
+test('preview assets have a separate Pages path and storage channel', () => {
+  const config = evaluate('vite.config.mts', {
+    vite: {defineConfig: config => config},
+    '@vitejs/plugin-react': () => ({}),
+    'vite-plugin-pwa': {VitePWA: () => ({})},
+  }, {GITHUB_REPOSITORY: 'runinit/ergogen-gui-preview'})({mode: 'production'});
+  assert.equal(config.base, '/ergogen-gui-preview/');
+  assert.equal(JSON.parse(config.define['process.env.REACT_APP_DEPLOYMENT_CHANNEL']), 'preview');
+});
+
 test('browser tests serve the production artifact without reusing a server', () => {
   const config = evaluate('playwright.config.ts', {
     '@playwright/test': { defineConfig: (config) => config, devices: { 'Desktop Chrome': {} } },
@@ -37,4 +47,10 @@ test('browser tests serve the production artifact without reusing a server', () 
   assert.match(config.webServer.command, /vite preview/);
   assert.equal(config.webServer.reuseExistingServer, false);
   assert.equal(config.webServer.url, config.use.baseURL);
+});
+
+test('Pages verifies the pinned generator version', () => {
+  const workflow = read('.github/workflows/deploy.yaml');
+  const version = require('ergogen/package.json').version;
+  assert.ok(workflow.includes(`assert.equal(pkg.version, '${version}')`));
 });

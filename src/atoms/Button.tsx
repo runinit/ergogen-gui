@@ -27,7 +27,7 @@ const Button = styled.button`
   padding: ${theme.buttonSizes.large.padding};
   margin: 0;
   text-decoration: none;
-  background-color: ${theme.colors.accent};
+  background-color: ${theme.workbench.primary};
   border-radius: 0.25rem;
   transition:
     color 0.15s ease-in-out,
@@ -43,7 +43,7 @@ const Button = styled.button`
   -moz-appearance: none;
 
   &:hover {
-    background-color: ${theme.colors.accentDark};
+    background-color: ${theme.workbench.primaryHover};
     border-color: ${theme.colors.accentDarker};
   }
 

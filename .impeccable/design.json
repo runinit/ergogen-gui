@@ -1,0 +1,561 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-12T00:01:01.050299+00:00",
+  "title": "Design System: Ergogen CAD Drafting Console",
+  "extensions": {
+    "shadows": [
+      {
+        "name": "canvas-tool",
+        "value": "0 4px 20px #0005",
+        "purpose": "Separate floating canvas tools."
+      },
+      {
+        "name": "metadata-popover",
+        "value": "0 4px 12px rgba(0, 0, 0, 0.4)",
+        "purpose": "Separate development metadata."
+      }
+    ],
+    "motion": [
+      {
+        "name": "pane-entry",
+        "value": "180ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Brief drawer entry."
+      },
+      {
+        "name": "state",
+        "value": "120ms ease-out",
+        "purpose": "Button and field state changes."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "studio",
+        "value": "1050px"
+      },
+      {
+        "name": "phone",
+        "value": "600px"
+      }
+    ],
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Primary",
+        "canonical": "#326b85",
+        "tonalRamp": [
+          "oklch(15.00% 0.07247 230.29)",
+          "oklch(26.43% 0.07247 230.29)",
+          "oklch(37.86% 0.07247 230.29)",
+          "oklch(49.29% 0.07247 230.29)",
+          "oklch(60.71% 0.07247 230.29)",
+          "oklch(72.14% 0.07247 230.29)",
+          "oklch(83.57% 0.07247 230.29)",
+          "oklch(95.00% 0.07247 230.29)"
+        ]
+      },
+      "primaryHover": {
+        "role": "primary",
+        "displayName": "Primary hover",
+        "canonical": "#3b7c99",
+        "tonalRamp": [
+          "oklch(15.00% 0.07992 229.71)",
+          "oklch(26.43% 0.07992 229.71)",
+          "oklch(37.86% 0.07992 229.71)",
+          "oklch(49.29% 0.07992 229.71)",
+          "oklch(60.71% 0.07992 229.71)",
+          "oklch(72.14% 0.07992 229.71)",
+          "oklch(83.57% 0.07992 229.71)",
+          "oklch(95.00% 0.07992 229.71)"
+        ]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Accent",
+        "canonical": "#79b7d4",
+        "tonalRamp": [
+          "oklch(15.00% 0.07615 229.10)",
+          "oklch(26.43% 0.07615 229.10)",
+          "oklch(37.86% 0.07615 229.10)",
+          "oklch(49.29% 0.07615 229.10)",
+          "oklch(60.71% 0.07615 229.10)",
+          "oklch(72.14% 0.07615 229.10)",
+          "oklch(83.57% 0.07615 229.10)",
+          "oklch(95.00% 0.07615 229.10)"
+        ]
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "Background",
+        "canonical": "#20252b",
+        "tonalRamp": [
+          "oklch(15.00% 0.01340 253.06)",
+          "oklch(26.43% 0.01340 253.06)",
+          "oklch(37.86% 0.01340 253.06)",
+          "oklch(49.29% 0.01340 253.06)",
+          "oklch(60.71% 0.01340 253.06)",
+          "oklch(72.14% 0.01340 253.06)",
+          "oklch(83.57% 0.01340 253.06)",
+          "oklch(95.00% 0.01340 253.06)"
+        ]
+      },
+      "backgroundLight": {
+        "role": "neutral",
+        "displayName": "Background light",
+        "canonical": "#282f37",
+        "tonalRamp": [
+          "oklch(15.00% 0.01750 251.87)",
+          "oklch(26.43% 0.01750 251.87)",
+          "oklch(37.86% 0.01750 251.87)",
+          "oklch(49.29% 0.01750 251.87)",
+          "oklch(60.71% 0.01750 251.87)",
+          "oklch(72.14% 0.01750 251.87)",
+          "oklch(83.57% 0.01750 251.87)",
+          "oklch(95.00% 0.01750 251.87)"
+        ]
+      },
+      "backgroundLighter": {
+        "role": "neutral",
+        "displayName": "Background lighter",
+        "canonical": "#343d47",
+        "tonalRamp": [
+          "oklch(15.00% 0.02117 251.16)",
+          "oklch(26.43% 0.02117 251.16)",
+          "oklch(37.86% 0.02117 251.16)",
+          "oklch(49.29% 0.02117 251.16)",
+          "oklch(60.71% 0.02117 251.16)",
+          "oklch(72.14% 0.02117 251.16)",
+          "oklch(83.57% 0.02117 251.16)",
+          "oklch(95.00% 0.02117 251.16)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Border",
+        "canonical": "#424d59",
+        "tonalRamp": [
+          "oklch(15.00% 0.02459 250.69)",
+          "oklch(26.43% 0.02459 250.69)",
+          "oklch(37.86% 0.02459 250.69)",
+          "oklch(49.29% 0.02459 250.69)",
+          "oklch(60.71% 0.02459 250.69)",
+          "oklch(72.14% 0.02459 250.69)",
+          "oklch(83.57% 0.02459 250.69)",
+          "oklch(95.00% 0.02459 250.69)"
+        ]
+      },
+      "borderHover": {
+        "role": "neutral",
+        "displayName": "Border hover",
+        "canonical": "#667788",
+        "tonalRamp": [
+          "oklch(15.00% 0.03327 248.42)",
+          "oklch(26.43% 0.03327 248.42)",
+          "oklch(37.86% 0.03327 248.42)",
+          "oklch(49.29% 0.03327 248.42)",
+          "oklch(60.71% 0.03327 248.42)",
+          "oklch(72.14% 0.03327 248.42)",
+          "oklch(83.57% 0.03327 248.42)",
+          "oklch(95.00% 0.03327 248.42)"
+        ]
+      },
+      "buttonHover": {
+        "role": "neutral",
+        "displayName": "Button hover",
+        "canonical": "#35414d",
+        "tonalRamp": [
+          "oklch(15.00% 0.02604 248.53)",
+          "oklch(26.43% 0.02604 248.53)",
+          "oklch(37.86% 0.02604 248.53)",
+          "oklch(49.29% 0.02604 248.53)",
+          "oklch(60.71% 0.02604 248.53)",
+          "oklch(72.14% 0.02604 248.53)",
+          "oklch(83.57% 0.02604 248.53)",
+          "oklch(95.00% 0.02604 248.53)"
+        ]
+      },
+      "fieldSurface": {
+        "role": "neutral",
+        "displayName": "Field surface",
+        "canonical": "#20262d",
+        "tonalRamp": [
+          "oklch(15.00% 0.01571 252.40)",
+          "oklch(26.43% 0.01571 252.40)",
+          "oklch(37.86% 0.01571 252.40)",
+          "oklch(49.29% 0.01571 252.40)",
+          "oklch(60.71% 0.01571 252.40)",
+          "oklch(72.14% 0.01571 252.40)",
+          "oklch(83.57% 0.01571 252.40)",
+          "oklch(95.00% 0.01571 252.40)"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Text",
+        "canonical": "#e1e8ee",
+        "tonalRamp": [
+          "oklch(15.00% 0.01109 243.66)",
+          "oklch(26.43% 0.01109 243.66)",
+          "oklch(37.86% 0.01109 243.66)",
+          "oklch(49.29% 0.01109 243.66)",
+          "oklch(60.71% 0.01109 243.66)",
+          "oklch(72.14% 0.01109 243.66)",
+          "oklch(83.57% 0.01109 243.66)",
+          "oklch(95.00% 0.01109 243.66)"
+        ]
+      },
+      "textDark": {
+        "role": "neutral",
+        "displayName": "Text dark",
+        "canonical": "#c0ccd6",
+        "tonalRamp": [
+          "oklch(15.00% 0.01918 243.01)",
+          "oklch(26.43% 0.01918 243.01)",
+          "oklch(37.86% 0.01918 243.01)",
+          "oklch(49.29% 0.01918 243.01)",
+          "oklch(60.71% 0.01918 243.01)",
+          "oklch(72.14% 0.01918 243.01)",
+          "oklch(83.57% 0.01918 243.01)",
+          "oklch(95.00% 0.01918 243.01)"
+        ]
+      },
+      "textDarker": {
+        "role": "neutral",
+        "displayName": "Text darker",
+        "canonical": "#a5b3c0",
+        "tonalRamp": [
+          "oklch(15.00% 0.02435 246.13)",
+          "oklch(26.43% 0.02435 246.13)",
+          "oklch(37.86% 0.02435 246.13)",
+          "oklch(49.29% 0.02435 246.13)",
+          "oklch(60.71% 0.02435 246.13)",
+          "oklch(72.14% 0.02435 246.13)",
+          "oklch(83.57% 0.02435 246.13)",
+          "oklch(95.00% 0.02435 246.13)"
+        ]
+      },
+      "white": {
+        "role": "neutral",
+        "displayName": "White",
+        "canonical": "#fff",
+        "tonalRamp": [
+          "oklch(15.00% 0.00000 89.88)",
+          "oklch(26.43% 0.00000 89.88)",
+          "oklch(37.86% 0.00000 89.88)",
+          "oklch(49.29% 0.00000 89.88)",
+          "oklch(60.71% 0.00000 89.88)",
+          "oklch(72.14% 0.00000 89.88)",
+          "oklch(83.57% 0.00000 89.88)",
+          "oklch(95.00% 0.00000 89.88)"
+        ]
+      },
+      "selected": {
+        "role": "neutral",
+        "displayName": "Selected",
+        "canonical": "#293f4d",
+        "tonalRamp": [
+          "oklch(15.00% 0.03687 237.12)",
+          "oklch(26.43% 0.03687 237.12)",
+          "oklch(37.86% 0.03687 237.12)",
+          "oklch(49.29% 0.03687 237.12)",
+          "oklch(60.71% 0.03687 237.12)",
+          "oklch(72.14% 0.03687 237.12)",
+          "oklch(83.57% 0.03687 237.12)",
+          "oklch(95.00% 0.03687 237.12)"
+        ]
+      },
+      "grid": {
+        "role": "neutral",
+        "displayName": "Grid",
+        "canonical": "#303942",
+        "tonalRamp": [
+          "oklch(15.00% 0.01997 248.41)",
+          "oklch(26.43% 0.01997 248.41)",
+          "oklch(37.86% 0.01997 248.41)",
+          "oklch(49.29% 0.01997 248.41)",
+          "oklch(60.71% 0.01997 248.41)",
+          "oklch(72.14% 0.01997 248.41)",
+          "oklch(83.57% 0.01997 248.41)",
+          "oklch(95.00% 0.01997 248.41)"
+        ]
+      },
+      "key": {
+        "role": "secondary",
+        "displayName": "Key",
+        "canonical": "#c7d5de",
+        "tonalRamp": [
+          "oklch(15.00% 0.01966 235.76)",
+          "oklch(26.43% 0.01966 235.76)",
+          "oklch(37.86% 0.01966 235.76)",
+          "oklch(49.29% 0.01966 235.76)",
+          "oklch(60.71% 0.01966 235.76)",
+          "oklch(72.14% 0.01966 235.76)",
+          "oklch(83.57% 0.01966 235.76)",
+          "oklch(95.00% 0.01966 235.76)"
+        ]
+      },
+      "outline": {
+        "role": "secondary",
+        "displayName": "Outline",
+        "canonical": "#79b7d4",
+        "tonalRamp": [
+          "oklch(15.00% 0.07615 229.10)",
+          "oklch(26.43% 0.07615 229.10)",
+          "oklch(37.86% 0.07615 229.10)",
+          "oklch(49.29% 0.07615 229.10)",
+          "oklch(60.71% 0.07615 229.10)",
+          "oklch(72.14% 0.07615 229.10)",
+          "oklch(83.57% 0.07615 229.10)",
+          "oklch(95.00% 0.07615 229.10)"
+        ]
+      },
+      "component": {
+        "role": "secondary",
+        "displayName": "Component",
+        "canonical": "#c3a96c",
+        "tonalRamp": [
+          "oklch(15.00% 0.08508 87.26)",
+          "oklch(26.43% 0.08508 87.26)",
+          "oklch(37.86% 0.08508 87.26)",
+          "oklch(49.29% 0.08508 87.26)",
+          "oklch(60.71% 0.08508 87.26)",
+          "oklch(72.14% 0.08508 87.26)",
+          "oklch(83.57% 0.08508 87.26)",
+          "oklch(95.00% 0.08508 87.26)"
+        ]
+      },
+      "error": {
+        "role": "neutral",
+        "displayName": "Error",
+        "canonical": "#ff6d6d",
+        "tonalRamp": [
+          "oklch(15.00% 0.17880 22.70)",
+          "oklch(26.43% 0.17880 22.70)",
+          "oklch(37.86% 0.17880 22.70)",
+          "oklch(49.29% 0.17880 22.70)",
+          "oklch(60.71% 0.17880 22.70)",
+          "oklch(72.14% 0.17880 22.70)",
+          "oklch(83.57% 0.17880 22.70)",
+          "oklch(95.00% 0.17880 22.70)"
+        ]
+      },
+      "warning": {
+        "role": "neutral",
+        "displayName": "Warning",
+        "canonical": "hsl(45, 100%, 90%)",
+        "tonalRamp": [
+          "oklch(15.00% 0.05146 91.77)",
+          "oklch(26.43% 0.05146 91.77)",
+          "oklch(37.86% 0.05146 91.77)",
+          "oklch(49.29% 0.05146 91.77)",
+          "oklch(60.71% 0.05146 91.77)",
+          "oklch(72.14% 0.05146 91.77)",
+          "oklch(83.57% 0.05146 91.77)",
+          "oklch(95.00% 0.05146 91.77)"
+        ]
+      },
+      "warningDark": {
+        "role": "neutral",
+        "displayName": "Warning dark",
+        "canonical": "hsl(32, 79%, 40%)",
+        "tonalRamp": [
+          "oklch(15.00% 0.13114 61.98)",
+          "oklch(26.43% 0.13114 61.98)",
+          "oklch(37.86% 0.13114 61.98)",
+          "oklch(49.29% 0.13114 61.98)",
+          "oklch(60.71% 0.13114 61.98)",
+          "oklch(72.14% 0.13114 61.98)",
+          "oklch(83.57% 0.13114 61.98)",
+          "oklch(95.00% 0.13114 61.98)"
+        ]
+      },
+      "info": {
+        "role": "neutral",
+        "displayName": "Info",
+        "canonical": "hsl(206, 94%, 92%)",
+        "tonalRamp": [
+          "oklch(15.00% 0.03226 240.77)",
+          "oklch(26.43% 0.03226 240.77)",
+          "oklch(37.86% 0.03226 240.77)",
+          "oklch(49.29% 0.03226 240.77)",
+          "oklch(60.71% 0.03226 240.77)",
+          "oklch(72.14% 0.03226 240.77)",
+          "oklch(83.57% 0.03226 240.77)",
+          "oklch(95.00% 0.03226 240.77)"
+        ]
+      },
+      "infoDark": {
+        "role": "neutral",
+        "displayName": "Info dark",
+        "canonical": "hsl(206, 100%, 30%)",
+        "tonalRamp": [
+          "oklch(15.00% 0.12880 250.44)",
+          "oklch(26.43% 0.12880 250.44)",
+          "oklch(37.86% 0.12880 250.44)",
+          "oklch(49.29% 0.12880 250.44)",
+          "oklch(60.71% 0.12880 250.44)",
+          "oklch(72.14% 0.12880 250.44)",
+          "oklch(83.57% 0.12880 250.44)",
+          "oklch(95.00% 0.12880 250.44)"
+        ]
+      },
+      "success": {
+        "role": "neutral",
+        "displayName": "Success",
+        "canonical": "hsl(120, 73%, 92%)",
+        "tonalRamp": [
+          "oklch(15.00% 0.05028 145.17)",
+          "oklch(26.43% 0.05028 145.17)",
+          "oklch(37.86% 0.05028 145.17)",
+          "oklch(49.29% 0.05028 145.17)",
+          "oklch(60.71% 0.05028 145.17)",
+          "oklch(72.14% 0.05028 145.17)",
+          "oklch(83.57% 0.05028 145.17)",
+          "oklch(95.00% 0.05028 145.17)"
+        ]
+      },
+      "successDark": {
+        "role": "neutral",
+        "displayName": "Success dark",
+        "canonical": "hsl(120, 50%, 35%)",
+        "tonalRamp": [
+          "oklch(15.00% 0.15152 143.16)",
+          "oklch(26.43% 0.15152 143.16)",
+          "oklch(37.86% 0.15152 143.16)",
+          "oklch(49.29% 0.15152 143.16)",
+          "oklch(60.71% 0.15152 143.16)",
+          "oklch(72.14% 0.15152 143.16)",
+          "oklch(83.57% 0.15152 143.16)",
+          "oklch(95.00% 0.15152 143.16)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "body": {
+        "displayName": "Workbench body",
+        "purpose": "Controls and descriptions."
+      },
+      "title": {
+        "displayName": "Workbench title",
+        "purpose": "Project and pane headings."
+      },
+      "label": {
+        "displayName": "Compact label",
+        "purpose": "Measurements and metadata."
+      }
+    }
+  },
+  "components": [
+    {
+      "name": "Project header",
+      "kind": "custom",
+      "refersTo": "button-primary",
+      "description": "Project context and generation actions.",
+      "html": "<header class=\"ds-header\"><h1>Project</h1><button data-primary=\"true\">Generate</button></header>",
+      "css": ".ds-header { color:#e1e8ee; background:#282f37; font:400 14px/1.45 Roboto,sans-serif; } .ds-header button { min-height:36px; padding:.5rem 1rem; font:inherit; color:#e1e8ee; background:#282f37; border:1px solid #424d59; border-radius:5px; cursor:pointer; } .ds-header button:hover { background:#35414d; border-color:#667788; } .ds-header button:focus-visible,.ds-header input:focus-visible { outline:2px solid #79b7d4; outline-offset:2px; } .ds-header input { color:#e1e8ee; background:#20262d; border:1px solid #424d59; border-radius:5px; min-height:36px; padding:.5rem; font:inherit; font-variant-numeric:tabular-nums; caret-color:#79b7d4; } .ds-header button[data-primary=\"true\"] { background:#326b85; color:#fff; border-color:#326b85; } .ds-header button[data-primary=\"true\"]:hover { background:#3b7c99; } .ds-header { display:flex; align-items:center; gap:.5rem; padding:.5rem 1rem; } .ds-header h1 { font-size:18px; margin:0 auto 0 0; }.ds-header { background: #20252b; border-bottom: 1px solid #424d59; font: 700 18px 'Roboto', sans-serif; }"
+    },
+    {
+      "name": "Stage navigation",
+      "kind": "nav",
+      "refersTo": "stage-nav",
+      "description": "Design, PCB, Case, and Export context strip.",
+      "html": "<nav class=\"ds-stage\" aria-label=\"Design stages\"><button aria-current=\"step\">Design</button><button>PCB</button><button>Case</button><button>Export</button></nav>",
+      "css": ".ds-stage { color:#e1e8ee; background:#282f37; font:400 14px/1.45 Roboto,sans-serif; } .ds-stage button { min-height:36px; padding:.5rem 1rem; font:inherit; color:#e1e8ee; background:#282f37; border:1px solid #424d59; border-radius:5px; cursor:pointer; } .ds-stage button:hover { background:#35414d; border-color:#667788; } .ds-stage button:focus-visible,.ds-stage input:focus-visible { outline:2px solid #79b7d4; outline-offset:2px; } .ds-stage input { color:#e1e8ee; background:#20262d; border:1px solid #424d59; border-radius:5px; min-height:36px; padding:.5rem; font:inherit; font-variant-numeric:tabular-nums; caret-color:#79b7d4; } .ds-stage button[data-primary=\"true\"] { background:#326b85; color:#fff; border-color:#326b85; } .ds-stage button[data-primary=\"true\"]:hover { background:#3b7c99; } .ds-stage { display:flex; } .ds-stage button { border:0; border-bottom:2px solid transparent; border-radius:0; padding:.5rem 1.5rem; }.ds-stage button[aria-current=\"step\"] { color: #79b7d4; border-bottom: 2px solid #79b7d4; }"
+    },
+    {
+      "name": "Object browser",
+      "kind": "custom",
+      "refersTo": "button-selected",
+      "description": "240px catalog for objects and parts.",
+      "html": "<aside class=\"ds-browser\" aria-label=\"Object browser\"><button aria-selected=\"true\">Cluster A</button></aside>",
+      "css": ".ds-browser { color:#e1e8ee; background:#282f37; font:400 14px/1.45 Roboto,sans-serif; } .ds-browser button { min-height:36px; padding:.5rem 1rem; font:inherit; color:#e1e8ee; background:#282f37; border:1px solid #424d59; border-radius:5px; cursor:pointer; } .ds-browser button:hover { background:#35414d; border-color:#667788; } .ds-browser button:focus-visible,.ds-browser input:focus-visible { outline:2px solid #79b7d4; outline-offset:2px; } .ds-browser input { color:#e1e8ee; background:#20262d; border:1px solid #424d59; border-radius:5px; min-height:36px; padding:.5rem; font:inherit; font-variant-numeric:tabular-nums; caret-color:#79b7d4; } .ds-browser button[data-primary=\"true\"] { background:#326b85; color:#fff; border-color:#326b85; } .ds-browser button[data-primary=\"true\"]:hover { background:#3b7c99; } .ds-browser { padding:1rem; } .ds-browser button { width:100%; text-align:left; border-color:transparent; }.ds-browser { width: 240px; background: #282f37; border-right: 1px solid #424d59; } .ds-browser button[aria-selected=\"true\"] { background: #293f4d; border-color: #79b7d4; }"
+    },
+    {
+      "name": "Canvas tool rail",
+      "kind": "custom",
+      "refersTo": "canvas-dock",
+      "description": "Selection, pan, snap, and delete tools.",
+      "html": "<div class=\"ds-rail\" role=\"toolbar\" aria-label=\"Canvas tools\"><button aria-label=\"Pan\">Pan</button><button aria-label=\"Select objects\" aria-pressed=\"true\">Select</button></div>",
+      "css": ".ds-rail { color:#e1e8ee; background:#282f37; font:400 14px/1.45 Roboto,sans-serif; } .ds-rail button { min-height:36px; padding:.5rem 1rem; font:inherit; color:#e1e8ee; background:#282f37; border:1px solid #424d59; border-radius:5px; cursor:pointer; } .ds-rail button:hover { background:#35414d; border-color:#667788; } .ds-rail button:focus-visible,.ds-rail input:focus-visible { outline:2px solid #79b7d4; outline-offset:2px; } .ds-rail input { color:#e1e8ee; background:#20262d; border:1px solid #424d59; border-radius:5px; min-height:36px; padding:.5rem; font:inherit; font-variant-numeric:tabular-nums; caret-color:#79b7d4; } .ds-rail button[data-primary=\"true\"] { background:#326b85; color:#fff; border-color:#326b85; } .ds-rail button[data-primary=\"true\"]:hover { background:#3b7c99; } .ds-rail { display:inline-flex; flex-direction:column; gap:.25rem; padding:.25rem; } .ds-rail button { border:0; }.ds-rail { background: #282f37; border-radius: 8px; box-shadow: 0 4px 20px #0005; } .ds-rail button[aria-pressed=\"true\"] { background: #293f4d; color: #79b7d4; }"
+    },
+    {
+      "name": "Canvas zoom dock",
+      "kind": "custom",
+      "refersTo": "canvas-dock",
+      "description": "Floating zoom and view controls.",
+      "html": "<div class=\"ds-zoom\" aria-label=\"Canvas zoom\"><button aria-label=\"Zoom out\">\u2212</button><small>100%</small><button aria-label=\"Zoom in\">+</button></div>",
+      "css": ".ds-zoom { color:#e1e8ee; background:#282f37; font:400 14px/1.45 Roboto,sans-serif; } .ds-zoom button { min-height:36px; padding:.5rem 1rem; font:inherit; color:#e1e8ee; background:#282f37; border:1px solid #424d59; border-radius:5px; cursor:pointer; } .ds-zoom button:hover { background:#35414d; border-color:#667788; } .ds-zoom button:focus-visible,.ds-zoom input:focus-visible { outline:2px solid #79b7d4; outline-offset:2px; } .ds-zoom input { color:#e1e8ee; background:#20262d; border:1px solid #424d59; border-radius:5px; min-height:36px; padding:.5rem; font:inherit; font-variant-numeric:tabular-nums; caret-color:#79b7d4; } .ds-zoom button[data-primary=\"true\"] { background:#326b85; color:#fff; border-color:#326b85; } .ds-zoom button[data-primary=\"true\"]:hover { background:#3b7c99; } .ds-zoom { display:inline-flex; gap:.5rem; align-items:center; padding:.25rem; } .ds-zoom button { border:0; }.ds-zoom { background: #282f37; border-radius: 8px; box-shadow: 0 4px 20px #0005; }"
+    },
+    {
+      "name": "Inspector",
+      "kind": "custom",
+      "refersTo": "input-studio",
+      "description": "320px selection and properties pane.",
+      "html": "<aside class=\"ds-inspector\" aria-label=\"Properties\"><h2>Selection</h2><label>Columns <input type=\"number\" value=\"5\"></label></aside>",
+      "css": ".ds-inspector { color:#e1e8ee; background:#282f37; font:400 14px/1.45 Roboto,sans-serif; } .ds-inspector button { min-height:36px; padding:.5rem 1rem; font:inherit; color:#e1e8ee; background:#282f37; border:1px solid #424d59; border-radius:5px; cursor:pointer; } .ds-inspector button:hover { background:#35414d; border-color:#667788; } .ds-inspector button:focus-visible,.ds-inspector input:focus-visible { outline:2px solid #79b7d4; outline-offset:2px; } .ds-inspector input { color:#e1e8ee; background:#20262d; border:1px solid #424d59; border-radius:5px; min-height:36px; padding:.5rem; font:inherit; font-variant-numeric:tabular-nums; caret-color:#79b7d4; } .ds-inspector button[data-primary=\"true\"] { background:#326b85; color:#fff; border-color:#326b85; } .ds-inspector button[data-primary=\"true\"]:hover { background:#3b7c99; } .ds-inspector { padding:1rem; } .ds-inspector h2 { font-size:18px; } .ds-inspector label { display:grid; grid-template-columns:1fr 1fr; align-items:center; gap:.5rem; } .ds-inspector input { min-width:0; width:100%; }.ds-inspector { width: 320px; background: #282f37; border-left: 1px solid #424d59; }"
+    },
+    {
+      "name": "Numeric field",
+      "kind": "input",
+      "refersTo": "input-studio",
+      "description": "Aligned geometry input with tabular numerals.",
+      "html": "<label class=\"ds-field\">Offset X <input type=\"number\" step=\"0.5\" value=\"0\"></label>",
+      "css": ".ds-field { color:#e1e8ee; background:#282f37; font:400 14px/1.45 Roboto,sans-serif; } .ds-field button { min-height:36px; padding:.5rem 1rem; font:inherit; color:#e1e8ee; background:#282f37; border:1px solid #424d59; border-radius:5px; cursor:pointer; } .ds-field button:hover { background:#35414d; border-color:#667788; } .ds-field button:focus-visible,.ds-field input:focus-visible { outline:2px solid #79b7d4; outline-offset:2px; } .ds-field input { color:#e1e8ee; background:#20262d; border:1px solid #424d59; border-radius:5px; min-height:36px; padding:.5rem; font:inherit; font-variant-numeric:tabular-nums; caret-color:#79b7d4; } .ds-field button[data-primary=\"true\"] { background:#326b85; color:#fff; border-color:#326b85; } .ds-field button[data-primary=\"true\"]:hover { background:#3b7c99; } .ds-field { display:grid; gap:.5rem; width:160px; }.ds-field input[type=number] { min-height: 36px; padding: .5rem; background: #20262d; border: 1px solid #424d59; border-radius: 5px; font-variant-numeric: tabular-nums; } .ds-field input:focus-visible { outline: 2px solid #79b7d4; outline-offset: 2px; }"
+    },
+    {
+      "name": "Primary action",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Generation and commit action.",
+      "html": "<button class=\"ds-primary\" data-primary=\"true\">Generate 3D</button>",
+      "css": ".ds-primary { color:#e1e8ee; background:#282f37; font:400 14px/1.45 Roboto,sans-serif; } .ds-primary { min-height:36px; padding:.5rem 1rem; font:inherit; color:#e1e8ee; background:#282f37; border:1px solid #424d59; border-radius:5px; cursor:pointer; } .ds-primary:hover { background:#35414d; border-color:#667788; } .ds-primary:focus-visible,.ds-primary input:focus-visible { outline:2px solid #79b7d4; outline-offset:2px; } .ds-primary input { color:#e1e8ee; background:#20262d; border:1px solid #424d59; border-radius:5px; min-height:36px; padding:.5rem; font:inherit; font-variant-numeric:tabular-nums; caret-color:#79b7d4; } .ds-primary[data-primary=\"true\"] { background:#326b85; color:#fff; border-color:#326b85; } .ds-primary[data-primary=\"true\"]:hover { background:#3b7c99; } .ds-primary { color:#fff; background:#326b85; border-color:#326b85; } .ds-primary:hover { background:#3b7c99; }"
+    },
+    {
+      "name": "Model editor",
+      "kind": "custom",
+      "refersTo": "input-studio",
+      "description": "Part model import and transform editor with sticky save context.",
+      "html": "<section class=\"ds-model\"><header class=\"ds-editor-header\"><h2>C_0603_1608Metric</h2><p>Unsaved changes</p><button data-primary=\"true\">Save footprint</button><button>Undo</button></header><fieldset><legend>Position (mm)</legend><label>Z <input type=\"number\" value=\"1\"></label></fieldset></section>",
+      "css": ".ds-model { color:#e1e8ee; background:#282f37; font:400 14px/1.45 Roboto,sans-serif; } .ds-model button { min-height:36px; padding:.5rem 1rem; font:inherit; color:#e1e8ee; background:#282f37; border:1px solid #424d59; border-radius:5px; cursor:pointer; } .ds-model button:hover { background:#35414d; border-color:#667788; } .ds-model button:focus-visible,.ds-model input:focus-visible { outline:2px solid #79b7d4; outline-offset:2px; } .ds-model input { color:#e1e8ee; background:#20262d; border:1px solid #424d59; border-radius:5px; min-height:36px; padding:.5rem; font:inherit; font-variant-numeric:tabular-nums; caret-color:#79b7d4; } .ds-model button[data-primary=\"true\"] { background:#326b85; color:#fff; border-color:#326b85; } .ds-model button[data-primary=\"true\"]:hover { background:#3b7c99; } .ds-editor-header { position: sticky; top: 0; background: #282f37; border-bottom: 1px solid #424d59; } .ds-editor-header button { min-height: 36px; padding: .5rem 1rem; color: #e1e8ee; background: #282f37; border: 1px solid #424d59; border-radius: 5px; } .ds-editor-header { padding:1rem; } .ds-editor-header h2 { font-size:16px; margin:0 0 .25rem; } .ds-model fieldset { border:0; border-top:1px solid #424d59; padding:1rem 0; }"
+    },
+    {
+      "name": "Neutral action",
+      "kind": "button",
+      "refersTo": "button-neutral",
+      "description": "Secondary workbench action.",
+      "html": "<button class=\"ds-neutral\">Back to design</button>",
+      "css": ".ds-neutral { color:#e1e8ee; background:#282f37; font:400 14px/1.45 Roboto,sans-serif; } .ds-neutral { min-height:36px; padding:.5rem 1rem; font:inherit; color:#e1e8ee; background:#282f37; border:1px solid #424d59; border-radius:5px; cursor:pointer; } .ds-neutral:hover { background:#35414d; border-color:#667788; } .ds-neutral:focus-visible,.ds-neutral input:focus-visible { outline:2px solid #79b7d4; outline-offset:2px; } .ds-neutral input { color:#e1e8ee; background:#20262d; border:1px solid #424d59; border-radius:5px; min-height:36px; padding:.5rem; font:inherit; font-variant-numeric:tabular-nums; caret-color:#79b7d4; } .ds-neutral[data-primary=\"true\"] { background:#326b85; color:#fff; border-color:#326b85; } .ds-neutral[data-primary=\"true\"]:hover { background:#3b7c99; } "
+    }
+  ],
+  "narrative": {
+    "northStar": "The CAD drafting console",
+    "overview": "This is a compact, practical workbench for keyboard designers. Cool graphite surfaces recede behind the drawing, while restrained blue marks the active stage, selection, focus, and primary generation actions. Roboto keeps controls workmanlike; aligned numeric fields make geometry readable at a glance.\n\nThe object browser, central geometry, and editable properties share one spatial model. Selection changes the inspector without replacing the canvas or losing an unfinished part draft. Bundled and custom parts stay distinct across Design, PCB, Case, and Export.",
+    "keyCharacteristics": [
+      "Graphite panels with blue selection and focus states.",
+      "Docked browser and inspector around a dominant drawing field.",
+      "Compact rectangular controls with numeric, tabular readouts.",
+      "Touch-safe controls and reduced-motion support."
+    ],
+    "rules": [
+      "Mobile assembly remains reachable as a sequential embedded section.",
+      "Gap fit, cutting checks, and export readiness use separate statuses.",
+      "Material layers are named and each layer reports its own status."
+    ],
+    "dos": [
+      "Do keep the canvas dominant between the 240px browser and 320px inspector.",
+      "Do keep save, selection, and unsaved part context visible in sticky editor headers.",
+      "Do use 36px controls on desktop and 44px targets at the 1050px breakpoint.",
+      "Do use tabular numerals and commit numeric edits on blur or Enter.",
+      "Do preserve separate key, outline, component, selection, and grid colors.",
+      "Do respect `prefers-reduced-motion`.",
+      "Do keep quarter-unit editing and physical center snapping explicit.",
+      "Do show named material layers with independent fit and export states."
+    ],
+    "donts": [
+      "Don't replace the canvas when selection changes.",
+      "Don't turn every surface into a floating card or add shadows to ordinary panels.",
+      "Don't merge bundled and custom ownership into one catalog.",
+      "Don't crowd narrow layouts with simultaneous inspectors.",
+      "Don't describe gap fit as cutting or export readiness."
+    ]
+  }
+}

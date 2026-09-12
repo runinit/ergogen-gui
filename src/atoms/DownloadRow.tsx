@@ -1,6 +1,7 @@
 import Icon from './Icon';
 import styled, { keyframes } from 'styled-components';
 import { theme } from '../theme/theme';
+import { useConfigContext } from '../context/ConfigContext';
 import { trackEvent } from '../utils/analytics';
 
 const spin = keyframes`
@@ -153,15 +154,19 @@ const DownloadRow = ({
   previewKey,
   'data-testid': dataTestId,
 }: Props) => {
+  const configContext = useConfigContext();
   // Determine if this row is disabled (pending STL generation or KiCad Preview disabled)
   const isDisabled =
+    configContext?.resultsStale ||
     (extension === 'stl' && !content) ||
     (extension === 'kicad_pcb' && !preview);
   // STL files without content show loading button, kicad_pcb files without preview still show download button
   const showLoadingButton = extension === 'stl' && !content;
 
   const handleDownload = () => {
-    if (showLoadingButton) return;
+    if (showLoadingButton || configContext?.resultsStale) {
+      return;
+    }
     trackEvent('download_button_clicked', {
       download_type: extension,
       file_name: fileName,
@@ -203,6 +208,7 @@ const DownloadRow = ({
           </LoadingButton>
         ) : (
           <StyledLinkButton
+            aria-disabled={configContext?.resultsStale}
             onClick={handleDownload}
             aria-label={`Download ${fileName}.${extension}`}
             data-testid={testId && `${testId}-download`}

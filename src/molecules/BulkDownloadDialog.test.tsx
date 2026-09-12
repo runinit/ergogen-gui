@@ -4,18 +4,18 @@ import BulkDownloadDialog from './BulkDownloadDialog';
 import { exportConfigsProgressively } from '../utils/zip';
 
 vi.mock('../utils/zip', () => ({
-  exportConfigsProgressively: jest.fn(),
+  exportConfigsProgressively: vi.fn(),
 }));
 
 describe('BulkDownloadDialog', () => {
-  const mockOnClose = jest.fn();
+  const mockOnClose = vi.fn();
   const mockConfigs = [
     { id: '1', name: 'Keyboard Alpha', config: 'points: {}' },
     { id: '2', name: 'Ergonomic Board', config: 'points: { ergonomic: true }' },
   ];
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('renders nothing when isOpen is false', () => {
@@ -110,7 +110,7 @@ describe('BulkDownloadDialog', () => {
   });
 
   it('triggers progressive export process on click proceed', async () => {
-    (exportConfigsProgressively as jest.Mock).mockResolvedValue(undefined);
+    vi.mocked(exportConfigsProgressively).mockResolvedValue(undefined);
 
     render(
       <BulkDownloadDialog
@@ -142,7 +142,7 @@ describe('BulkDownloadDialog', () => {
 
   it('shows progress bar and ratio during generation', async () => {
     let progressCallback: any = null;
-    (exportConfigsProgressively as jest.Mock).mockImplementation(
+    vi.mocked(exportConfigsProgressively).mockImplementation(
       (configs, injections, debug, stlPreview, onlyConfigs, onProgress) => {
         progressCallback = onProgress;
         return new Promise(() => {}); // never resolves to keep it in generating state

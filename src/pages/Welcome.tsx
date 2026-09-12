@@ -5,7 +5,8 @@ import styled from 'styled-components';
 import { theme } from '../theme/theme';
 import { useConfigContext } from '../context/ConfigContext';
 import { exampleOptions, ConfigOption } from '../examples';
-import EmptyYAML from '../examples/empty_yaml';
+import Starter from '../examples/starter';
+import { createBoard } from '../utils/boardDefaults';
 import { fetchConfigFromUrl, GitInjection } from '../utils/github';
 import { ConflictResolutionStrategy } from '../utils/injections';
 import { loadLocalFile } from '../utils/localFiles';
@@ -490,7 +491,7 @@ const Welcome = () => {
   const handleSelectExample = async (configValue: string) => {
     if (configContext) {
       // Determine if this is the empty config
-      const isEmptyConfig = configValue === EmptyYAML.value;
+      const isEmptyConfig = configValue === Starter.value;
 
       // Find the example name by searching through all examples
       let exampleName = 'unknown';
@@ -832,13 +833,21 @@ const Welcome = () => {
         <OptionsContainer>
           <OptionBox>
             <h2>Start Fresh</h2>
-            <p>Begin with a completely blank slate.</p>
+            <p>
+              Set key spacing and footprints, then build your layout on an empty
+              canvas.
+            </p>
             <Button
-              onClick={() => handleSelectExample(EmptyYAML.value)}
-              aria-label="Start with empty configuration"
+              onClick={() => {
+                if (configContext) {
+                  configContext.createNewConfig(createBoard());
+                  setShouldNavigate(true);
+                }
+              }}
+              aria-label="New native design"
               data-testid="empty-config-button"
             >
-              Empty Configuration
+              New native design
             </Button>
           </OptionBox>
           <OptionBox>

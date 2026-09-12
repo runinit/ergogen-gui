@@ -28,10 +28,10 @@ export const mockGitHubNetworkRequests = async (page: Page) => {
           headers: rateLimitHeaders,
           contentType: 'text/yaml',
           body: `
-points:
-  key: 1
-footprints:
-  ceoloide/logo_mr_useful: {}
+schema: ergogen/v1
+layout:
+  objects:
+    logo: {kind: component, footprints: {logo: {what: ceoloide/logo_mr_useful}}}
 `,
         });
         return;
@@ -76,10 +76,10 @@ footprints:
           headers: rateLimitHeaders,
           contentType: 'text/yaml',
           body: `
-points:
-  key: 2
-footprints:
-  unspecworks/pico_oneside: {}
+schema: ergogen/v1
+layout:
+  objects:
+    mcu: {kind: component, footprints: {mcu: {what: unspecworks/pico_oneside}}}
 `,
         });
         return;

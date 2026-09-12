@@ -4,16 +4,23 @@ import Ergogen from './Ergogen';
 import { useConfigContext } from './context/ConfigContext';
 
 vi.mock('./context/ConfigContext', () => ({
-  useConfigContext: jest.fn(),
+  useConfigContext: vi.fn(),
 }));
 
 vi.mock('react-router-dom', () => ({
-  useNavigate: () => jest.fn(),
+  useNavigate: () => vi.fn(),
   useLocation: () => ({ pathname: '/' }),
 }));
 
 vi.mock('react-hotkeys-hook', () => ({
-  useHotkeys: jest.fn(),
+  useHotkeys: vi.fn(),
+}));
+
+vi.mock('./molecules/BoardStudio', () => ({
+  default: function MockBoardStudio() {
+    const [stage, setStage] = React.useState('Design');
+    return <button onClick={() => setStage('Case')}>{stage}</button>;
+  },
 }));
 
 // Mock sub-components
@@ -49,17 +56,17 @@ vi.mock('./molecules/ResizablePanel', () => {
 });
 
 // Mock zip, share, and analytics utils
-const mockCreateZip = jest.fn();
+const mockCreateZip = vi.fn();
 vi.mock('./utils/zip', () => ({
   createZip: (...args: any[]) => mockCreateZip(...args),
 }));
 
-const mockCreateShareableUri = jest.fn().mockReturnValue('https://share.link');
+const mockCreateShareableUri = vi.fn().mockReturnValue('https://share.link');
 vi.mock('./utils/share', () => ({
   createShareableUri: (...args: any[]) => mockCreateShareableUri(...args),
 }));
 
-const mockTrackEvent = jest.fn();
+const mockTrackEvent = vi.fn();
 vi.mock('./utils/analytics', () => ({
   trackEvent: (...args: any[]) => mockTrackEvent(...args),
 }));
@@ -81,16 +88,74 @@ describe('Ergogen Subheader Buttons', () => {
     showSideNav: false,
     showConfig: true,
     showDownloads: false,
-    setShowSettings: jest.fn(),
-    setShowSideNav: jest.fn(),
-    setShowConfig: jest.fn(),
-    setShowDownloads: jest.fn(),
-    generateNow: jest.fn(),
+    setShowSettings: vi.fn(),
+    setShowSideNav: vi.fn(),
+    setShowConfig: vi.fn(),
+    setShowDownloads: vi.fn(),
+    generateNow: vi.fn(),
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    (useConfigContext as jest.Mock).mockReturnValue(mockContextValue);
+    vi.clearAllMocks();
+    vi.mocked(useConfigContext, { partial: true }).mockReturnValue(
+      mockContextValue
+    );
+  });
+
+  it('keeps the native workspace mounted while settings are open', () => {
+    const context = {
+      ...mockContextValue,
+      configInput: 'schema: ergogen/v1\nlayout: {}',
+    };
+    vi.mocked(useConfigContext, { partial: true }).mockReturnValue(context);
+    const view = render(<Ergogen />);
+    fireEvent.click(screen.getByRole('button', { name: 'Design' }));
+
+    vi.mocked(useConfigContext, { partial: true }).mockReturnValue({
+      ...context,
+      showSettings: true,
+    });
+    view.rerender(<Ergogen />);
+    vi.mocked(useConfigContext, { partial: true }).mockReturnValue(context);
+    view.rerender(<Ergogen />);
+
+    expect(screen.getByRole('button', { name: 'Case' })).toBeInTheDocument();
+  });
+
+  it('does not mistake a schema mention in a comment for a native project', () => {
+    vi.mocked(useConfigContext, { partial: true }).mockReturnValue({
+      ...mockContextValue,
+      configInput: '# See ergogen/v1 for the new format\npoints: {}',
+    });
+    render(<Ergogen />);
+    expect(screen.getByTestId('mock-config-editor')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Design' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('retains the editor during invalid YAML and resets it for another project', () => {
+    const context = {
+      ...mockContextValue,
+      configInput: 'schema: ergogen/v1\nlayout: {}',
+    };
+    vi.mocked(useConfigContext, { partial: true }).mockReturnValue(context);
+    const view = render(<Ergogen />);
+    fireEvent.click(screen.getByRole('button', { name: 'Design' }));
+    vi.mocked(useConfigContext, { partial: true }).mockReturnValue({
+      ...context,
+      configInput: 'schema: [unfinished',
+    });
+    view.rerender(<Ergogen />);
+    expect(screen.getByRole('button', { name: 'Case' })).toBeInTheDocument();
+
+    vi.mocked(useConfigContext, { partial: true }).mockReturnValue({
+      ...context,
+      activeConfigId: '2',
+      configInput: 'points: [unfinished',
+    });
+    view.rerender(<Ergogen />);
+    expect(screen.getByTestId('mock-config-editor')).toBeInTheDocument();
   });
 
   it('renders mobile share button and triggers share logic on click when showConfig is true', () => {
@@ -114,7 +179,7 @@ describe('Ergogen Subheader Buttons', () => {
   });
 
   it('renders mobile archive button and triggers download archive logic on click when showConfig is false', () => {
-    (useConfigContext as jest.Mock).mockReturnValue({
+    vi.mocked(useConfigContext, { partial: true }).mockReturnValue({
       ...mockContextValue,
       showConfig: false,
       results: { canonical: 'canonical_yaml' },

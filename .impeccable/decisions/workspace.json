@@ -1,0 +1,314 @@
+{
+  "title": "A cohesive keyboard workbench",
+  "question": "Choose the workspace direction. Both preserve existing editing and generation capabilities.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Bench instrument",
+      "kicker": "THE ROLL",
+      "lineage": "Electronics test instruments and measurement workstations",
+      "thesis": "One stable editing frame for boards and parts, with precise controls beside the work.",
+      "palette": [
+        "#191c20",
+        "#24292f",
+        "#343c45",
+        "#edf2f5",
+        "#73c79e"
+      ],
+      "materials": [
+        "matte graphite",
+        "crisp instrument readouts"
+      ],
+      "viewport": "A compact project header and stage strip frame the canvas; a quiet inspector aligns fields and keeps save visible.",
+      "risk": "The hierarchy must stay clear when an inspector contains many technical fields.",
+      "comp": ".impeccable/mocks/decision/assigned.webp",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          {
+            "label": "Project \u00b7 stages \u00b7 save",
+            "x": 0,
+            "y": 0,
+            "w": 12,
+            "h": 1,
+            "accent": false
+          },
+          {
+            "label": "Parts / objects",
+            "x": 0,
+            "y": 1,
+            "w": 2,
+            "h": 8,
+            "accent": false
+          },
+          {
+            "label": "Board or part canvas",
+            "x": 2,
+            "y": 1,
+            "w": 7,
+            "h": 8,
+            "accent": true
+          },
+          {
+            "label": "Properties",
+            "x": 9,
+            "y": 1,
+            "w": 3,
+            "h": 8,
+            "accent": false
+          },
+          {
+            "label": "Selection \u00b7 status",
+            "x": 0,
+            "y": 9,
+            "w": 12,
+            "h": 1,
+            "accent": false
+          }
+        ]
+      },
+      "raised": [
+        {
+          "from": "Parts archive",
+          "raise": "Catalogue rows get a strict name, origin, and selection hierarchy."
+        },
+        {
+          "from": "Parametric notation",
+          "raise": "Numeric edits remain legible and reversible throughout updates."
+        },
+        {
+          "from": "Assembly notebook",
+          "raise": "Every control has a clear boundary, state, and task ownership."
+        },
+        {
+          "from": "Four-stage sleeve",
+          "raise": "Stage navigation remains a small, consistent set without nested toolbars."
+        },
+        {
+          "from": "Live parts board",
+          "raise": "Dimensions and field labels align; status changes never shift the control layout."
+        },
+        {
+          "from": "Layer register",
+          "raise": "Overlay transitions preserve canvas context and honor reduced motion."
+        }
+      ]
+    },
+    {
+      "id": "model-pick",
+      "label": "CAD drafting console",
+      "kicker": "IMPECCABLE\u2019S PICK",
+      "lineage": "Desktop CAD workbenches",
+      "thesis": "Persistent object and property panes make every editing task immediately familiar.",
+      "palette": [
+        "#20252b",
+        "#2c333b",
+        "#e1e8ee",
+        "#79b7d4"
+      ],
+      "materials": [
+        "flat tool chrome",
+        "technical drawing field"
+      ],
+      "viewport": "An object tree, centered drawing, and fixed right inspector share one compact toolbar.",
+      "risk": "Familiar and effective, but close to conventional CAD interfaces and less spacious.",
+      "comp": ".impeccable/mocks/decision/model-pick.webp",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          {
+            "label": "Project / tools",
+            "x": 0,
+            "y": 0,
+            "w": 12,
+            "h": 2,
+            "accent": false
+          },
+          {
+            "label": "Object tree",
+            "x": 0,
+            "y": 2,
+            "w": 3,
+            "h": 7,
+            "accent": false
+          },
+          {
+            "label": "Drawing",
+            "x": 3,
+            "y": 2,
+            "w": 6,
+            "h": 7,
+            "accent": true
+          },
+          {
+            "label": "Inspector",
+            "x": 9,
+            "y": 2,
+            "w": 3,
+            "h": 7,
+            "accent": false
+          },
+          {
+            "label": "Status",
+            "x": 0,
+            "y": 9,
+            "w": 12,
+            "h": 1,
+            "accent": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "textiles-weave-drape-fashion-sneaker-box-stacks",
+      "label": "Parts archive",
+      "lineage": "stacked box labels",
+      "thesis": "Parts browse as labelled boxes that open into editors.",
+      "palette": [
+        "#bc582d",
+        "#181818",
+        "#f5eee1"
+      ],
+      "materials": [
+        "stacked box labels"
+      ],
+      "viewport": "Labelled parts stack alongside one open part.",
+      "risk": "Box theatrics distract from continuous geometry editing.",
+      "case": "Keyboard designers identify less with retail shelving; repeated opening obscures placement work.",
+      "kept": "Catalogue rows get a strict name, origin, and selection hierarchy.",
+      "verdict": "declined",
+      "board": "https://impeccable.style/worlds/cards/textiles-weave-drape-fashion-sneaker-box-stacks.webp"
+    },
+    {
+      "id": "dream-surreal-impossible-worlds-alphabet-storm",
+      "label": "Parametric notation",
+      "lineage": "large editable notation",
+      "thesis": "Parameters reorganize a live drawing through a field of editable notation.",
+      "palette": [
+        "#ffffff",
+        "#111111",
+        "#a7abb0"
+      ],
+      "materials": [
+        "large editable notation"
+      ],
+      "viewport": "Parameters surround a live generated keyboard.",
+      "risk": "Typographic motion makes precision editing harder to scan.",
+      "case": "Language-first navigation is less familiar and less clear for direct geometry manipulation.",
+      "kept": "Numeric edits remain legible and reversible throughout updates.",
+      "verdict": "declined",
+      "board": "https://impeccable.style/worlds/cards/dream-surreal-impossible-worlds-alphabet-storm.webp"
+    },
+    {
+      "id": "digital-design-canon-skeuomorph-leather-studio",
+      "label": "Assembly notebook",
+      "lineage": "bound pages",
+      "thesis": "Parts and boards live in a notebook with physical tabs.",
+      "palette": [
+        "#8d593c",
+        "#e7ddcc",
+        "#45342a"
+      ],
+      "materials": [
+        "bound pages"
+      ],
+      "viewport": "A board page sits beside its component specifications.",
+      "risk": "Decorative materials consume space needed by the drawing.",
+      "case": "Physical page handling weakens both CAD familiarity and immediate task access.",
+      "kept": "Every control has a clear boundary, state, and task ownership.",
+      "verdict": "declined",
+      "board": "https://impeccable.style/worlds/cards/digital-design-canon-skeuomorph-leather-studio.webp"
+    },
+    {
+      "id": "posters-covers-sleeves-yeye-pop-sleeve",
+      "label": "Four-stage sleeve",
+      "lineage": "flat saturated fields",
+      "thesis": "Four editing stages occupy a single strongly colored frame.",
+      "palette": [
+        "#e86729",
+        "#35aab2",
+        "#ffffff"
+      ],
+      "materials": [
+        "flat saturated fields"
+      ],
+      "viewport": "Four stage labels border a large board preview.",
+      "risk": "Saturated surfaces compete with semantic geometry colors.",
+      "case": "Record sleeve identity lacks keyboard-tool resonance and gives properties too little structure.",
+      "kept": "Stage navigation remains a small, consistent set without nested toolbars.",
+      "verdict": "declined",
+      "board": "https://impeccable.style/worlds/cards/posters-covers-sleeves-yeye-pop-sleeve.webp"
+    },
+    {
+      "id": "signals-instruments-split-flap-concourse",
+      "label": "Live parts board",
+      "lineage": "ruled instrument rows",
+      "thesis": "Fixed columns align components, dimensions, and checks.",
+      "palette": [
+        "#171a1d",
+        "#eff0ee",
+        "#cfaa51"
+      ],
+      "materials": [
+        "ruled instrument rows"
+      ],
+      "viewport": "A component table controls a linked drawing view.",
+      "risk": "The table becomes dominant over spatial placement.",
+      "case": "Schedule-like browsing is less familiar for board design and delays direct manipulation.",
+      "kept": "Dimensions and field labels align; status changes never shift the control layout.",
+      "verdict": "declined",
+      "board": "https://impeccable.style/worlds/cards/signals-instruments-split-flap-concourse.webp"
+    },
+    {
+      "id": "operate-b-exposure-record-zone-sheets",
+      "label": "Layer register",
+      "lineage": "tonal sheets",
+      "thesis": "Board and part layers slide over a common drawing field.",
+      "palette": [
+        "#222222",
+        "#5b5b5b",
+        "#eeeeee",
+        "#c64293"
+      ],
+      "materials": [
+        "tonal sheets"
+      ],
+      "viewport": "A layered drawing remains under sliding property sheets.",
+      "risk": "Overlaps can hide geometry and make small screens harder to operate.",
+      "case": "Darkroom notation has weaker audience identification and requires translating unfamiliar states.",
+      "kept": "Overlay transitions preserve canvas context and honor reduced motion.",
+      "verdict": "declined",
+      "board": "https://impeccable.style/worlds/cards/operate-b-exposure-record-zone-sheets.webp"
+    }
+  ],
+  "reroll": {
+    "registers": [
+      "safer",
+      "bolder"
+    ]
+  },
+  "buildPath": {
+    "value": "code",
+    "toggle": true
+  },
+  "canon": true,
+  "canonCard": {
+    "label": "Standard CAD layout",
+    "thesis": "Conventional desktop CAD, with menu, toolbars, object tree and properties.",
+    "palette": [
+      "#242424",
+      "#393939",
+      "#eeeeee",
+      "#28a745"
+    ],
+    "materials": [
+      "standard application panels"
+    ],
+    "viewport": "A familiar three-pane CAD editor.",
+    "risk": "Keeps conventional density and much of the current structural language.",
+    "comp": ".impeccable/mocks/decision/canon.webp"
+  },
+  "steer": true
+}
