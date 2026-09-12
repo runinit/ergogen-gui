@@ -1,5 +1,90 @@
 # Changelog
 
+## Units, alignment and in-place setup
+
+September 12, 2026
+
+Enter stagger and spacing as `0.5u` or `0.25v`, with millimetres shown beside the
+value. Quarter-unit snapping is the default; switch increments in the canvas pill.
+Drag to key, component, row or column centers, then choose **Keep aligned** to
+retain the relationship. The Inspector also exposes alignment, distance and equal
+spacing controls.
+
+New boards start empty. **Design setup** stays beside the workspace and groups
+spacing, topology, per-key electronics and mechanical layers. Preview the real
+switch/diode/LED footprints and generate a separate KiCad sample. Add matrices,
+MCUs, encoders and other hardware directly in Layout.
+
+Foam, silicone and gasket layers occupy existing assembly gaps. Thickness and
+compression show fit without moving the stack. Export fitting layers separately
+as DXF files, with material metadata and nominal 3D references.
+
+## A consistent CAD workspace
+
+September 11, 2026
+
+![Docked object browser, drawing and properties.](./public/images/changelog/cad-redesign/desktop.png)
+
+Board design and part editing now share a compact graphite interface with blue
+selection, aligned controls, and consistent panes. Desktop starts with the object
+browser and properties beside the canvas. Mobile uses a focused inspector drawer.
+
+Part save and undo stay visible while editing models. Browsing other parts or
+returning from board editing preserves unsaved drafts. Model number fields accept
+replacement values without snapping back mid-edit; Enter commits and Escape
+cancels.
+
+## Clear canvas and key resizing
+
+September 11, 2026
+
+Open **Inspector** beside the canvas tools for Objects, Selection and Design.
+Both sidebars and automatic selection popups are replaced by this manually opened
+panel. Sections remember their expanded state during the session.
+
+**Auto (make room)** grows outside keys outward. Interior resizing adjusts native
+spacing in one undoable edit, preserving authored offsets. Unresolved clearance
+is reported and blocks fabrication exports.
+
+## A simpler design workflow
+
+September 11, 2026
+
+![Design, PCB, Case and Export in one workspace.](./public/images/changelog/studio-workflow.png)
+
+Layout and component placement now share **Design**. Continue through **PCB**,
+**Case** and **Export** without losing generated geometry when opening Code or
+the part library.
+
+**What changed:**
+
+- **One generation action:** Generate 3D and the editor shortcut share a build.
+- **One export destination:** Download source, portable projects, boards and case
+  files from Export. Case review resets when geometry changes.
+- **Settings stays in context:** Keep the current stage, selection and camera.
+  Advanced library code appears when an entry is selected.
+- **Explicit case creation:** Opening Case leaves the source and undo history
+  untouched until you choose Create case.
+- **Reliable editing:** Unfinished YAML keeps its editor, and legacy automatic
+  generation no longer starts extra native builds.
+
+## Direct layout editing
+
+September 10, 2026
+
+The canvas now has a floating tool pill with Objects, Columns and Matrices at the
+top. Selection opens the relevant quick controls; owned electronics fold beneath
+keys in a smaller tree.
+
+Drag components directly, use Ctrl/Cmd to toggle selections and Shift to select a
+range. Snapping preserves layout spacing and checks nearby envelopes. Components
+can keep a snapped target and offset. Drops retain their visible position while
+validation finishes, without refitting the camera.
+
+Delete removes the selection as one undoable edit, including owned components.
+Locks and external references remain protected; text fields retain normal Delete
+behavior. Phone controls fit the screen and quick edits stay above the zoom pill.
+
 ## Reliable setup and assembly edits
 
 September 10, 2026

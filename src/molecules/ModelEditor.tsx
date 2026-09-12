@@ -18,6 +18,45 @@ const Axes = styled.div`
     font-size: ${theme.fontSizes.bodySmall};
   }
 `;
+const Editor = styled.div`
+  > label {
+    display: grid;
+    gap: ${theme.spacing.xs};
+  }
+  > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: ${theme.spacing.sm};
+  }
+  > div button {
+    padding: ${theme.spacing.sm};
+    font-size: ${theme.fontSizes.bodySmall};
+  }
+  > p {
+    font-size: ${theme.fontSizes.bodySmall};
+    color: ${theme.colors.textDarker};
+  }
+  fieldset {
+    border: 0;
+    padding: 0;
+    margin: ${theme.spacing.lg} 0;
+    min-width: 0;
+  }
+  legend {
+    font-size: ${theme.fontSizes.bodySmall};
+    color: ${theme.colors.textDark};
+    padding: 0;
+    margin-bottom: ${theme.spacing.sm};
+  }
+  details {
+    border-top: 1px solid ${theme.colors.border};
+    margin-top: ${theme.spacing.md};
+  }
+  input,
+  select {
+    width: 100%;
+  }
+`;
 type Props = {
   models: ModelBinding[];
   assets: CaseAssets;
@@ -26,6 +65,57 @@ type Props = {
   onBusy?: (state: 'busy' | 'idle') => void;
   onChange: (models: ModelBinding[], assets: CaseAssets) => void;
 };
+
+// Keep unfinished numbers local so typing does not fight model updates.
+function ModelNumber({
+  value,
+  label,
+  step,
+  min,
+  onCommit,
+}: {
+  value: number;
+  label: string;
+  step: number;
+  min?: number;
+  onCommit: (value: number) => void;
+}) {
+  const [text, setText] = useState(String(value));
+  useEffect(() => setText(String(value)), [value]);
+  return (
+    <input
+      type="number"
+      aria-label={label}
+      step={step}
+      min={min}
+      value={text}
+      onChange={(event) => setText(event.target.value)}
+      onBlur={(event) => {
+        const next = event.currentTarget.valueAsNumber;
+        if (!Number.isFinite(next) || (min !== undefined && next < min)) {
+          setText(String(value));
+          return;
+        }
+        setText(String(next));
+        if (next !== value) {
+          onCommit(next);
+        }
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.stopPropagation();
+          event.currentTarget.value = String(value);
+          setText(String(value));
+          event.currentTarget.blur();
+        }
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          event.currentTarget.blur();
+        }
+      }}
+    />
+  );
+}
 export default function ModelEditor({
   models,
   assets,
@@ -146,7 +236,7 @@ export default function ModelEditor({
   };
   const model = models[selected];
   return (
-    <div>
+    <Editor>
       <label>
         Model
         <select
@@ -245,20 +335,13 @@ export default function ModelEditor({
                 {(['X', 'Y', 'Z'] as const).map((axis, index) => (
                   <label key={axis}>
                     {axis}
-                    <input
-                      type="number"
-                      aria-label={`Model ${property} ${axis}`}
+                    <ModelNumber
+                      key={`${selected}:${model.path}:${property}:${axis}`}
+                      label={`Model ${property} ${axis}`}
                       step={property === 'rotate' ? 1 : 0.1}
                       min={property === 'scale' ? 0.001 : undefined}
                       value={model[property][index]}
-                      onChange={(event) => {
-                        const value = event.target.valueAsNumber;
-                        if (
-                          !Number.isFinite(value) ||
-                          (property === 'scale' && value <= 0)
-                        ) {
-                          return;
-                        }
+                      onCommit={(value) => {
                         const vector = [...model[property]] as Vec3;
                         vector[index] = value;
                         update({ ...model, [property]: vector });
@@ -403,6 +486,6 @@ export default function ModelEditor({
           <button onClick={() => input.current?.click()}>Upload file</button>
         </p>
       )}
-    </div>
+    </Editor>
   );
 }

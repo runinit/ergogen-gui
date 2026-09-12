@@ -1,3 +1,5 @@
+import DimensionField from './DimensionField';
+import { pitchUnits, ensurePitchUnits } from '../utils/designUnits';
 import { StudioActions, StudioField } from './StudioStyles';
 import { KEY_SIZES } from '../utils/keySizes';
 import {
@@ -64,24 +66,19 @@ export default function LayoutDefaults({
             </select>
           </StudioField>
           {(['Column spacing', 'Row spacing'] as const).map((label, index) => (
-            <StudioField key={`${label}-${options.pitch[index]}`}>
-              <span>{label}</span>
-              <input
-                aria-label={`Default ${label.toLowerCase()}`}
-                defaultValue={options.pitch[index]}
-                onBlur={(event) => {
-                  const value = event.target.value.trim();
-                  if (!value) {
-                    return;
-                  }
-                  const pitch = [...options.pitch];
-                  pitch[index] = Number.isFinite(Number(value))
-                    ? Number(value)
-                    : value;
-                  patch({ pitch });
-                }}
-              />
-            </StudioField>
+            <DimensionField
+              key={`${cluster}-${label}`}
+              label={`Default ${label.toLowerCase()}`}
+              value={options.pitch[index]}
+              units={pitchUnits(source)}
+              onCommit={(value) => {
+                const pitch = [...options.pitch];
+                pitch[index] = value;
+                edit((before) =>
+                  setKeyOptions(ensurePitchUnits(before), { pitch }, cluster)
+                );
+              }}
+            />
           ))}
         </>
       )}

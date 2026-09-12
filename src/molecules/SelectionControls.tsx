@@ -1,5 +1,16 @@
+import { useState } from 'react';
+import DimensionField from './DimensionField';
+import {
+  dimension,
+  dimensionValue,
+  pitchUnits,
+  ensurePitchUnits,
+} from '../utils/designUnits';
+import { targets } from '../utils/studioTargets';
 import type { LayoutReport } from 'ergogen/src/native';
-import { StudioActions, StudioField } from './StudioStyles';
+import styled from 'styled-components';
+import { theme } from '../theme/theme';
+import { StudioField } from './StudioStyles';
 import type { StudioSelection } from './StudioCanvas';
 import { KEY_SIZES } from '../utils/keySizes';
 import {
@@ -17,6 +28,19 @@ import {
 import type { KeyAlignment } from '../utils/keyResize';
 import { setLayout } from '../utils/layoutSource';
 
+const RelativeFields = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: ${theme.spacing.sm};
+  margin: ${theme.spacing.sm} 0;
+  label {
+    grid-template-columns: minmax(0, 1fr);
+    margin: 0;
+  }
+  input {
+    width: 100%;
+  }
+`;
 type Props = {
   source: string;
   selection: StudioSelection;
@@ -29,6 +53,9 @@ export default function SelectionControls({
   report,
   edit,
 }: Props) {
+  const [adjustment, setAdjustment] = useState(0);
+  const [adjustError, setAdjustError] = useState('');
+  const units = pitchUnits(source);
   const keys = selectedKeys(source, selection),
     data = readStudio(source);
   const item = data.layout.objects?.[keys[0]];
@@ -37,6 +64,12 @@ export default function SelectionControls({
       ? selection.id
       : selection.cluster || item?.cluster;
   const locked =
+    targets(selection).some((target) =>
+      target.section === 'objects'
+        ? report?.objects[target.id]?.locked ||
+          data.layout.objects?.[target.id]?.locked
+        : data.layout.clusters?.[target.cluster || target.id]?.locked
+    ) ||
     !!data.layout.clusters?.[cluster || '']?.locked ||
     keys.some((id) => data.layout.objects?.[id]?.locked);
   const size = item?.envelopes?.keycap?.size ||
@@ -60,46 +93,39 @@ export default function SelectionControls({
           const pitch = data.layout.clusters![selection.id].arrangement!
             .pitch || [19, 19];
           return (
-            <StudioField key={`${label}-${pitch[index]}`}>
-              <span>{label} spacing</span>
-              <input
-                aria-label={`Selection ${label.toLowerCase()} spacing`}
-                defaultValue={pitch[index]}
-                onBlur={(event) => {
-                  const value = event.target.value.trim();
-                  if (!value) {
-                    return;
-                  }
-                  edit((before) => {
-                    const at = [
-                      ...((getValue(before, [
-                        'layout',
-                        'clusters',
-                        selection.id,
-                        'arrangement',
-                        'pitch',
-                      ]) as (number | string)[]) || [19, 19]),
-                    ];
-                    at[index] = Number.isFinite(Number(value))
-                      ? Number(value)
-                      : value;
-                    return setLayout(
-                      before,
+            <DimensionField
+              key={`${selection.id}-${label}`}
+              label={`Selection ${label.toLowerCase()} spacing`}
+              value={pitch[index]}
+              units={units}
+              onCommit={(value) =>
+                edit((before) => {
+                  const at = [
+                    ...((getValue(before, [
+                      'layout',
                       'clusters',
                       selection.id,
-                      ['arrangement', 'pitch'],
-                      at
-                    );
-                  });
-                }}
-              />
-            </StudioField>
+                      'arrangement',
+                      'pitch',
+                    ]) as (number | string)[]) || ['u', 'v']),
+                  ];
+                  at[index] = value;
+                  return setLayout(
+                    ensurePitchUnits(before),
+                    'clusters',
+                    selection.id,
+                    ['arrangement', 'pitch'],
+                    at
+                  );
+                })
+              }
+            />
           );
         })}
       {!!keys.length && (
         <>
           <StudioField>
-            <span>Selection key size</span>
+            <span>Key size</span>
             <select
               aria-label="Selection key size"
               value={
@@ -134,7 +160,7 @@ export default function SelectionControls({
             </select>
           </StudioField>
           <StudioField>
-            <span>Horizontal alignment</span>
+            <span>Align X</span>
             <select
               aria-label="Horizontal alignment"
               value={alignment.x}
@@ -150,14 +176,14 @@ export default function SelectionControls({
                 )
               }
             >
-              <option value="auto">Auto (outer edge)</option>
+              <option value="auto">Auto (make room)</option>
               <option value="left">Left</option>
               <option value="center">Centre</option>
               <option value="right">Right</option>
             </select>
           </StudioField>
           <StudioField>
-            <span>Vertical alignment</span>
+            <span>Align Y</span>
             <select
               aria-label="Vertical alignment"
               value={alignment.y}
@@ -185,43 +211,46 @@ export default function SelectionControls({
           event.preventDefault();
           const form = event.currentTarget,
             values = new FormData(form);
-          edit((before) =>
-            adjustSelection(
-              before,
-              selection,
-              [Number(values.get('x')), Number(values.get('y')), 0],
-              Number(values.get('rotation')),
-              Number(values.get('stagger') || 0)
-            )
-          );
-          form.reset();
+          try {
+            const value = (name: string) =>
+              dimension(dimensionValue(String(values.get(name) || '0')), units);
+            edit((before) =>
+              adjustSelection(
+                ensurePitchUnits(before),
+                selection,
+                [value('x'), value('y'), 0],
+                value('rotation'),
+                value('stagger')
+              )
+            );
+            setAdjustment((count) => count + 1);
+            setAdjustError('');
+          } catch (reason) {
+            setAdjustError(String(reason));
+          }
         }}
       >
         <small>Relative to current placement, in the parent’s axes.</small>
-        <StudioActions>
+        <RelativeFields>
           {[
             'x',
             'y',
             'rotation',
             ...(selection.section === 'columns' ? ['stagger'] : []),
           ].map((name) => (
-            <StudioField key={name}>
-              <span>
-                {name === 'rotation'
-                  ? 'Rotate Δ°'
-                  : `${name.toUpperCase()} Δ mm`}
-              </span>
-              <input
-                aria-label={`Relative ${name}`}
-                name={name}
-                type="number"
-                step="any"
-                defaultValue="0"
-              />
-            </StudioField>
+            <DimensionField
+              key={`${name}-${adjustment}`}
+              name={name}
+              label={`Relative ${name}`}
+              value={0}
+              units={units}
+              suffix={name === 'rotation' ? '°' : 'mm'}
+              onCommit={() => {}}
+            />
           ))}
-        </StudioActions>
+        </RelativeFields>
         <button type="submit">Apply relative adjustment</button>
+        {adjustError && <p role="alert">{adjustError}</p>}
       </form>
       {!!keys.length && (
         <details>

@@ -1,5 +1,13 @@
+import { hasSpacing, layoutSpacing } from './snapSpacing';
+import { resolve } from 'ergogen/src/native/layout';
+import { clearResizeSpacing, spaceResizedKeys } from './resizeSpacing';
 import type { LayoutReport } from 'ergogen/src/native';
-import type { StudioSelection } from '../molecules/StudioCanvas';
+import {
+  includesObject,
+  targets,
+  movingTargets,
+  type StudioSelection,
+} from './studioTargets';
 import { readStudio, getValue, setValue, moveColumn } from './studioSource';
 import { moveLayout, setLayout } from './layoutSource';
 import { resizeKey, KeyAlignment } from './keyResize';
@@ -12,13 +20,11 @@ export function selectedKeys(
     .filter(
       ([id, item]) =>
         item.kind === 'key' &&
-        (selection.section === 'objects'
-          ? id === selection.id
-          : selection.section === 'clusters'
-            ? item.cluster === selection.id
-            : selection.section === 'columns' &&
-              item.cluster === selection.cluster &&
-              item.cell?.[0] === selection.id)
+        includesObject(selection, {
+          id,
+          cluster: item.cluster,
+          cell: item.cell,
+        })
     )
     .map(([id]) => id);
 }
@@ -29,8 +35,30 @@ export function sizeSelection(
   alignment?: Partial<KeyAlignment>,
   report?: LayoutReport
 ): string {
-  let result = source;
-  for (const id of selectedKeys(source, selection)) {
+  const keys = selectedKeys(source, selection);
+  const initial = readStudio(source);
+  const clusters = Array.from(
+    new Set(
+      keys
+        .map((id) => initial.layout.objects![id].cluster)
+        .filter((id): id is string => !!id)
+    )
+  );
+  if (
+    keys.some(
+      (id) =>
+        initial.layout.objects![id].locked ||
+        initial.layout.clusters?.[initial.layout.objects![id].cluster || '']
+          ?.locked ||
+        report?.objects[id]?.locked
+    )
+  ) {
+    throw new Error('This object is locked.');
+  }
+  const original = resolve(initial);
+  let result = clearResizeSpacing(source, clusters);
+  const draft = resolve(readStudio(result));
+  for (const id of keys) {
     const data = readStudio(result),
       item = data.layout.objects![id];
     const current = item.envelopes?.keycap?.size ||
@@ -43,29 +71,55 @@ export function sizeSelection(
       result,
       id,
       size || current,
-      report,
+      draft,
       alignment ? { ...prior, ...alignment } : undefined
     );
   }
-  if (size && selection.section === 'clusters') {
-    result = setValue(
-      result,
-      ['meta', 'studio', 'layouts', selection.id, 'size'],
-      size
-    );
+  for (const target of targets(selection)) {
+    if (size && target.section === 'clusters') {
+      result = setValue(
+        result,
+        ['meta', 'studio', 'layouts', target.id, 'size'],
+        size
+      );
+    }
+    if (size && target.section === 'columns') {
+      result = setValue(
+        result,
+        ['meta', 'studio', 'columns', target.cluster || '', target.id, 'size'],
+        size
+      );
+    }
   }
-  if (size && selection.section === 'columns') {
+  result = spaceResizedKeys(result, clusters, original);
+  const checked = resolve(readStudio(result));
+  if (
+    Object.values(original.objects).some(
+      (item) =>
+        item.locked &&
+        JSON.stringify(item.matrix) !==
+          JSON.stringify(checked.objects[item.id]?.matrix)
+    )
+  ) {
+    throw new Error('Resizing would move a locked attachment or mirror.');
+  }
+  const spacing = layoutSpacing(result, checked);
+  for (const id of keys.filter(
+    (key) =>
+      initial.layout.clusters?.[initial.layout.objects![key].cluster || '']
+        ?.arrangement?.type !== 'columns'
+  )) {
     result = setValue(
       result,
-      [
-        'meta',
-        'studio',
-        'columns',
-        selection.cluster || '',
-        selection.id,
-        'size',
-      ],
-      size
+      ['meta', 'studio', 'resizeSpacing', `object:${id}`],
+      {
+        edits: [],
+        conflicts: hasSpacing(checked, [id], [0, 0], 0, spacing)
+          ? []
+          : [
+              `Keycap clearance remains unresolved for ${id}. Move nearby objects before exporting.`,
+            ],
+      }
     );
   }
   return result;
@@ -84,6 +138,14 @@ export function adjustSelection(
 ): string {
   if (![...offset, rotation, stagger].every(Number.isFinite)) {
     throw new Error('Enter numeric relative adjustments.');
+  }
+  const members = movingTargets(source, selection);
+  if (members.length > 1 || selection.members) {
+    return members.reduce(
+      (current, member) =>
+        adjustSelection(current, member, offset, rotation, stagger),
+      source
+    );
   }
   let result = source;
   const column = selection.section === 'columns';

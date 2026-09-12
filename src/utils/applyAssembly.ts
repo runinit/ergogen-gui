@@ -73,6 +73,7 @@ export function applyAssembly(
     ]) as KeyAssembly | undefined;
     const recipe = compileKey(setup, id, {
       pcb: item.pcb,
+      pcbThickness: data.pcbs?.[item.pcb || '']?.thickness,
       cluster: item.cluster,
       cell: item.cell,
       index: item.index,

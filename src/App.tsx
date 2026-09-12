@@ -1,3 +1,4 @@
+import { useProjectMode } from './hooks/useProjectMode';
 import { storageKey } from './utils/storageKey';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
@@ -282,6 +283,7 @@ const AppContent = ({
   const configContext = useConfigContext();
   // Get configInput from context to ensure we have the latest value
   const configInput = configContext?.configInput;
+  const mode = useProjectMode(configInput, configContext?.activeConfigId);
   const location = useLocation();
   const onUpdate = useServiceWorkerUpdate();
   const onInstall = usePwaInstallPrompt();
@@ -590,8 +592,7 @@ const AppContent = ({
           data-testid="bulk-download-dialog"
         />
       )}
-      {(!configInput?.includes('ergogen/v1') ||
-        configContext?.showSettings) && (
+      {(mode === 'legacy' || location.pathname === '/new') && (
         <Header onUpdate={onUpdate} onInstall={onInstall} />
       )}
       <LoadingBar

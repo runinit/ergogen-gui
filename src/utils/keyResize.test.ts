@@ -23,12 +23,12 @@ it('applies width compensation in the rotated key axes', () => {
   ).toEqual([0, 5, 0]);
 });
 
-it('keeps the outside left edge aligned while preserving its existing offset', () => {
+it('keeps the inward edge of the first column aligned while preserving its existing offset', () => {
   const source =
     'schema: ergogen/v1\nlayout: {clusters: {fingers: {arrangement: {type: columns, columns: [c1, c2], rows: [r1, r2]}}}, objects: {a: {kind: key, cluster: fingers, cell: [c1, r1], placement: {override: {at: [2, 3, 0]}}}}}\n';
   const enlarged = resizeKey(source, 'a', [22.7625, 18]);
   expect(parse(enlarged).layout.objects.a.placement.override.at).toEqual([
-    4.38125, 3, 0,
+    -0.38125, 3, 0,
   ]);
   expect(
     parse(resizeKey(enlarged, 'a', [18, 18])).layout.objects.a.placement
@@ -36,12 +36,12 @@ it('keeps the outside left edge aligned while preserving its existing offset', (
   ).toEqual([2, 3, 0]);
 });
 
-it('keeps the outside right edge fixed and supports centre alignment', () => {
+it('keeps the inward right edge fixed and supports centre alignment', () => {
   const source =
     'schema: ergogen/v1\nlayout: {clusters: {fingers: {arrangement: {type: columns, columns: [c1, c2], rows: [r1]}}}, objects: {a: {kind: key, cluster: fingers, cell: [c2, r1]}}}\n';
   const resized = resizeKey(source, 'a', [28, 18]);
   expect(parse(resized).layout.objects.a.placement.override.at).toEqual([
-    -5, 0, 0,
+    5, 0, 0,
   ]);
   const centred = resizeKey(resized, 'a', [28, 18], undefined, {
     x: 'center',

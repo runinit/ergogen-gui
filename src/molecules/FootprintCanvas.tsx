@@ -27,7 +27,7 @@ const Surface = styled.div`
   width: 100%;
   height: 100%;
   min-height: ${theme.caseWizard.previewHeight};
-  background: ${theme.colors.backgroundLight};
+  background: ${theme.colors.background};
   svg[role='img'] {
     width: 100%;
     height: 100%;

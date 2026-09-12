@@ -1,4 +1,4 @@
-import { studio, openCase, readSource } from './utils/studio';
+import { studio, openCase, openExport, readSource } from './utils/studio';
 import { parse } from 'yaml';
 import { test, expect, Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
@@ -46,11 +46,13 @@ const choose = async (page: Page) => {
 const ready = async (page: Page) => {
   const dialog = page.getByRole('region', { name: 'Case designer' });
   await expect(
-    dialog.getByRole('button', { name: 'Generate', exact: true })
+    page.getByRole('button', { name: 'Generate project', exact: true })
   ).toBeEnabled({ timeout: GEOMETRY_TIMEOUT });
-  await dialog.getByRole('button', { name: 'Generate', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Generate project', exact: true })
+    .click();
   await expect(
-    dialog.getByText('Generated current draft', { exact: true })
+    dialog.getByRole('status').filter({ hasText: /Current geometry/ })
   ).toBeVisible({ timeout: GEOMETRY_TIMEOUT });
   await expect(dialog.getByRole('alert')).toHaveCount(0);
   await dialog.getByRole('button', { name: 'assembled', exact: true }).click();
@@ -74,7 +76,7 @@ test('autosaves gasket case edits, restores them with undo and exports solids', 
   await dialog.getByLabel('Wall thickness (mm)', { exact: true }).press('Tab');
   await page
     .getByRole('navigation', { name: 'Design workflow' })
-    .getByRole('button', { name: 'Layout', exact: true })
+    .getByRole('button', { name: 'Design', exact: true })
     .click();
   expect(parse(await saved(page)).designs.assemblies.case.wall).toBe(4);
   await page.getByRole('button', { name: 'Undo project edit' }).click();
@@ -99,12 +101,15 @@ test('autosaves gasket case edits, restores them with undo and exports solids', 
   await dialog.getByLabel('Suspension travel').fill('0.1');
   await dialog.getByLabel('Lateral travel').fill('0.05');
   await dialog.getByRole('button', { name: 'Review', exact: true }).click();
-  await dialog.getByRole('checkbox').check();
+  const exportView = await openExport(page);
+  await exportView
+    .getByRole('checkbox', { name: /I reviewed dimensions/ })
+    .check();
   await expect(
-    dialog.getByRole('button', { name: 'Download ZIP' })
+    exportView.getByRole('button', { name: 'Download case ZIP' })
   ).toBeEnabled({ timeout: 90000 });
   const downloading = page.waitForEvent('download');
-  await dialog.getByRole('button', { name: 'Download ZIP' }).click();
+  await exportView.getByRole('button', { name: 'Download case ZIP' }).click();
   const download = await downloading;
   const zip = await JSZip.loadAsync(readFileSync((await download.path())!));
   const names = Object.keys(zip.files);
@@ -116,7 +121,7 @@ test('autosaves gasket case edits, restores them with undo and exports solids', 
   expect(names.some((name) => name.endsWith('/case_plate.dxf'))).toBe(true);
   await page
     .getByRole('navigation', { name: 'Design workflow' })
-    .getByRole('button', { name: 'Layout', exact: true })
+    .getByRole('button', { name: 'Design', exact: true })
     .click();
   await expect(dialog).not.toBeVisible();
   expect(await saved(page)).toContain('# Keep the original layout');
@@ -145,7 +150,7 @@ test('reopens a gasket enclosure offline without touching production storage', a
   });
   await page
     .getByRole('navigation', { name: 'Design workflow' })
-    .getByRole('button', { name: 'Layout', exact: true })
+    .getByRole('button', { name: 'Design', exact: true })
     .click();
   await page.waitForFunction(async () => {
     const keys = await caches.keys();
@@ -181,13 +186,16 @@ test('uses the supplier CNC preset with explicit corner relief', async ({
   await choose(page);
   await ready(page);
   await dialog.getByRole('button', { name: 'Review', exact: true }).click();
-  await dialog.getByRole('checkbox').check();
+  const exportView = await openExport(page);
+  await exportView
+    .getByRole('checkbox', { name: /I reviewed dimensions/ })
+    .check();
   await expect(
-    dialog.getByRole('button', { name: 'Download ZIP', exact: true })
+    exportView.getByRole('button', { name: 'Download case ZIP', exact: true })
   ).toBeEnabled();
   await page
     .getByRole('navigation', { name: 'Design workflow' })
-    .getByRole('button', { name: 'Layout', exact: true })
+    .getByRole('button', { name: 'Design', exact: true })
     .click();
   await expect.poll(() => saved(page)).toContain('corner_relief: 0.5');
   await expect
@@ -215,7 +223,7 @@ test('keeps the native BHK boundary and limits switch selections to typed keys',
   });
   await page
     .getByRole('navigation', { name: 'Design workflow' })
-    .getByRole('button', { name: 'Layout', exact: true })
+    .getByRole('button', { name: 'Design', exact: true })
     .click();
   expect(await saved(page)).toBe(original);
 });
@@ -298,7 +306,10 @@ test('generates BHK CNC relief from the process controls', async ({
   await expect(
     dialog.getByRole('button', { name: /Review 0 blockers/ })
   ).toBeVisible();
-  await dialog.getByText('Generated current draft', { exact: true }).click();
+  await dialog
+    .getByRole('status')
+    .filter({ hasText: /Current geometry/ })
+    .click();
   await dialog
     .getByText(/Added cutter relief/)
     .first()

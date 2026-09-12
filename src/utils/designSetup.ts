@@ -25,6 +25,7 @@ export type DesignSetup = {
   rows: number;
   thumbs: number;
   pitch: number;
+  pitchY?: number;
   topology: 'single' | 'mirrored' | 'reversible';
   connection: 'wired' | 'wireless';
   link: 'trrs' | 'usbc' | 'rj45';
@@ -268,7 +269,7 @@ export function compileSetup(setup: DesignSetup): string {
           (_, i) => `c${mirrored ? setup.columns - i : i + 1}`
         ),
         rows: Array.from({ length: setup.rows }, (_, i) => `r${i + 1}`),
-        pitch: [setup.pitch, setup.pitch],
+        pitch: [setup.pitch, setup.pitchY ?? setup.pitch],
       },
       ...(mirrored
         ? { placement: { at: [(setup.columns * 2 + 3) * setup.pitch, 0, 0] } }

@@ -1,5 +1,5 @@
 import type { LayoutReport } from 'ergogen/src/native';
-import { getValue, readStudio } from './studioSource';
+import { getValue, readStudio, setValue } from './studioSource';
 import { setLayout } from './layoutSource';
 
 type Dimension = number | string;
@@ -30,15 +30,31 @@ export function resizeKey(
     const horizontal =
       value.x === 'auto'
         ? columns.length > 1 && item?.cell?.[0] === columns.at(-1)
-          ? 'right'
-          : 'left'
+          ? 'left'
+          : columns.length > 1 && item?.cell?.[0] === columns[0]
+            ? 'right'
+            : columns.length > 1
+              ? 'center'
+              : 'left'
         : value.x;
     return [
       { left: 0.5, center: 0, right: -0.5 }[horizontal],
       { top: -0.5, center: 0, bottom: 0.5 }[value.y],
     ];
   };
-  const beforeFactors = factors(prior),
+  const path = ['layout', 'objects', id, 'placement', 'override', 'at'];
+  const present = (getValue(source, path) || [0, 0, 0]) as Dimension[];
+  const owned = getValue(source, ['meta', 'studio', 'resizeAnchors', id]) as
+    | {
+        before: Dimension[];
+        after: Dimension[];
+        size: Dimension[];
+        alignment: KeyAlignment;
+      }
+    | undefined;
+  const reusable =
+    owned && JSON.stringify(owned.after) === JSON.stringify(present);
+  const beforeFactors = factors(reusable ? owned.alignment : prior),
     afterFactors = factors(chosen);
   const base = (getValue(source, [
     'parts',
@@ -55,7 +71,7 @@ export function resizeKey(
       'keycap',
       'size',
     ]) || [18, 18];
-  const previous = old as Dimension[];
+  const previous = reusable ? owned.size : (old as Dimension[]);
   const resolved = report?.objects[id];
   const angle =
     Number(item?.placement?.rotate || 0) +
@@ -90,14 +106,7 @@ export function resizeKey(
         [Math.sin(angle * DEGREES), Math.cos(angle * DEGREES)],
         [0, 0],
       ];
-  const current = (getValue(source, [
-    'layout',
-    'objects',
-    id,
-    'placement',
-    'override',
-    'at',
-  ]) || [0, 0, 0]) as Dimension[];
+  const current = reusable ? owned.before : present;
   const at = axes.map((coefficients, axis) => {
     let value: Dimension = current[axis] ?? 0;
     coefficients.forEach((coefficient, dimension) => {
@@ -146,5 +155,17 @@ export function resizeKey(
       alignment
     );
   }
-  return setLayout(resized, 'objects', id, ['placement', 'override', 'at'], at);
+  resized = setLayout(
+    resized,
+    'objects',
+    id,
+    ['placement', 'override', 'at'],
+    at
+  );
+  return setValue(resized, ['meta', 'studio', 'resizeAnchors', id], {
+    before: current,
+    after: at,
+    size: previous,
+    alignment: reusable ? owned.alignment : prior,
+  });
 }

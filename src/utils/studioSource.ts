@@ -1,5 +1,8 @@
+import { initBoardOutlines } from './boardOutlines';
+import { syncBoardTopology } from './boardTopology';
 import { syncAssemblySupport } from './assemblySupport';
 import { reviewResize } from './resizeReview';
+import { addDimension } from './designUnits';
 import { syncAssemblyMirrors } from './assemblyMirrors';
 import { syncControllerNets } from './assemblyNets';
 import { syncLedChains } from './assemblyWiring';
@@ -43,7 +46,12 @@ export interface StudioItem {
   mirror?: { source: string; axis: number | string };
   envelopes?: Record<
     string,
-    { size?: (number | string)[]; height?: (number | string)[] }
+    {
+      size?: (number | string)[];
+      height?: (number | string)[];
+      at?: (number | string)[];
+      rotate?: number | string;
+    }
   >;
   properties?: Record<string, unknown>;
   footprints?: Record<string, unknown>;
@@ -254,9 +262,12 @@ export function addObject(
     }
   }
   result = setValue(result, ['layout', 'objects', id], item);
-  return kind === 'key' && defaults === 'apply'
-    ? applyKeyDefaults(result, id)
-    : result;
+  if (defaults === 'defer') {
+    return result;
+  }
+  return initBoardOutlines(
+    kind === 'key' ? applyKeyDefaults(result, id) : result
+  );
 }
 export function addCluster(
   source: string,
@@ -295,18 +306,20 @@ export function addCluster(
     ...(layer ? { layer } : {}),
   });
   if (type === 'free') {
-    return result;
+    return syncBoardTopology(result);
   }
-  return resizeCluster(
-    result,
-    id,
-    type === 'arc'
-      ? { count: 3 }
-      : {
-          columns: matrixNames([], size.columns, 'c'),
-          rows: matrixNames([], size.rows, 'r'),
-        },
-    'fill'
+  return syncBoardTopology(
+    resizeCluster(
+      result,
+      id,
+      type === 'arc'
+        ? { count: 3 }
+        : {
+            columns: matrixNames([], size.columns, 'c'),
+            rows: matrixNames([], size.rows, 'r'),
+          },
+      'fill'
+    )
   );
 }
 export function createMatrix(
@@ -406,14 +419,29 @@ export function moveColumn(
         delta.reduce((sum, v, row) => sum + v * frame[row * 4 + axis], 0) * 1e6
       ) / 1e6
   );
+  // Vertical column movement is stagger; keep authored offsets independent.
+  if (local[1]) {
+    const stagger = ['arrangement', 'stagger', column];
+    source = setLayout(
+      source,
+      'clusters',
+      cluster,
+      stagger,
+      addDimension(
+        getValue(source, ['layout', 'clusters', cluster, ...stagger]),
+        local[1]
+      )
+    );
+  }
+  if (!local[0] && !local[2]) {
+    return source;
+  }
   return setLayout(
     source,
     'clusters',
     cluster,
     path,
-    current.map((value, i) =>
-      typeof value === 'number' ? value + local[i] : `(${value}) + ${local[i]}`
-    )
+    current.map((value, i) => (i === 1 ? value : addDimension(value, local[i])))
   );
 }
 
@@ -855,8 +883,14 @@ export function addOutline(
       : '';
   const previous = (data.designs?.boundaries?.[previousBoundary] ||
     {}) as Record<string, unknown>;
+  const objects: Record<string, StudioItem> = { ...data.layout.objects };
+  for (const [id, item] of Object.entries(report?.objects || {})) {
+    if (!objects[id]) {
+      objects[id] = item;
+    }
+  }
   const groups: Record<string, string[]> = {};
-  for (const [id, item] of Object.entries(data.layout.objects || {})) {
+  for (const [id, item] of Object.entries(objects)) {
     if (
       item.kind === 'anchor' ||
       (item.pcb && item.pcb !== board) ||
@@ -900,7 +934,7 @@ export function addOutline(
           ? { kind, pcb: board }
           : { ids: groups[group] },
       envelope,
-      close: 2,
+      ...(kind === 'key' ? { close: 2 } : {}),
     });
     sources.push(`regions.${region}`);
   }
@@ -926,8 +960,8 @@ export function addOutline(
     );
     pairs.sort((a, b) => a.distance - b.distance);
     const pair = pairs[0];
-    const a = data.layout.objects![pair.a],
-      b = data.layout.objects![pair.b];
+    const a = objects[pair.a],
+      b = objects[pair.b];
     if (
       (!a.cluster || a.cluster !== b.cluster) &&
       (!report || pair.distance > 0.001)

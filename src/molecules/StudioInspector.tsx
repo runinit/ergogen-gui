@@ -14,11 +14,19 @@ import {
   nextId,
 } from '../utils/studioSource';
 import ColumnInspector from './ColumnInspector';
+import DimensionField from './DimensionField';
+import {
+  pitchUnits,
+  ensurePitchUnits,
+  type Dimension,
+} from '../utils/designUnits';
 import SelectionControls from './SelectionControls';
+import { unlinkRelation } from '../utils/layoutRelations';
 import LayoutDefaults from './LayoutDefaults';
 import { KEY_SIZES } from '../utils/keySizes';
-import { resizeKey } from '../utils/keyResize';
+import { sizeSelection } from '../utils/studioSelection';
 import { matrixNames } from '../utils/studioSource';
+import { targets } from '../utils/studioTargets';
 import { setLayout } from '../utils/layoutSource';
 import type { SourcePath } from '../utils/designSource';
 
@@ -42,6 +50,23 @@ export default function StudioInspector({
   const { section, id } = selection;
   const [newName, setNewName] = useState('');
   const [resizeAttempt, setResizeAttempt] = useState(0);
+  if (selection.members && targets(selection).length > 1) {
+    return (
+      <>
+        <h2>{targets(selection).length} selected</h2>
+        <SelectionControls
+          source={source}
+          selection={selection}
+          report={report}
+          edit={edit}
+        />
+        <p>
+          Ctrl/Cmd toggles items. Shift selects a range. Drag any selected item
+          to move the set.
+        </p>
+      </>
+    );
+  }
   const objectSection = section === 'objects' || section === 'clusters';
   const item = objectSection ? data.layout[section]?.[id] : undefined;
   const resolved = objectSection ? report?.[section]?.[id] : undefined;
@@ -65,6 +90,13 @@ export default function StudioInspector({
         : ['layout', section, id];
   const patch = (field: SourcePath, value: unknown) =>
     edit((before) => {
+      if (
+        typeof value === 'string' &&
+        !['label', 'part', 'footprints'].includes(String(field[0])) &&
+        /(?:[0-9]|\b)[uv]\b/.test(value)
+      ) {
+        before = ensurePitchUnits(before);
+      }
       if (locked && field[0] !== 'locked') {
         throw new Error('This object is locked.');
       }
@@ -92,7 +124,13 @@ export default function StudioInspector({
         if (!Array.isArray(value)) {
           size[Number(field[3])] = value as number | string;
         }
-        return resizeKey(before, id, size, report);
+        return sizeSelection(
+          before,
+          { section: 'objects', id },
+          size,
+          undefined,
+          report
+        );
       }
       const last = field.at(-1);
       if (
@@ -137,6 +175,30 @@ export default function StudioInspector({
     options?: { text?: boolean; actual?: number; list?: boolean }
   ) => {
     const value = getValue(source, [...path, ...fieldPath]) ?? fallback;
+    if (
+      !options?.text &&
+      !options?.list &&
+      (typeof value === 'number' ||
+        fieldPath[0] === 'placement' ||
+        fieldPath[0] === 'arrangement' ||
+        label === 'Value')
+    ) {
+      return (
+        <DimensionField
+          key={`${id}-${label}`}
+          label={label}
+          value={value as Dimension}
+          units={pitchUnits(source)}
+          disabled={locked}
+          suffix={
+            label.toLowerCase().includes('angle') || label === 'Rotation'
+              ? '°'
+              : 'mm'
+          }
+          onCommit={(next) => patch(fieldPath, next)}
+        />
+      );
+    }
     return (
       <StudioField key={`${label}-${JSON.stringify(value)}`}>
         <span>{label}</span>
@@ -222,18 +284,18 @@ export default function StudioInspector({
   if (section === 'columns') {
     return (
       <>
-        <SelectionControls
-          source={source}
-          selection={selection}
-          report={report}
-          edit={edit}
-        />
         <ColumnInspector
           source={source}
           data={data}
           selection={selection}
           edit={edit}
           select={select}
+        />
+        <SelectionControls
+          source={source}
+          selection={selection}
+          report={report}
+          edit={edit}
         />
       </>
     );
@@ -305,13 +367,14 @@ export default function StudioInspector({
         <>
           <h2>Constraints</h2>
           <p>
-            Add a rule to align, space, or link objects. Enable Solve X, Y, or
-            rotation on the objects that may move.
+            Select objects and use Align and constrain to keep their centers
+            aligned or evenly spaced. Advanced rules can be edited here.
           </p>
         </>
       );
     }
     const types = {
+      aligned: 'Center alignment',
       distance: 'Distance',
       angle: 'Angle',
       coincident: 'Coincident',
@@ -389,7 +452,7 @@ export default function StudioInspector({
         ))}
         {['distance', 'angle'].includes(rule.type) &&
           field('Value', ['value'], 19)}
-        {['distance', 'symmetric'].includes(rule.type) && (
+        {['aligned', 'distance', 'symmetric'].includes(rule.type) && (
           <StudioField>
             <span>Axis</span>
             <select
@@ -410,7 +473,15 @@ export default function StudioInspector({
           </StudioField>
         )}
         <StudioActions>
-          <button onClick={() => edit((before) => removeValue(before, path))}>
+          <button
+            onClick={() =>
+              edit((before) =>
+                report
+                  ? unlinkRelation(before, id, report)
+                  : removeValue(before, path)
+              )
+            }
+          >
             <Trash2 size={16} />
             Delete constraint
           </button>
@@ -529,15 +600,12 @@ export default function StudioInspector({
   return (
     <>
       <h2>{item.label || id}</h2>
-      <details>
-        <summary>Size, alignment and relative adjustments</summary>
-        <SelectionControls
-          source={source}
-          selection={selection}
-          report={report}
-          edit={edit}
-        />
-      </details>
+      <SelectionControls
+        source={source}
+        selection={selection}
+        report={report}
+        edit={edit}
+      />
       {field('Label', ['label'], id, { text: true })}
       <small>
         {item.kind ||

@@ -1,4 +1,4 @@
-import { studio, openCase } from './utils/studio';
+import { studio, openCase, openExport } from './utils/studio';
 import { expect, test, Page } from '@playwright/test';
 import { stringify } from 'yaml';
 import {
@@ -108,10 +108,13 @@ test('retains height blockers after cached mounting changes', async ({
   ).toHaveCount(0, { timeout: TIMEOUT });
   await dialog.getByRole('button', { name: 'Review', exact: true }).click();
   await expect(blocker).toBeVisible({ timeout: TIMEOUT });
-  await dialog.getByRole('checkbox').check();
-  for (const name of ['Download ZIP']) {
+  const exportView = await openExport(page);
+  await expect(
+    exportView.getByRole('checkbox', { name: /I reviewed dimensions/ })
+  ).toBeDisabled();
+  for (const name of ['Download case ZIP']) {
     await expect(
-      dialog.getByRole('button', { name, exact: true })
+      exportView.getByRole('button', { name, exact: true })
     ).toBeDisabled();
   }
 });
@@ -181,11 +184,13 @@ test('generates imported PCB with a native battery and shell opening', async ({
       .selectOption('fdm');
   }
   await expect(
-    dialog.getByRole('button', { name: 'Generate', exact: true })
+    page.getByRole('button', { name: 'Generate project', exact: true })
   ).toBeEnabled({ timeout: TIMEOUT });
-  await dialog.getByRole('button', { name: 'Generate', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Generate project', exact: true })
+    .click();
   await expect(
-    dialog.getByText('Generated current draft', { exact: true })
+    dialog.getByRole('status').filter({ hasText: /Current geometry/ })
   ).toBeVisible({ timeout: TIMEOUT });
   await dialog.getByRole('button', { name: 'exploded', exact: true }).click();
   await expect(dialog.getByLabel('3D assembly preview')).toHaveAttribute(
@@ -229,10 +234,13 @@ test('generates imported PCB with a native battery and shell opening', async ({
     path: test.info().outputPath('imported-native-battery.png'),
   });
   await dialog.getByRole('button', { name: 'Review', exact: true }).click();
-  await dialog.getByRole('checkbox').check();
+  const exportView = await openExport(page);
+  await exportView
+    .getByRole('checkbox', { name: /I reviewed dimensions/ })
+    .check();
   const downloaded = page.waitForEvent('download');
-  await dialog
-    .getByRole('button', { name: 'Download ZIP', exact: true })
+  await exportView
+    .getByRole('button', { name: 'Download case ZIP', exact: true })
     .click();
   const archive = await JSZip.loadAsync(
     readFileSync((await (await downloaded).path())!)

@@ -6,7 +6,7 @@ import { theme } from '../theme/theme';
 import { useConfigContext } from '../context/ConfigContext';
 import { exampleOptions, ConfigOption } from '../examples';
 import Starter from '../examples/starter';
-import NewDesignWorkspace from '../molecules/NewDesignWorkspace';
+import { createBoard } from '../utils/boardDefaults';
 import { fetchConfigFromUrl, GitInjection } from '../utils/github';
 import { ConflictResolutionStrategy } from '../utils/injections';
 import { loadLocalFile } from '../utils/localFiles';
@@ -401,7 +401,6 @@ const allExamples: ConfigOption[] = exampleOptions
 const Welcome = () => {
   const navigate = useNavigate();
   const configContext = useConfigContext();
-  const [setupOpen, setSetupOpen] = useState(false);
   const [repoInput, setRepoInput] = useState('');
   const [provider, setProvider] = useState<'github' | 'codeberg' | 'forgejo'>(
     'github'
@@ -823,28 +822,6 @@ const Welcome = () => {
           data-testid="conflict-resolution-dialog"
         />
       )}
-      {setupOpen && (
-        <NewDesignWorkspace
-          onCancel={() => setSetupOpen(false)}
-          onCreate={(source, assets, injections) => {
-            if (!configContext) {
-              return;
-            }
-            configContext.createNewConfig(source);
-            configContext.setProjectAssets(assets);
-            if (injections?.length) {
-              configContext.setInjectionInput((before) => [
-                ...(before || []).filter(
-                  (item) => !injections.some((next) => next[1] === item[1])
-                ),
-                ...injections,
-              ]);
-            }
-            setSetupOpen(false);
-            setShouldNavigate(true);
-          }}
-        />
-      )}
       <WelcomeContainer>
         <Header>Ergogen Web UI</Header>
         <SubHeader>
@@ -856,9 +833,17 @@ const Welcome = () => {
         <OptionsContainer>
           <OptionBox>
             <h2>Start Fresh</h2>
-            <p>Choose your layout, key assemblies and electronics.</p>
+            <p>
+              Set key spacing and footprints, then build your layout on an empty
+              canvas.
+            </p>
             <Button
-              onClick={() => setSetupOpen(true)}
+              onClick={() => {
+                if (configContext) {
+                  configContext.createNewConfig(createBoard());
+                  setShouldNavigate(true);
+                }
+              }}
               aria-label="New native design"
               data-testid="empty-config-button"
             >

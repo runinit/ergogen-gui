@@ -1,3 +1,4 @@
+import { useProjectMode } from './hooks/useProjectMode';
 import Icon from './atoms/Icon';
 import {
   useEffect,
@@ -26,12 +27,11 @@ import { findResult } from './utils/object';
 import { isMacOS } from './utils/platform';
 import Input from './atoms/Input';
 import { Injection } from './atoms/InjectionRow';
-import GenOption from './atoms/GenOption';
+import SettingsOptions from './molecules/SettingsOptions';
 import OutlineIconButton from './atoms/OutlineIconButton';
 import GrowButton from './atoms/GrowButton';
 import Title from './atoms/Title';
 import { theme } from './theme/theme';
-import { SettingsCard, SettingsGroupTitle } from './atoms/SettingsLayout';
 
 import { trackEvent } from './utils/analytics';
 import ShareDialog from './molecules/ShareDialog';
@@ -183,13 +183,6 @@ const StyledConfigEditor = styled(ConfigEditor)`
   position: relative;
   flex-grow: 1;
   min-height: 0;
-`;
-
-const OptionContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  width: 100%;
 `;
 
 const SettingsPaneContainer = styled.div`
@@ -812,77 +805,7 @@ const Ergogen = () => {
                 }}
               >
                 <SettingsPaneContainer>
-                  <OptionContainer>
-                    <SettingsGroupTitle>General</SettingsGroupTitle>
-                    <SettingsCard>
-                      <GenOption
-                        optionId={'autogen'}
-                        label={'Auto-generate'}
-                        description={
-                          'Automatically generate new outputs and update previews on changes.'
-                        }
-                        setSelected={configContext.setAutoGen}
-                        checked={configContext.autoGen}
-                        aria-label="Enable auto-generate"
-                      />
-                      <GenOption
-                        optionId={'autogen3d'}
-                        label={'Auto-generate PCB & 3D'}
-                        description={
-                          'Build 3D models and PCB files during generation (can be slow).'
-                        }
-                        setSelected={configContext.setAutoGen3D}
-                        checked={configContext.autoGen3D}
-                        aria-label="Enable auto-generate PCB and 3D (slow)"
-                      />
-                      <GenOption
-                        optionId={'debug'}
-                        label={'Debug'}
-                        description={'Include debug files in the outputs.'}
-                        setSelected={configContext.setDebug}
-                        checked={configContext.debug}
-                        aria-label="Enable debug mode"
-                      />
-                    </SettingsCard>
-
-                    <SettingsGroupTitle>
-                      Previews (Experimental)
-                    </SettingsGroupTitle>
-                    <SettingsCard>
-                      <GenOption
-                        optionId={'kicanvasPreview'}
-                        label={'KiCad Preview'}
-                        description={
-                          'Render interactive PCB layouts using KiCanvas.'
-                        }
-                        setSelected={configContext.setKicanvasPreview}
-                        checked={configContext.kicanvasPreview}
-                        aria-label="Enable KiCad preview (experimental)"
-                      />
-                      <GenOption
-                        optionId={'stlPreview'}
-                        label={'STL Preview'}
-                        description={'Render 3D preview of generated cases.'}
-                        setSelected={configContext.setStlPreview}
-                        checked={configContext.stlPreview}
-                        aria-label="Enable STL preview (experimental)"
-                      />
-                    </SettingsCard>
-
-                    <SettingsGroupTitle>Privacy</SettingsGroupTitle>
-                    <SettingsCard>
-                      <GenOption
-                        optionId={'sendUsageMetrics'}
-                        label={'Send Usage Metrics'}
-                        description={
-                          'Help improve Ergogen Web UI by sharing anonymous usage statistics.'
-                        }
-                        setSelected={configContext.setSendUsageMetrics}
-                        checked={configContext.sendUsageMetrics}
-                        aria-label="Send usage metrics"
-                      />
-                    </SettingsCard>
-                  </OptionContainer>
+                  <SettingsOptions />
                   <Injections
                     onOpenLibrary={openLibrary}
                     setInjectionToEdit={setInjectionToEdit}
@@ -967,10 +890,11 @@ export default function ProjectWorkspace({
   onInstall?: () => void;
 }) {
   const context = useConfigContext();
-  if (context?.configInput?.includes('ergogen/v1') && !context.showSettings) {
+  const mode = useProjectMode(context?.configInput, context?.activeConfigId);
+  if (mode === 'native') {
     return (
       <BoardStudio
-        key={context.activeConfigId || 'preview'}
+        key={context?.activeConfigId || 'preview'}
         onUpdate={onUpdate}
         onInstall={onInstall}
       />

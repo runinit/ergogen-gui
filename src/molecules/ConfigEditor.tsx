@@ -5,6 +5,7 @@ import { useConfigContext } from '../context/ConfigContext';
 type Props = {
   className?: string;
   options?: { readOnly?: boolean };
+  onGenerate?: () => void;
   'data-testid'?: string;
   'aria-label'?: string;
 };
@@ -12,11 +13,14 @@ type Props = {
 export default function ConfigEditor({
   className,
   options,
+  onGenerate,
   ...attributes
 }: Props) {
   const context = useConfigContext();
   const live = useRef(context);
   live.current = context;
+  const generate = useRef(onGenerate);
+  generate.current = onGenerate;
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const syncing = useRef(false);
   const source = context?.configInput;
@@ -84,12 +88,17 @@ export default function ConfigEditor({
       id: 'generate-config',
       label: 'Generate',
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
-      run: () =>
-        live.current?.generateNow(
+      run: () => {
+        if (generate.current) {
+          generate.current();
+          return;
+        }
+        void live.current?.generateNow(
           editor.getValue(),
           live.current.injectionInput,
           { pointsonly: false }
-        ),
+        );
+      },
     });
   };
   if (!context) {

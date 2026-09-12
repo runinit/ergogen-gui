@@ -2,8 +2,22 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useCaseAnalysis, useCasePreview } from './useCasePreview';
 
-const mocks = vi.hoisted(() => ({ available: true, workers: [] as any[] }));
+const mocks = vi.hoisted(() => ({
+  available: true,
+  workers: [] as any[],
+  conversions: [] as any[],
+}));
 vi.mock('../workers/workerFactory', () => ({
+  createJscadWorker: () => {
+    const worker = {
+      postMessage: vi.fn(),
+      terminate: vi.fn(),
+      onmessage: null,
+      onerror: null,
+    };
+    mocks.conversions.push(worker);
+    return worker;
+  },
   createErgogenWorker: () => {
     if (!mocks.available) {
       return null;
@@ -21,10 +35,58 @@ vi.mock('../workers/workerFactory', () => ({
 beforeEach(() => {
   mocks.available = true;
   mocks.workers = [];
+  mocks.conversions = [];
   vi.useFakeTimers();
 });
 afterEach(() => vi.useRealTimers());
 const injections: string[][] = [];
+
+it('finishes tray STL conversion before publishing a generated result', () => {
+  const hook = renderHook(() => useCasePreview('draft', injections));
+  act(() => hook.result.current.generate());
+  const result = { cases: { tray: { jscad: 'function main() {}' } } };
+  act(() =>
+    mocks.workers[0].onmessage({ data: { type: 'success', results: result } })
+  );
+  expect(hook.result.current.pending).toBe(true);
+  expect(hook.result.current.result).toBeNull();
+  expect(mocks.conversions[0].postMessage).toHaveBeenCalledWith(
+    expect.objectContaining({ type: 'batch_jscad_to_stl', results: result })
+  );
+  const converted = { cases: { tray: { stl: new Uint8Array([1]) } } };
+  act(() =>
+    mocks.conversions[0].onmessage({
+      data: { type: 'success', results: converted },
+    })
+  );
+  expect(hook.result.current.result).toEqual(converted);
+  expect(hook.result.current.stale).toBe(false);
+  expect(hook.result.current.pending).toBe(false);
+  expect(mocks.conversions[0].terminate).toHaveBeenCalled();
+});
+
+it('rejects late tray conversion after cancellation and retry', () => {
+  const hook = renderHook(() => useCasePreview('draft', injections));
+  act(() => hook.result.current.generate());
+  act(() =>
+    mocks.workers[0].onmessage({
+      data: {
+        type: 'success',
+        results: { cases: { tray: { jscad: 'source' } } },
+      },
+    })
+  );
+  act(() => hook.result.current.cancel());
+  expect(mocks.conversions[0].terminate).toHaveBeenCalled();
+  act(() => hook.result.current.generate());
+  act(() =>
+    mocks.conversions[0].onmessage({
+      data: { type: 'success', results: { canonical: 'old' } },
+    })
+  );
+  expect(hook.result.current.result).toBeNull();
+  expect(hook.result.current.pending).toBe(true);
+});
 const respond = (worker: any, type = 'success') =>
   act(() =>
     worker.onmessage({
@@ -190,5 +252,21 @@ it('stops unused analysis and resumes it when enabled again', () => {
   hook.rerender({ enabled: true });
   act(() => vi.advanceTimersByTime(200));
   expect(mocks.workers).toHaveLength(2);
+  hook.unmount();
+});
+
+it('does not apply a failed placement result to a new drag candidate', () => {
+  const hook = renderHook(({ source }) => useCaseAnalysis(source, injections), {
+    initialProps: { source: 'bad drop' },
+  });
+  act(() => vi.advanceTimersByTime(1000));
+  respond(mocks.workers.at(-1), 'error');
+  expect(hook.result.current.error).toContain('Invalid seam');
+  hook.rerender({ source: 'corrected drop' });
+  expect(hook.result.current.error).toBe('');
+  expect(hook.result.current.diagnostics).toEqual([]);
+  act(() => vi.advanceTimersByTime(1000));
+  respond(mocks.workers.at(-1));
+  expect(hook.result.current.stale).toBe(false);
   hook.unmount();
 });

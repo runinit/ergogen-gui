@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import ModelEditor from './ModelEditor';
 import type { ModelBinding } from '../types/footprint';
+import { useState } from 'react';
 
 vi.mock('../utils/modelSources', () => ({
   modelUrl: (source: string) => source,
@@ -24,6 +25,52 @@ vi.mock('../utils/footprintService', () => ({
     assets: { 'hash/part.step': 'STEP' },
   }),
 }));
+
+it('lets a model value be replaced without restoring it mid-edit', () => {
+  const change = vi.fn();
+  function Editor() {
+    const [models, setModels] = useState<ModelBinding[]>([
+      {
+        path: 'part.step',
+        offset: [1, 2, 3],
+        rotate: [0, 0, 0],
+        scale: [1, 1, 1],
+      },
+    ]);
+    return (
+      <ModelEditor
+        models={models}
+        assets={{}}
+        selected={0}
+        onSelect={vi.fn()}
+        onChange={(next) => {
+          change(next);
+          setModels(next);
+        }}
+      />
+    );
+  }
+  render(<Editor />);
+  const input = screen.getByRole('spinbutton', { name: 'Model offset X' });
+  fireEvent.focus(input);
+  fireEvent.change(input, { target: { value: '' } });
+  expect(input).toHaveValue(null);
+  expect(change).not.toHaveBeenCalled();
+  fireEvent.change(input, { target: { value: '-2.5' } });
+  fireEvent.blur(input);
+  expect(input).toHaveValue(-2.5);
+  expect(change.mock.lastCall![0][0].offset).toEqual([-2.5, 2, 3]);
+  expect(change).toHaveBeenCalledTimes(1);
+  fireEvent.change(input, { target: { value: '7' } });
+  fireEvent.keyDown(input, { key: 'Escape' });
+  expect(input).toHaveValue(-2.5);
+  expect(change).toHaveBeenCalledTimes(1);
+  const scale = screen.getByRole('spinbutton', { name: 'Model scale X' });
+  fireEvent.change(scale, { target: { value: '0' } });
+  fireEvent.blur(scale);
+  expect(scale).toHaveValue(1);
+  expect(change).toHaveBeenCalledTimes(1);
+});
 describe('Model reference resolution', () => {
   it('resolves a missing reference in place and retains its alignment', async () => {
     const model: ModelBinding = {

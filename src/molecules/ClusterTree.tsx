@@ -1,17 +1,41 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode, type MouseEvent } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import styled from 'styled-components';
 import type { LayoutReport } from 'ergogen/src/native';
 import type { StudioDoc, StudioItem } from '../utils/studioSource';
-import type { StudioSelection } from './StudioCanvas';
+import {
+  targets,
+  sameTarget,
+  selectionMode,
+  type StudioSelection,
+  type StudioTarget,
+  type SelectionMode,
+} from '../utils/studioTargets';
 import { TreeButton } from './StudioStyles';
 import { theme } from '../theme/theme';
 
+const Tree = styled.div`
+  button {
+    min-height: ${theme.studio.treeRow};
+    font-size: ${theme.fontSizes.bodySmall};
+    padding: ${theme.spacing.xs} ${theme.spacing.sm};
+    margin: 0;
+  }
+  @media (pointer: coarse) {
+    button {
+      min-height: ${theme.studio.touchSize};
+    }
+  }
+`;
 const BranchRow = styled.div`
   display: flex;
   align-items: center;
   > button:first-child {
-    padding: ${theme.spacing.xs};
+    min-width: 24px;
+    width: 24px;
+    padding: 0;
+    border: 0;
+    background: transparent;
     flex-shrink: 0;
   }
   > button:last-child {
@@ -20,21 +44,29 @@ const BranchRow = styled.div`
   }
 `;
 const Children = styled.div`
-  margin-left: ${theme.spacing.md};
+  margin-left: ${theme.spacing.sm};
   padding-left: ${theme.spacing.xs};
   border-left: 1px solid ${theme.colors.border};
 `;
+const Name = styled.span`
+  display: block !important;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+`;
 function Branch({
   name,
+  caption,
   active,
   selected,
   choose,
   children,
 }: {
   name: string;
+  caption?: string;
   active: boolean;
   selected: boolean;
-  choose: () => void;
+  choose: (event: MouseEvent) => void;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(active);
@@ -55,10 +87,15 @@ function Branch({
           aria-label={`${open ? 'Collapse' : 'Expand'} ${name}`}
           onClick={() => setOpen(!open)}
         >
-          {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </button>
-        <TreeButton aria-pressed={selected} onClick={choose}>
-          {name}
+        <TreeButton
+          aria-label={name}
+          title={name}
+          aria-pressed={selected}
+          onClick={choose}
+        >
+          <Name>{caption || name}</Name>
         </TreeButton>
       </BranchRow>
       {open && <Children role="group">{children}</Children>}
@@ -74,21 +111,67 @@ export default function ClusterTree({
   data: StudioDoc;
   report?: LayoutReport;
   selection: StudioSelection;
-  choose: (value: StudioSelection) => void;
+  choose: (
+    value: StudioSelection,
+    mode?: SelectionMode,
+    order?: StudioTarget[]
+  ) => void;
 }) {
-  const keyNode = ([id, item]: [string, StudioItem]) => (
-    <TreeButton
-      key={id}
-      role="treeitem"
-      aria-selected={selection.section === 'objects' && selection.id === id}
-      onClick={() => choose({ section: 'objects', id })}
-    >
-      {item.label || id}
-    </TreeButton>
-  );
+  const selected = (target: StudioTarget) =>
+    targets(selection).some((item) => sameTarget(item, target));
+  const keyNode = (
+    [id, item]: [string, StudioItem],
+    order: StudioTarget[],
+    members: [string, StudioItem][]
+  ) => {
+    const target: StudioTarget = { section: 'objects', id };
+    const owned = members.filter(([, child]) => child.properties?.owner === id);
+    const name = item.label || id;
+    const caption =
+      item.kind === 'key' && item.cell && (!item.label || item.label === id)
+        ? item.cell[1]
+        : name;
+    const select = (event: MouseEvent) =>
+      choose(target, selectionMode(event), order);
+    if (owned.length) {
+      return (
+        <Branch
+          key={id}
+          name={name}
+          caption={caption}
+          selected={selected(target)}
+          active={owned.some(([child]) =>
+            selected({ section: 'objects', id: child })
+          )}
+          choose={select}
+        >
+          {owned.map((child) =>
+            keyNode(
+              child,
+              owned.map(([id]) => ({ section: 'objects', id })),
+              []
+            )
+          )}
+        </Branch>
+      );
+    }
+    return (
+      <TreeButton
+        key={id}
+        role="treeitem"
+        aria-label={name}
+        title={name}
+        aria-selected={selected(target)}
+        onClick={select}
+      >
+        <Name>{caption}</Name>
+      </TreeButton>
+    );
+  };
+  const clusters = Object.entries(data.layout.clusters || {});
   return (
-    <div role="tree" aria-label="Layout clusters">
-      {Object.entries(data.layout.clusters || {}).map(([id, item]) => {
+    <Tree role="tree" aria-label="Layout clusters" aria-multiselectable="true">
+      {clusters.map(([id, item]) => {
         const members: [string, StudioItem][] = item.mirror
           ? Object.entries(report?.objects || {}).filter(
               ([, key]) => key.cluster === id
@@ -96,62 +179,96 @@ export default function ClusterTree({
           : Object.entries(data.layout.objects || {}).filter(
               ([, key]) => key.cluster === id
             );
-        const selected =
-          selection.section === 'clusters' && selection.id === id;
-        const active =
-          selected ||
-          selection.cluster === id ||
-          members.some(
-            ([key]) => selection.section === 'objects' && selection.id === key
-          );
+        const direct = members.filter(([, item]) => !item.properties?.owner);
+        const target: StudioTarget = { section: 'clusters', id };
+        const active = targets(selection).some(
+          (value) =>
+            sameTarget(value, target) ||
+            value.cluster === id ||
+            members.some(
+              ([key]) => value.section === 'objects' && value.id === key
+            )
+        );
         const count = members.filter(([, key]) => key.kind === 'key').length;
+        const name = `${item.label || id} ${count} keys${item.mirror ? ' · linked' : ''}`;
         return (
           <Branch
             key={id}
-            name={`${item.label || id} ${count} keys${item.mirror ? ' · linked' : ''}`}
+            name={name}
             active={active}
-            selected={selected}
-            choose={() => choose({ section: 'clusters', id })}
+            selected={selected(target)}
+            choose={(event) =>
+              choose(
+                target,
+                selectionMode(event),
+                clusters.map(([id]) => ({ section: 'clusters', id }))
+              )
+            }
           >
             {item.arrangement?.type === 'columns' ? (
               <>
                 {item.arrangement.columns?.map((column, index) => {
-                  const keys = members.filter(
+                  const keys = direct.filter(
                     ([, key]) => key.cell?.[0] === column
                   );
-                  const selectedColumn =
-                    selection.section === 'columns' &&
-                    selection.cluster === id &&
-                    selection.id === column;
+                  const target: StudioTarget = {
+                    section: 'columns',
+                    cluster: id,
+                    id: column,
+                  };
                   return (
                     <Branch
                       key={column}
                       name={`Column ${index + 1} · ${column}`}
-                      active={
-                        selectedColumn ||
-                        keys.some(
-                          ([key]) =>
-                            selection.section === 'objects' &&
-                            selection.id === key
+                      caption={column}
+                      selected={selected(target)}
+                      active={keys.some(([key]) =>
+                        selected({ section: 'objects', id: key })
+                      )}
+                      choose={(event) =>
+                        choose(
+                          target,
+                          selectionMode(event),
+                          item.arrangement!.columns!.map((column) => ({
+                            section: 'columns',
+                            cluster: id,
+                            id: column,
+                          }))
                         )
                       }
-                      selected={selectedColumn}
-                      choose={() =>
-                        choose({ section: 'columns', cluster: id, id: column })
-                      }
                     >
-                      {keys.map(keyNode)}
+                      {keys.map((key) =>
+                        keyNode(
+                          key,
+                          keys.map(([id]) => ({ section: 'objects', id })),
+                          members
+                        )
+                      )}
                     </Branch>
                   );
                 })}
-                {members.filter(([, key]) => !key.cell).map(keyNode)}
+                {direct
+                  .filter(([, key]) => !key.cell)
+                  .map((key) =>
+                    keyNode(
+                      key,
+                      direct.map(([id]) => ({ section: 'objects', id })),
+                      members
+                    )
+                  )}
               </>
             ) : (
-              members.map(keyNode)
+              direct.map((key) =>
+                keyNode(
+                  key,
+                  direct.map(([id]) => ({ section: 'objects', id })),
+                  members
+                )
+              )
             )}
           </Branch>
         );
       })}
-    </div>
+    </Tree>
   );
 }

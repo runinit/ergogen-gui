@@ -4,6 +4,11 @@ import { createDraft, openCode, readSource } from './utils/studio';
 test('creates a matrix draft and previews its PCB', async ({ page }) => {
   await page.goto('./new');
   await createDraft(page);
+  await page.getByRole('button', { name: 'Add matrix', exact: true }).click();
+  await page.getByLabel('New item name').fill('fingers');
+  await page.getByLabel('New matrix columns').fill('5');
+  await page.getByLabel('New matrix rows').fill('4');
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
   await expect(
     page.getByRole('group', { name: 'Interactive board layout' })
   ).toBeVisible();

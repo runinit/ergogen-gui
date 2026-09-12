@@ -45,7 +45,7 @@ export function keyOptions(
     ...DEFAULT_KEY_OPTIONS,
     ...(setup
       ? {
-          pitch: [setup.pitch, setup.pitch],
+          pitch: [setup.pitch, setup.pitchY ?? setup.pitch],
           ...templateOptions(setup.template),
         }
       : {}),

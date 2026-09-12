@@ -18,7 +18,11 @@ import { parseDocument } from 'yaml';
 import makerjs from 'makerjs';
 import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';
-import { useCasePreview, useCaseAnalysis } from '../hooks/useCasePreview';
+import {
+  useCasePreview,
+  useCaseAnalysis,
+  type GeometryJob,
+} from '../hooks/useCasePreview';
 import {
   CASE_STEPS,
   batchCaseEdit,
@@ -86,8 +90,8 @@ const Shell = styled.section<{ $embedded?: boolean }>`
     font: inherit;
     color: inherit;
     border: 1px solid ${theme.colors.border};
-    border-radius: ${theme.caseWizard.radius};
-    background: ${theme.colors.backgroundLighter};
+    border-radius: ${theme.cad.fieldRadius};
+    background: ${theme.workbench.fieldSurface};
     padding: ${theme.buttonSizes.small.padding};
   }
   button {
@@ -349,16 +353,22 @@ type Props = {
   onClose: () => void;
   initialView?: 'case' | 'library' | 'yaml';
   presentation?: 'embedded' | 'dialog';
+  session?: {
+    preview: GeometryJob;
+    analysis: GeometryJob;
+    onExport: () => void;
+  };
 };
 export default function CaseWizard({
   onClose,
   initialView,
   presentation,
+  session,
 }: Props) {
   const context = useConfigContext();
-  const [initialError] = useState(() => {
+  const source = context?.configInput || '';
+  const initialError = useMemo(() => {
     try {
-      const source = context?.getRealtimeConfigInput() || '';
       const doc = parseDocument(source);
       if (doc.errors.length) {
         throw new Error(doc.errors[0].message);
@@ -370,7 +380,7 @@ export default function CaseWizard({
     } catch (caught) {
       return `Repair the source YAML before opening the case designer: ${String(caught)}`;
     }
-  });
+  }, [source]);
   if (initialError) {
     return (
       <Shell role="dialog" aria-modal="true" aria-label="Case designer">
@@ -379,16 +389,36 @@ export default function CaseWizard({
       </Shell>
     );
   }
+  if (presentation === 'embedded' && !caseNames(source).length) {
+    return (
+      <Shell $embedded role="region" aria-label="Case designer">
+        <Form>
+          <h2>Add a case</h2>
+          <p>Create an enclosure when the board layout is ready.</p>
+          <button
+            onClick={() =>
+              context?.editSource(
+                createCase(context.getRealtimeConfigInput() || source, 'case')
+              )
+            }
+          >
+            Create case
+          </button>
+        </Form>
+      </Shell>
+    );
+  }
   return (
     <CaseDraft
       onClose={onClose}
       initialView={initialView}
       presentation={presentation}
+      session={session}
     />
   );
 }
 
-function CaseDraft({ onClose, initialView, presentation }: Props) {
+function CaseDraft({ onClose, initialView, presentation, session }: Props) {
   const context = useConfigContext();
   const embedded = presentation === 'embedded';
   const treeButton = useRef<HTMLButtonElement>(null);
@@ -408,21 +438,7 @@ function CaseDraft({ onClose, initialView, presentation }: Props) {
       ? base.current
       : createCase(base.current, 'case')
   );
-  const initialized = useRef(false);
-  // The first render needs the generated case before it enters project history.
-  const draft =
-    embedded && initialized.current
-      ? context?.configInput || localDraft
-      : localDraft;
-  useEffect(() => {
-    if (!embedded || initialized.current) {
-      return;
-    }
-    initialized.current = true;
-    if (localDraft !== context?.getRealtimeConfigInput()) {
-      context?.editSource(localDraft);
-    }
-  }, [embedded, localDraft, context]);
+  const draft = embedded ? context?.configInput || localDraft : localDraft;
   const liveDraft = useRef(draft);
   liveDraft.current = draft;
   const [step, setStep] = useState(0);
@@ -488,8 +504,16 @@ function CaseDraft({ onClose, initialView, presentation }: Props) {
     () => data?.designs?.assemblies?.[name] || {},
     [data, name]
   );
-  const preview = useCasePreview(draft, context?.injectionInput, assets);
-  const analysis = useCaseAnalysis(draft, context?.injectionInput, assets);
+  // Standalone drafts own their jobs; embedded views use the persistent project jobs.
+  const localPreview = useCasePreview(draft, context?.injectionInput, assets);
+  const localAnalysis = useCaseAnalysis(
+    draft,
+    context?.injectionInput,
+    assets,
+    !session
+  );
+  const preview = session?.preview || localPreview;
+  const analysis = session?.analysis || localAnalysis;
   const plan = analysis.result?.designs?.analysis?.[name];
   const board = analysis.result?.designs?.boards?.[name];
   const assembly = preview.result?.designs?.assemblies[name];
@@ -670,7 +694,18 @@ function CaseDraft({ onClose, initialView, presentation }: Props) {
     <Field
       key={path.join('.')}
       label={label}
-      value={doc.getIn(['designs', 'assemblies', name, ...path]) ?? fallback}
+      value={
+        spec.stackup &&
+        path.length === 1 &&
+        ['plate', 'pcb_thickness', 'plate_z'].includes(String(path[0]))
+          ? path[0] === 'plate'
+            ? (data.designs.stackups[spec.stackup]?.plate?.thickness ??
+              fallback)
+            : path[0] === 'pcb_thickness'
+              ? (data.pcbs[spec.board.name]?.thickness ?? fallback)
+              : `(${spec.pcb_z ?? 6}) + (${data.pcbs[spec.board.name]?.thickness ?? 1.6}) + (${data.designs.stackups[spec.stackup]?.plate?.gap ?? 5.4})`
+          : (doc.getIn(['designs', 'assemblies', name, ...path]) ?? fallback)
+      }
       choices={choices}
       defaultValue={fallback}
       onChange={(value) => edit(path, value)}
@@ -1146,54 +1181,56 @@ function CaseDraft({ onClose, initialView, presentation }: Props) {
               Inspector
             </button>
           </DrawerButtons>
-          <Controls>
-            <button
-              onClick={preview.generate}
-              disabled={
-                preview.pending ||
-                !!automatic ||
-                analysis.stale ||
-                !!analysis.error ||
-                !spec.mounting
-              }
-              title="Build and validate the current draft; edits only update the 2D plan."
-            >
-              {preview.pending ? 'Generating…' : 'Generate'}
-            </button>
-            {findings.length > 0 && (
-              <button onClick={() => setStep(6)}>Review findings</button>
-            )}
-            {(preview.pending || preview.error) && (
-              <button onClick={preview.generate}>
-                Restart worker and retry
-              </button>
-            )}
-            {(analysis.pending || (analysis.stale && !analysis.error)) && (
-              <span role="status">Calculating mounting plan…</span>
-            )}
-            <span role="status">
-              {preview.pending
-                ? 'Generating geometry…'
-                : preview.stale
-                  ? 'Changes not generated'
-                  : 'Generated current draft'}
-            </span>
-            {!embedded && (
+          {!session && (
+            <Controls>
               <button
-                disabled={!history.current.length}
-                onClick={() => {
-                  const previous = history.current.pop();
-                  if (previous) {
-                    setDraft(previous);
-                    setConfirmed(false);
-                  }
-                }}
-                title="Undo the last draft edit"
+                onClick={preview.generate}
+                disabled={
+                  preview.pending ||
+                  !!automatic ||
+                  analysis.stale ||
+                  !!analysis.error ||
+                  !spec.mounting
+                }
+                title="Build and validate the current draft; edits only update the 2D plan."
               >
-                Undo
+                {preview.pending ? 'Generating…' : 'Generate'}
               </button>
-            )}
-          </Controls>
+              {findings.length > 0 && (
+                <button onClick={() => setStep(6)}>Review findings</button>
+              )}
+              {(preview.pending || preview.error) && (
+                <button onClick={preview.generate}>
+                  Restart worker and retry
+                </button>
+              )}
+              {(analysis.pending || (analysis.stale && !analysis.error)) && (
+                <span role="status">Calculating mounting plan…</span>
+              )}
+              <span role="status">
+                {preview.pending
+                  ? 'Generating geometry…'
+                  : preview.stale
+                    ? 'Changes not generated'
+                    : 'Generated current draft'}
+              </span>
+              {!embedded && (
+                <button
+                  disabled={!history.current.length}
+                  onClick={() => {
+                    const previous = history.current.pop();
+                    if (previous) {
+                      setDraft(previous);
+                      setConfirmed(false);
+                    }
+                  }}
+                  title="Undo the last draft edit"
+                >
+                  Undo
+                </button>
+              )}
+            </Controls>
+          )}
           <Body>
             <TreePanel $open={treeOpen} aria-label="Assembly panel">
               <DrawerClose
@@ -1691,6 +1728,12 @@ function CaseDraft({ onClose, initialView, presentation }: Props) {
                     ...refs,
                   ])}
                   {field(['pcb_z'], 'PCB underside height (mm)', 6)}
+                  {spec.stackup && (
+                    <p>
+                      PCB and plate dimensions are shared with Design setup →
+                      Stackup.
+                    </p>
+                  )}
                   {field(['pcb_thickness'], 'PCB thickness (mm)', 1.6)}
                   {spec.mounting === 'gasket' ? (
                     <>
@@ -2136,40 +2179,53 @@ function CaseDraft({ onClose, initialView, presentation }: Props) {
                       setView('plan');
                     }}
                   />
-                  <label>
-                    <span>
-                      <input
-                        type="checkbox"
-                        checked={confirmed}
-                        onChange={(event) => setConfirmed(event.target.checked)}
-                      />{' '}
-                      I reviewed dimensions, hardware and manufacturing
-                      findings.
-                    </span>
-                  </label>
-                  <Controls>
-                    {!embedded && (
-                      <button onClick={apply} disabled={blocked || !confirmed}>
-                        Apply design
-                      </button>
-                    )}
-                    <button
-                      disabled={blocked || !confirmed}
-                      onClick={() =>
-                        preview.result &&
-                        void createZip(
-                          preview.result,
-                          draft,
-                          context?.injectionInput,
-                          false,
-                          true,
-                          assets
-                        )
-                      }
-                    >
-                      Download ZIP
+                  {session ? (
+                    <button onClick={session.onExport}>
+                      Export case files
                     </button>
-                  </Controls>
+                  ) : (
+                    <>
+                      <label>
+                        <span>
+                          <input
+                            type="checkbox"
+                            checked={confirmed}
+                            onChange={(event) =>
+                              setConfirmed(event.target.checked)
+                            }
+                          />{' '}
+                          I reviewed dimensions, hardware and manufacturing
+                          findings.
+                        </span>
+                      </label>
+                      <Controls>
+                        {!embedded && (
+                          <button
+                            onClick={apply}
+                            disabled={blocked || !confirmed}
+                          >
+                            Apply design
+                          </button>
+                        )}
+                        <button
+                          disabled={blocked || !confirmed}
+                          onClick={() =>
+                            preview.result &&
+                            void createZip(
+                              preview.result,
+                              draft,
+                              context?.injectionInput,
+                              false,
+                              true,
+                              assets
+                            )
+                          }
+                        >
+                          Download ZIP
+                        </button>
+                      </Controls>
+                    </>
+                  )}
                   <p>
                     Physical fit and suspension feel require a fabricated
                     prototype.

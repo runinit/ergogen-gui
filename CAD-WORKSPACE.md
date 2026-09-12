@@ -1,12 +1,15 @@
 # CAD workspace and footprint library
 
-Open **Create / edit case** or **Footprint library** beside the editor. Both open
-the same workspace: assembly tree, canvas and contextual inspector. **YAML**
-retains direct access to the project source.
+Native projects follow **Design → PCB → Case → Export**. Place keys and components
+in Design and open **Part library** for reusable footprints and models. **Code**
+opens the source. Settings preserves the active workspace, selection and camera.
+Legacy projects retain **Create / edit case** and **Footprint library** beside
+the editor.
 
 ## Case workflow
 
-1. Select a shell, plate, PCB, footprint group, placement or mounting feature.
+1. Open **Case** and choose **Create case** if the project has no enclosure.
+   Select a shell, plate, PCB, footprint group, placement or mounting feature.
    Tree and canvas selections share the inspector. Expand a footprint group for
    individual placements; eye buttons control visibility.
 2. Prepare footprints and models in the library, or set a placement override in
@@ -15,8 +18,10 @@ retains direct access to the project source.
    Selection, visibility and model transforms update without rebuilding solids.
 4. Press **Generate**. Review blockers and incomplete clearance checks separately.
    An affected-feature action selects the target and opens its repair controls.
-5. Review dimensions and manufacturing findings, then apply the draft or download
-   its ZIP. Failed generation retains the last valid preview and disables export.
+5. Review dimensions and manufacturing findings, then open **Export** to confirm
+   the current geometry and download its case ZIP. Edits invalidate confirmation;
+   failed generation retains the last valid preview. Source and valid PCB exports
+   remain available. Standalone legacy drafts retain Apply and case downloads.
 
 Existing profile, mounting, hardware, manufacturing, keycap and assembly controls
 remain under **Case tools**. Choose an existing PCB outline when the layout-based

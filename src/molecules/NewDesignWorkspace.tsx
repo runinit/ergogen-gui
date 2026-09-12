@@ -1,3 +1,4 @@
+import { Maximize2, Minimize2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
@@ -21,10 +22,16 @@ import { loadComponentModel, setupModels } from '../utils/componentModels';
 import type { ModelBinding } from '../types/footprint';
 import { graphicPoints, padOutline } from '../utils/footprintGeometry';
 
-const Workspace = styled(StudioShell)`
-  position: fixed;
+const Workspace = styled(StudioShell)<{
+  $embedded?: boolean;
+  $expanded?: boolean;
+}>`
+  position: ${(p) => (p.$embedded ? 'static' : 'fixed')};
   inset: 0;
-  z-index: 620;
+  z-index: ${(p) => (p.$embedded ? 'auto' : 620)};
+  ${(p) =>
+    p.$embedded &&
+    `height:auto; overflow:visible; > div {display:flex; flex-direction:column; overflow:visible;} > div > nav {display:none;} > div > main, > div > aside {padding:0; border:0; overflow:visible;} > div > main {flex:none; min-height:0;} svg[aria-label="Key assembly footprint editor"] {height:${p.$expanded ? theme.studio.expandedPreviewHeight : theme.studio.setupPreviewHeight};min-height:0;flex:none;} `}
   header {
     padding: ${theme.spacing.md};
     display: flex;
@@ -60,7 +67,7 @@ const Body = styled.div`
     flex-direction: column;
     padding: ${theme.spacing.md};
   }
-  svg {
+  main > svg {
     width: 100%;
     flex: 1;
     min-height: 260px;
@@ -128,6 +135,8 @@ export default function NewDesignWorkspace({
   onCancel,
   initial,
   mode = 'design',
+  embedded = false,
+  onDraft,
 }: {
   onCreate: (
     source: string,
@@ -136,17 +145,23 @@ export default function NewDesignWorkspace({
   ) => void;
   onCancel: () => void;
   initial?: DesignSetup;
+  embedded?: boolean;
+  onDraft?: (setup: DesignSetup) => void;
   mode?: 'design' | 'assembly';
 }) {
   const [setup, setSetup] = useState(() =>
     initial ? structuredClone(initial) : defaultSetup()
   );
+  useEffect(() => {
+    onDraft?.(setup);
+  }, [setup, onDraft]);
   const [section, setSection] = useState<Section>(
     mode === 'assembly' ? 'Key assembly' : 'Layout'
   );
   const [selected, setSelected] = useState<Role>('switch');
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [info, setInfo] = useState<Partial<Record<Role, FootprintInfo>>>({});
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<[number, number]>([0, 0]);
@@ -154,10 +169,13 @@ export default function NewDesignWorkspace({
   const panDrag = useRef<[number, number] | null>(null);
   const dialog = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    if (embedded) {
+      return;
+    }
     const previous = document.activeElement as HTMLElement | null;
     dialog.current?.querySelector<HTMLButtonElement>('button')?.focus();
     return () => previous?.focus();
-  }, []);
+  }, [embedded]);
   const [view, setView] = useState<'2d' | '3d'>('2d');
   const [controllerInfo, setControllerInfo] = useState<FootprintInfo>();
   const controller = CONTROLLERS.find((item) => item.id === setup.controller);
@@ -370,10 +388,15 @@ export default function NewDesignWorkspace({
   return (
     <Workspace
       ref={dialog}
-      role="dialog"
-      aria-modal="true"
+      $embedded={embedded}
+      $expanded={expanded}
+      role={embedded ? 'region' : 'dialog'}
+      aria-modal={embedded ? undefined : true}
       aria-label="New design workspace"
       onKeyDown={(event) => {
+        if (embedded) {
+          return;
+        }
         if (event.key === 'Tab') {
           const controls = Array.from(
             event.currentTarget.querySelectorAll<HTMLElement>(
@@ -396,25 +419,27 @@ export default function NewDesignWorkspace({
         }
       }}
     >
-      <header>
-        <h1>
-          {mode === 'assembly'
-            ? 'Edit key assembly'
-            : initial
-              ? 'Design setup'
-              : 'New design'}
-        </h1>
-        <button onClick={onCancel}>Cancel</button>
-        <button onClick={create} disabled={creating} data-primary="true">
-          {mode === 'assembly'
-            ? 'Apply to selection'
-            : initial
-              ? 'Apply setup'
-              : findings.length
-                ? 'Create draft'
-                : 'Create design'}
-        </button>
-      </header>
+      {(!embedded || !onDraft) && (
+        <header>
+          <h1>
+            {mode === 'assembly'
+              ? 'Edit key assembly'
+              : initial
+                ? 'Design setup'
+                : 'New design'}
+          </h1>
+          <button onClick={onCancel}>Cancel</button>
+          <button onClick={create} disabled={creating} data-primary="true">
+            {mode === 'assembly'
+              ? 'Apply to selection'
+              : initial
+                ? 'Apply setup'
+                : findings.length
+                  ? 'Create draft'
+                  : 'Create design'}
+          </button>
+        </header>
+      )}
       {error && <p role="alert">{error}</p>}
       <Body>
         <nav aria-label="Design setup">
@@ -431,6 +456,12 @@ export default function NewDesignWorkspace({
           )}
         </nav>
         <main>
+          {embedded &&
+            option('family', 'Switch family', [
+              ['mx', 'Cherry MX'],
+              ['choc_v1', 'Kailh Choc V1'],
+              ['choc_v2', 'Kailh Choc V2'],
+            ])}
           <StudioActions>
             <button aria-pressed={view === '2d'} onClick={() => setView('2d')}>
               2D
@@ -438,30 +469,47 @@ export default function NewDesignWorkspace({
             <button aria-pressed={view === '3d'} onClick={() => setView('3d')}>
               3D component
             </button>
-            <strong>
-              {assembly
-                ? 'Key assembly · millimetres'
-                : `${setup.columns} × ${setup.rows} matrix`}
-            </strong>
-            <button
-              onClick={() => setZoom((value) => Math.min(4, value * 1.25))}
-            >
-              Zoom in
-            </button>
-            <button
-              onClick={() => setZoom((value) => Math.max(0.4, value / 1.25))}
-            >
-              Zoom out
-            </button>
-            <button
-              onClick={() => {
-                setZoom(1);
-                setPan([0, 0]);
-              }}
-            >
-              Fit
-            </button>
-            {assembly && (
+            {!embedded && (
+              <strong>
+                {assembly
+                  ? 'Key assembly · millimetres'
+                  : `${setup.columns} × ${setup.rows} matrix`}
+              </strong>
+            )}
+            {(!embedded || expanded) && (
+              <>
+                <button
+                  onClick={() => setZoom((value) => Math.min(4, value * 1.25))}
+                >
+                  Zoom in
+                </button>
+                <button
+                  onClick={() =>
+                    setZoom((value) => Math.max(0.4, value / 1.25))
+                  }
+                >
+                  Zoom out
+                </button>
+                <button
+                  onClick={() => {
+                    setZoom(1);
+                    setPan([0, 0]);
+                  }}
+                >
+                  Fit
+                </button>
+              </>
+            )}
+            {embedded && (
+              <button
+                aria-label={expanded ? 'Compact preview' : 'Expand preview'}
+                title={expanded ? 'Compact preview' : 'Expand preview'}
+                onClick={() => setExpanded((value) => !value)}
+              >
+                {expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              </button>
+            )}
+            {assembly && (!embedded || expanded) && (
               <button
                 aria-pressed={tool === 'pan'}
                 onClick={() => setTool(tool === 'pan' ? 'select' : 'pan')}
@@ -740,11 +788,12 @@ export default function NewDesignWorkspace({
           )}
           {assembly && (
             <>
-              {option('family', 'Switch family', [
-                ['mx', 'Cherry MX'],
-                ['choc_v1', 'Kailh Choc V1'],
-                ['choc_v2', 'Kailh Choc V2'],
-              ])}
+              {!embedded &&
+                option('family', 'Switch family', [
+                  ['mx', 'Cherry MX'],
+                  ['choc_v1', 'Kailh Choc V1'],
+                  ['choc_v2', 'Kailh Choc V2'],
+                ])}
               {option('mounting', 'Switch mounting', [
                 ['solder', 'Soldered'],
                 ['hotswap', 'Hotswap'],

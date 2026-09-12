@@ -1,3 +1,5 @@
+import { SnapProvider } from '../hooks/useSnapOptions';
+import { removeSelection, isDeleteShortcut } from '../utils/studioDelete';
 import { ResizeReview, type ResizeProposal } from '../utils/resizeReview';
 import { repairSetup } from '../utils/setupRepair';
 import { keySetup } from '../utils/keyOptions';
@@ -12,7 +14,6 @@ import {
   FolderOpen,
   GitBranch,
   LayoutGrid,
-  ListTree,
   Plus,
   Redo2,
   Settings,
@@ -22,20 +23,32 @@ import {
   X,
 } from 'lucide-react';
 import { useConfigContext } from '../context/ConfigContext';
-import { useCaseAnalysis, useLayoutAnalysis } from '../hooks/useCasePreview';
+import {
+  useCasePreview,
+  useCaseAnalysis,
+  useLayoutAnalysis,
+} from '../hooks/useCasePreview';
 import {
   getValue,
   readStudio,
   addCluster,
-  moveColumn,
   addObject,
   addOutline,
   nextId,
   setValue,
   StudioDoc,
 } from '../utils/studioSource';
-import { moveLayout } from '../utils/layoutSource';
+import { moveTargets } from '../utils/studioMove';
+import {
+  targets,
+  selectTargets,
+  selectionMode,
+  includesObject,
+  type SelectionMode,
+  type StudioTarget,
+} from '../utils/studioTargets';
 import StudioExport from './StudioExport';
+import StudioSettings from './StudioSettings';
 import ConfigEditor from './ConfigEditor';
 import UpdateChip from '../atoms/UpdateChip';
 import InstallChip from '../atoms/InstallChip';
@@ -44,13 +57,21 @@ import FilePreview from './FilePreview';
 import StudioCanvas, { StudioSelection } from './StudioCanvas';
 import StudioInspector from './StudioInspector';
 import NewDesignWorkspace from './NewDesignWorkspace';
+import DesignSetupPanel from './DesignSetupPanel';
+import RelationshipPanel from './RelationshipPanel';
+import {
+  insertComponent,
+  COMPONENT_CHOICES,
+} from '../utils/componentPlacement';
+import { componentPackage } from '../utils/componentPackage';
+import { alignObject } from '../utils/layoutRelations';
 import { defaultSetup, type DesignSetup } from '../utils/designSetup';
 import { applyAssembly } from '../utils/applyAssembly';
+import { theme } from '../theme/theme';
 import { selectedKeys } from '../utils/studioSelection';
 import { updateSetup } from '../utils/updateSetup';
 import ClusterTree from './ClusterTree';
 import LayoutDefaults from './LayoutDefaults';
-import SelectionPopover from './SelectionPopover';
 import { placeNewItem } from '../utils/studioPlacement';
 import {
   StudioShell,
@@ -59,24 +80,26 @@ import {
   StageNav,
   StudioBody,
   StudioPane,
+  StudioBrowser,
+  StudioProperties,
   StudioMain,
+  StudioLibrary,
   StudioActions,
   StudioField,
   TreeButton,
   StudioStatus,
 } from './StudioStyles';
-import { theme } from '../theme/theme';
 const FootprintLibrary = lazy(() => import('./FootprintLibrary'));
 const DesignView = lazy(() => import('./DesignView'));
 const stages = [
-  ['layout', 'Layout', LayoutGrid],
-  ['components', 'Components', Component],
+  ['design', 'Design', LayoutGrid],
   ['pcb', 'PCB', Cpu],
   ['case', 'Case', Box],
   ['export', 'Export', Download],
 ] as const;
 type Stage = (typeof stages)[number][0];
 const EMPTY: StudioDoc = { schema: 'ergogen/v1', layout: {} };
+const EMPTY_ASSETS = {};
 
 export default function BoardStudio({
   onUpdate,
@@ -92,7 +115,7 @@ export default function BoardStudio({
     }
   }, [source]);
   const data = parsed.data;
-  const [stage, setStage] = useState<Stage>('layout');
+  const [stage, setStage] = useState<Stage>('design');
   const [selection, setSelection] = useState<StudioSelection>({
     section: Object.keys(data.layout.clusters || {}).length
       ? 'clusters'
@@ -102,20 +125,45 @@ export default function BoardStudio({
       Object.keys(data.layout.objects || {})[0] ||
       '',
   });
-  const [sheet, setSheet] = useState<'tree' | 'inspector' | ''>('');
-  const [code, setCode] = useState(false);
-  const [library, setLibrary] = useState(false);
-  const [sketch, setSketch] = useState(false);
+  const [sections, setSections] = useState<Record<string, boolean>>({
+    objects: true,
+    selection: true,
+    design: true,
+  });
+  const [sheet, setSheet] = useState<'inspector' | ''>(() =>
+    window.innerWidth > parseInt(theme.studio.breakpoint) ||
+    getValue(source, ['meta', 'studio', 'openSetup'])
+      ? 'inspector'
+      : ''
+  );
+  const [view, setView] = useState<'canvas' | 'code' | 'library' | 'sketch'>(
+    'canvas'
+  );
+  const [paneTab, setPaneTab] = useState<'objects' | 'properties'>(
+    'properties'
+  );
+  const codeReturn = useRef<'canvas' | 'library' | 'sketch'>('canvas');
+  const [libraryOpened, setLibraryOpened] = useState(false);
+  const openLibrary = () => {
+    setLibraryOpened(true);
+    setView('library');
+  };
   const [side, setSide] = useState<'top' | 'side'>('top');
   const [pcbView, setPcbView] = useState<'outline' | 'pcb'>('outline');
-  const assets = context?.projectAssets || {};
+  const assets = context?.projectAssets || EMPTY_ASSETS;
   const [error, setError] = useState('');
   const [adding, setAdding] = useState(false);
+  const [componentBoard, setComponentBoard] = useState('');
+  const [componentChoice, setComponentChoice] = useState('nice_nano');
+  const [batterySize, setBatterySize] = useState([0, 0, 0]);
+  const [addingBusy, setAddingBusy] = useState(false);
   const [newKind, setNewKind] = useState('columns');
   const [newName, setNewName] = useState('');
   const [matrixSize, setMatrixSize] = useState({ columns: 5, rows: 4 });
   const [review, setReview] = useState(false);
-  const [setupOpen, setSetupOpen] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(
+    () => !!getValue(source, ['meta', 'studio', 'openSetup'])
+  );
   const [assemblyKeys, setAssemblyKeys] = useState<string[]>([]);
   const [resizeReview, setResizeReview] = useState<{
     proposal: ResizeProposal;
@@ -137,39 +185,78 @@ export default function BoardStudio({
       setError(String(caught));
     }
   }, [source, parsed.error, editSource]);
-  const [quickRequest, setQuickRequest] = useState(0);
-  const treeTrigger = useRef<HTMLButtonElement>(null),
-    inspectorTrigger = useRef<HTMLButtonElement>(null);
-  const treePane = useRef<HTMLElement>(null),
-    inspectorPane = useRef<HTMLElement>(null);
+  const inspectorTrigger = useRef<HTMLButtonElement>(null);
+  const inspectorPane = useRef<HTMLElement>(null);
   useEffect(() => {
-    if (
-      !sheet ||
-      !window.matchMedia?.(`(max-width: ${theme.studio.breakpoint})`)?.matches
-    ) {
-      return;
+    if (sheet) {
+      inspectorPane.current
+        ?.querySelector<HTMLButtonElement>('.close-pane')
+        ?.focus();
     }
-    (sheet === 'tree' ? treePane : inspectorPane).current
-      ?.querySelector<HTMLButtonElement>('.close-pane')
-      ?.focus();
   }, [sheet]);
   const cad = context?.setCadActive;
   useEffect(() => {
     cad?.(true);
     return () => cad?.(false);
   }, [cad]);
-  const analysis = useCaseAnalysis(
-    source,
-    context?.injectionInput,
-    assets,
-    stage !== 'case'
-  );
+  const analysis = useCaseAnalysis(source, context?.injectionInput, assets);
+  const preview = useCasePreview(source, context?.injectionInput, assets);
+  const published = useRef(preview.result);
+  const adoptGenerated = context?.adoptGenerated;
+  useEffect(() => {
+    if (
+      !preview.result ||
+      preview.stale ||
+      published.current === preview.result
+    ) {
+      return;
+    }
+    published.current = preview.result;
+    adoptGenerated?.(source, preview.result, assets);
+  }, [preview.result, preview.stale, source, assets, adoptGenerated]);
   const layout = useLayoutAnalysis(
     source,
     context?.injectionInput,
     stage !== 'case'
   );
   const report = layout.result?.layout;
+  const [picking, setPicking] = useState<{
+    id: string;
+    axis: 'x' | 'y';
+  } | null>(null);
+  const [relation, setRelation] = useState<{
+    before: string;
+    source: string;
+  } | null>(null);
+  const relationPreview = useLayoutAnalysis(
+    relation?.source || '',
+    context?.injectionInput,
+    !!relation
+  );
+  useEffect(() => {
+    if (
+      !relation ||
+      relationPreview.pending ||
+      (relationPreview.stale && !relationPreview.error)
+    ) {
+      return;
+    }
+    if (relation.before !== context?.getRealtimeConfigInput()) {
+      setError('The project changed. Retry the alignment.');
+    } else if (relationPreview.error) {
+      setError(relationPreview.error);
+    } else if (relationPreview.result?.layout) {
+      context?.editSource(relation.source);
+    }
+    setRelation(null);
+  }, [
+    relation,
+    relationPreview.pending,
+    relationPreview.stale,
+    relationPreview.error,
+    relationPreview.result,
+    context,
+  ]);
   const stale =
     layout.stale || layout.pending || !!layout.error || !!parsed.error;
   const boardStale =
@@ -183,63 +270,61 @@ export default function BoardStudio({
       const next = transform(before);
       finish(next);
       setError('');
+      return true;
     } catch (caught) {
       if (caught instanceof ResizeReview) {
         setResizeReview({ proposal: caught.proposal, finish });
-        return;
+        return false;
       }
       setError(String(caught));
+      return false;
     }
+  };
+  const deleteSelected = () => {
+    if (stale || !selection.id) {
+      return;
+    }
+    edit(
+      (before) => removeSelection(before, selection),
+      (next) => {
+        context?.editSource(next);
+        setSelection({ section: 'objects', id: '' });
+      }
+    );
   };
   const choose = (
     value: StudioSelection,
-    panel: 'inspect' | 'keep' = 'inspect'
+    _panel: 'inspect' | 'keep' = 'inspect',
+    mode: SelectionMode = 'replace',
+    order: StudioTarget[] = []
   ) => {
-    setSelection(value);
+    setSelection((current) => selectTargets(current, value, mode, order));
+    setPaneTab('properties');
     setReview(false);
-    if (panel === 'inspect') {
-      setSheet('inspector');
-    }
   };
-  const move = (target: StudioSelection, delta: number[], before: string) => {
+  const move = (
+    target: StudioSelection,
+    delta: number[],
+    before: string,
+    candidate?: string
+  ) => {
     if (before !== context?.getRealtimeConfigInput()) {
       setError('The source changed during this move. Retry.');
-      return;
+      return false;
     }
-    if (target.section === 'columns') {
-      const cluster = target.cluster || '',
-        frame = report?.clusters[cluster];
-      if (!frame || frame.locked || stale) {
-        return;
-      }
-      edit((current) =>
-        moveColumn(current, cluster, target.id, delta, frame.matrix)
-      );
-      return;
+    if (!report || stale) {
+      return false;
     }
-    if (target.section !== 'objects' && target.section !== 'clusters') {
-      return;
-    }
-    const frame = report?.[target.section]?.[target.id];
-    if (!frame || frame.locked || stale) {
-      return;
-    }
-    edit((current) =>
-      moveLayout(
-        current,
-        target.section as 'objects' | 'clusters',
-        target.id,
-        delta,
-        frame.editMatrix
-      )
+    return edit(
+      (current) => candidate || moveTargets(current, target, delta, report)
     );
   };
   const changeStage = (next: Stage) => {
     setStage(next);
-    setLibrary(false);
-    setSketch(false);
-    setCode(false);
-    setSheet('');
+    setView('canvas');
+    if (window.innerWidth <= parseInt(theme.studio.breakpoint)) {
+      setSheet('');
+    }
     setReview(false);
     if (next === 'pcb') {
       choose({
@@ -248,7 +333,11 @@ export default function BoardStudio({
       });
     }
   };
-  const add = () => {
+  const add = async () => {
+    if (addingBusy) {
+      return;
+    }
+    setAddingBusy(true);
     const id =
       newName.trim() ||
       nextId(
@@ -263,6 +352,7 @@ export default function BoardStudio({
     let section: StudioSelection['section'] = 'objects';
     try {
       let next = source;
+      let payload: Awaited<ReturnType<typeof componentPackage>> | undefined;
       if (['columns', 'arc', 'free'].includes(newKind)) {
         section = 'clusters';
         next = addCluster(
@@ -314,6 +404,18 @@ export default function BoardStudio({
           refs: [first, second],
           value,
         });
+      } else if (newKind === 'component' && componentChoice !== 'custom') {
+        payload = await componentPackage(componentChoice);
+        if (source !== context?.getRealtimeConfigInput()) {
+          throw new Error('The project changed. Retry adding the component.');
+        }
+        next = insertComponent(
+          source,
+          id,
+          componentChoice,
+          batterySize,
+          componentBoard
+        );
       } else if (newKind === 'layer') {
         section = 'layers';
         next = setValue(source, ['layout', 'layers', id], { surface: 'world' });
@@ -339,14 +441,19 @@ export default function BoardStudio({
           report
         );
       }
-      context?.editSource(next);
+      if (payload) {
+        context?.commitProject({ source: next }, payload);
+      } else {
+        context?.editSource(next);
+      }
       choose({ section, id });
       setNewName('');
       setAdding(false);
-      setSheet('inspector');
       setError('');
     } catch (caught) {
       setError(String(caught));
+    } finally {
+      setAddingBusy(false);
     }
   };
   const selectedProfile =
@@ -365,7 +472,20 @@ export default function BoardStudio({
   const electricalIssues = ((!parsed.error &&
     getValue(source, ['meta', 'studio', 'electricalFindings'])) ||
     []) as string[];
+  const resizeIssues = Object.values(
+    (getValue(source, ['meta', 'studio', 'resizeSpacing']) || {}) as Record<
+      string,
+      { conflicts?: string[] }
+    >
+  ).flatMap((entry) => entry.conflicts || []);
   const findings = [
+    ...resizeIssues.map((message) => ({
+      feature: 'layout',
+      sourcePath: 'layout',
+      code: 'resize-clearance',
+      severity: 'error',
+      message,
+    })),
     ...[...setupIssues, ...electricalIssues].map((message) => ({
       feature: 'meta.studio.setup',
       sourcePath: 'meta.studio.setup',
@@ -402,652 +522,1025 @@ export default function BoardStudio({
         section: chunks[1] as StudioSelection['section'],
         id: chunks[2],
       });
-      setStage('layout');
+      setStage('design');
     } else if (chunks[0] === 'units') {
       setSelection({ section: 'parameters', id: '' });
     } else {
       setStage('case');
     }
     setReview(false);
-    setSheet('inspector');
   };
   const closeSheet = () => {
-    const trigger = sheet === 'tree' ? treeTrigger : inspectorTrigger;
+    if (!sheet) {
+      return;
+    }
+    const trigger = inspectorTrigger;
     setSheet('');
     trigger.current?.focus();
   };
+  const inspectorButton = (
+    <button
+      ref={inspectorTrigger}
+      aria-expanded={sheet === 'inspector'}
+      aria-controls="studio-inspector"
+      onClick={() => setSheet(sheet ? '' : 'inspector')}
+    >
+      <SlidersHorizontal size={18} /> Inspector
+    </button>
+  );
   if (!context) {
     return null;
   }
   return (
-    <StudioShell
-      aria-label="Board Studio"
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') {
-          setAdding(false);
-          setLibrary(false);
-          setReview(false);
-          closeSheet();
-        }
-        if (
-          (event.ctrlKey || event.metaKey) &&
-          event.key.toLowerCase() === 'z' &&
-          !(event.target as Element).closest('.monaco-editor')
-        ) {
-          event.preventDefault();
-          if (event.shiftKey) {
-            context.redo();
-          } else {
-            context.undo();
+    <SnapProvider>
+      <StudioShell
+        aria-label="Board Studio"
+        onKeyDown={(event) => {
+          if (
+            stage === 'design' &&
+            view === 'canvas' &&
+            isDeleteShortcut(event.key, event.target) &&
+            !event.ctrlKey &&
+            !event.metaKey &&
+            !event.altKey
+          ) {
+            event.preventDefault();
+            deleteSelected();
           }
-        }
-      }}
-    >
-      {resizeReview && (
-        <ResizeReviewDialog
-          proposal={resizeReview.proposal}
-          onCancel={() => setResizeReview(null)}
-          onApply={() => {
-            if (
-              context.getRealtimeConfigInput() !== resizeReview.proposal.before
-            ) {
-              setError(
-                'The project changed during review. Resize again to review the current keys.'
-              );
-              setResizeReview(null);
-              return;
-            }
-            try {
-              resizeReview.finish(resizeReview.proposal.after);
-              setResizeReview(null);
-              setError('');
-            } catch (caught) {
-              setError(String(caught));
-            }
-          }}
-        />
-      )}
-      {setupOpen && (
-        <NewDesignWorkspace
-          initial={
-            (assemblyKeys.length
-              ? keySetup(source, assemblyKeys[0])
-              : savedSetup) || defaultSetup()
+          if (event.key === 'Escape') {
+            setAdding(false);
+            setView(view === 'code' ? codeReturn.current : 'canvas');
+            setReview(false);
+            closeSheet();
           }
-          mode={assemblyKeys.length ? 'assembly' : 'design'}
-          onCancel={() => setSetupOpen(false)}
-          onCreate={(next, newAssets, injections) => {
-            const setup = getValue(next, [
-              'meta',
-              'studio',
-              'setup',
-            ]) as DesignSetup;
-            edit(
-              (before) =>
-                assemblyKeys.length
-                  ? applyAssembly(
-                      before,
-                      assemblyKeys,
-                      setup,
-                      'preserve',
-                      selection?.section === 'clusters'
-                        ? 'cluster'
-                        : selection?.section === 'columns'
-                          ? 'column'
-                          : 'keys'
-                    )
-                  : updateSetup(before, setup),
-              (after) => {
-                context.commitProject(
-                  { source: after },
-                  { assets: newAssets, injections }
+          if (
+            (event.ctrlKey || event.metaKey) &&
+            event.key.toLowerCase() === 'z' &&
+            !(event.target as Element).closest('.monaco-editor')
+          ) {
+            event.preventDefault();
+            if (event.shiftKey) {
+              context.redo();
+            } else {
+              context.undo();
+            }
+          }
+        }}
+      >
+        {resizeReview && (
+          <ResizeReviewDialog
+            proposal={resizeReview.proposal}
+            onCancel={() => setResizeReview(null)}
+            onApply={() => {
+              if (
+                context.getRealtimeConfigInput() !==
+                resizeReview.proposal.before
+              ) {
+                setError(
+                  'The project changed during review. Resize again to review the current keys.'
                 );
-                setSetupOpen(false);
+                setResizeReview(null);
+                return;
               }
-            );
-          }}
-        />
-      )}
-      <StudioHeader>
-        <button
-          aria-label="Projects"
-          onClick={() => context.setShowSideNav(true)}
-        >
-          <FolderOpen size={20} />
-        </button>
-        <h1>
-          <span className="desktop">Board Studio / </span>
-          {context.activeConfigName}
-        </h1>
-        <small className="desktop">
-          {context.error ? 'Needs attention' : 'Autosaved'}
-        </small>
-        {onUpdate && <UpdateChip onClick={onUpdate} />}
-        {onInstall && <InstallChip onClick={onInstall} />}
-        <div className="project-actions">
-          <button
-            aria-label="Undo project edit"
-            disabled={!context.canUndo}
-            onClick={context.undo}
-          >
-            <Undo2 size={18} />
-          </button>
-          <button
-            aria-label="Redo project edit"
-            disabled={!context.canRedo}
-            onClick={context.redo}
-          >
-            <Redo2 size={18} />
-          </button>
-          <button
-            aria-label="Code"
-            aria-pressed={code}
-            onClick={() => {
-              setCode(!code);
-              setLibrary(false);
+              try {
+                resizeReview.finish(resizeReview.proposal.after);
+                setResizeReview(null);
+                setError('');
+              } catch (caught) {
+                setError(String(caught));
+              }
             }}
-          >
-            <Code2 size={18} />
-            <span className="desktop">Code</span>
-            <span
-              className="sr-only"
-              style={{
-                position: 'absolute',
-                width: 1,
-                height: 1,
-                overflow: 'hidden',
-              }}
-            >
-              Code
-            </span>
-          </button>
-          {!parsed.error && selectedKeys(source, selection).length > 0 && (
-            <button
-              onClick={() => {
-                setAssemblyKeys(selectedKeys(source, selection));
-                setSetupOpen(true);
-              }}
-            >
-              Edit key assembly
-            </button>
-          )}
-          {savedSetup && (
-            <button
-              onClick={() => {
-                setAssemblyKeys([]);
-                setSetupOpen(true);
-              }}
-            >
-              Design setup
-            </button>
-          )}
-          <button
-            data-primary="true"
-            aria-label="Generate project"
-            disabled={!!parsed.error || context.isGenerating || stale}
-            onClick={() =>
-              context.generateNow(source, context.injectionInput, {
-                pointsonly: false,
-              })
-            }
-          >
-            <Box size={18} />
-            <span className="desktop">Generate 3D</span>
-          </button>
-        </div>
-        <button
-          aria-label="Settings"
-          onClick={() => context.setShowSettings(true)}
-        >
-          <Settings size={18} />
-        </button>
-      </StudioHeader>
-      <StageNav aria-label="Design workflow">
-        {stages.map(([id, label, Glyph]) => (
-          <button
-            key={id}
-            aria-current={stage === id ? 'step' : undefined}
-            onClick={() => changeStage(id)}
-          >
-            <Glyph size={20} />
-            {label}
-          </button>
-        ))}
-      </StageNav>
-      {context.error && (
-        <StudioStatus role="alert">{context.error}</StudioStatus>
-      )}
-      {(error || parsed.error) && (
-        <StudioStatus role="alert">
-          {error || parsed.error}
-          <button
-            onClick={() => {
-              setError('');
-              setCode(true);
-            }}
-          >
-            Open Code
-          </button>
-        </StudioStatus>
-      )}
-      {code ? (
-        <StudioMain style={{ flex: 1 }}>
-          <ConfigEditor aria-label="Project YAML" className="studio-code" />
-        </StudioMain>
-      ) : library ? (
-        <Suspense fallback={<p>Opening part library…</p>}>
-          <StudioBar>
-            <h2>Part library</h2>
-            <button onClick={() => setLibrary(false)}>Back to design</button>
-          </StudioBar>
-          <FootprintLibrary
-            source={source}
-            onSource={(next) => edit(() => next)}
-            onPreview={() => changeStage('case')}
           />
-        </Suspense>
-      ) : stage === 'case' && !parsed.error ? (
-        <CaseWizard
-          presentation="embedded"
-          onClose={() => changeStage('layout')}
-        />
-      ) : stage === 'export' ? (
-        <StudioExport
-          source={source}
-          injections={context.injectionInput}
-          assets={assets}
-          result={analysis.result}
-          stale={boardStale}
-          blockers={blockers}
-          review={() => changeStage('case')}
-        />
-      ) : (
-        <>
-          <StudioBar
-            className={
-              stage === 'layout' ? 'studio-mobile-tools' : 'studio-stage-tools'
-            }
+        )}
+        {context.showSettings && (
+          <StudioSettings
+            onClose={() => context.setShowSettings(false)}
+            onLibrary={() => {
+              context.setShowSettings(false);
+              openLibrary();
+            }}
+          />
+        )}
+        <StudioHeader>
+          <button
+            aria-label="Projects"
+            onClick={() => context.setShowSideNav(true)}
           >
+            <FolderOpen size={20} />
+          </button>
+          <h1>
+            <span className="desktop">Board Studio / </span>
+            {context.activeConfigName}
+          </h1>
+          <small className="desktop">
+            {context.error ? 'Needs attention' : 'Autosaved'}
+          </small>
+          {onUpdate && <UpdateChip onClick={onUpdate} />}
+          {onInstall && <InstallChip onClick={onInstall} />}
+          <div className="project-actions">
             <button
-              className="mobile-only"
-              ref={treeTrigger}
-              onClick={() => setSheet(sheet === 'tree' ? '' : 'tree')}
+              aria-label="Undo project edit"
+              disabled={!context.canUndo}
+              onClick={context.undo}
             >
-              <ListTree size={18} />
-              Objects
+              <Undo2 size={18} />
             </button>
             <button
-              className="mobile-only"
-              ref={inspectorTrigger}
-              onClick={() => setSheet(sheet === 'inspector' ? '' : 'inspector')}
+              aria-label="Redo project edit"
+              disabled={!context.canRedo}
+              onClick={context.redo}
             >
-              <SlidersHorizontal size={18} />
-              Inspector
+              <Redo2 size={18} />
             </button>
-            {stage === 'components' && (
-              <button onClick={() => setLibrary(true)}>Part library</button>
-            )}
-            {stage === 'pcb' && (
-              <>
-                <button
-                  aria-pressed={pcbView === 'outline'}
-                  onClick={() => setPcbView('outline')}
-                >
-                  Outline
-                </button>
-                <button
-                  aria-pressed={pcbView === 'pcb'}
-                  onClick={() => setPcbView('pcb')}
-                >
-                  KiCad PCB
-                </button>
-              </>
-            )}
-          </StudioBar>
-          <StudioBody data-sheet={sheet || undefined}>
-            <StudioPane
-              ref={treePane}
-              $side="left"
-              $open={sheet === 'tree'}
-              aria-label="Object tree"
+            <button
+              aria-label="Code"
+              aria-pressed={view === 'code'}
+              onClick={() => {
+                if (view === 'code') {
+                  setView(codeReturn.current);
+                  return;
+                }
+                codeReturn.current = view;
+                setView('code');
+              }}
             >
-              <button className="close-pane" onClick={closeSheet}>
-                <X size={18} />
-                Close objects
+              <Code2 size={18} />
+              <span className="desktop">Code</span>
+              <span
+                className="sr-only"
+                style={{
+                  position: 'absolute',
+                  width: 1,
+                  height: 1,
+                  overflow: 'hidden',
+                }}
+              >
+                Code
+              </span>
+            </button>
+            {!parsed.error && selectedKeys(source, selection).length > 0 && (
+              <button
+                onClick={() => {
+                  setAssemblyKeys(selectedKeys(source, selection));
+                  setSetupOpen(true);
+                  setSheet('inspector');
+                  setPaneTab('properties');
+                }}
+              >
+                Edit key assembly
               </button>
-              <StudioActions>
-                <button
-                  onClick={() => {
-                    setAdding(!adding);
-                    setNewKind(
-                      stage === 'components' ? 'component' : 'columns'
-                    );
-                  }}
-                >
-                  <Plus size={16} />
-                  Add
+            )}
+            {!parsed.error && (
+              <button
+                onClick={() => {
+                  setAssemblyKeys([]);
+                  setSetupOpen(true);
+                  setSheet('inspector');
+                  setPaneTab('properties');
+                }}
+              >
+                Design setup
+              </button>
+            )}
+            <button
+              data-primary="true"
+              aria-label="Generate project"
+              aria-busy={preview.pending}
+              disabled={
+                !!parsed.error ||
+                preview.pending ||
+                analysis.pending ||
+                analysis.stale ||
+                !!analysis.error
+              }
+              onClick={preview.generate}
+            >
+              <Box size={18} />
+              <span className="desktop">
+                {preview.pending
+                  ? 'Generating…'
+                  : preview.error
+                    ? 'Retry generation'
+                    : 'Generate 3D'}
+              </span>
+            </button>
+            {preview.pending && (
+              <button onClick={preview.cancel}>Cancel generation</button>
+            )}
+          </div>
+          <button
+            aria-label="Settings"
+            onClick={() => context.setShowSettings(true)}
+          >
+            <Settings size={18} />
+          </button>
+        </StudioHeader>
+        <StageNav aria-label="Design workflow">
+          {stages.map(([id, label, Glyph]) => (
+            <button
+              key={id}
+              aria-current={stage === id ? 'step' : undefined}
+              onClick={() => changeStage(id)}
+            >
+              <Glyph size={20} />
+              {label}
+            </button>
+          ))}
+          {view !== 'library' && (
+            <div className="workspace-actions">
+              {['design', 'pcb'].includes(stage) && inspectorButton}
+              <button onClick={openLibrary}>
+                <Component size={16} />
+                Part library
+              </button>
+            </div>
+          )}
+        </StageNav>
+        {preview.error && (
+          <StudioStatus role="alert">{preview.error}</StudioStatus>
+        )}
+        {analysis.error && (
+          <StudioStatus role="alert">
+            {analysis.error}
+            <button onClick={analysis.generate}>Retry board analysis</button>
+          </StudioStatus>
+        )}
+        {resizeIssues.length > 0 && (
+          <StudioStatus role="alert">{resizeIssues.join(' ')}</StudioStatus>
+        )}
+        {context.error && (
+          <StudioStatus role="alert">{context.error}</StudioStatus>
+        )}
+        {(error || parsed.error) && (
+          <StudioStatus role="alert">
+            {error || parsed.error}
+            <button
+              onClick={() => {
+                setError('');
+                setView('code');
+              }}
+            >
+              Open Code
+            </button>
+          </StudioStatus>
+        )}
+        {libraryOpened && (
+          <StudioLibrary $active={view === 'library'}>
+            <Suspense fallback={<p>Opening part library…</p>}>
+              <StudioBar>
+                <h2>Part library</h2>
+                <button onClick={() => setView('canvas')}>
+                  Back to design
                 </button>
-              </StudioActions>
-              {adding && (
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    add();
-                  }}
-                >
-                  <StudioField>
-                    <span>Kind</span>
-                    <select
-                      aria-label="New item kind"
-                      value={newKind}
-                      onChange={(event) => setNewKind(event.target.value)}
+              </StudioBar>
+              <FootprintLibrary
+                source={source}
+                onSource={(next) => edit(() => next)}
+                onPreview={() => changeStage('case')}
+              />
+            </Suspense>
+          </StudioLibrary>
+        )}
+        {view === 'library' ? null : view === 'code' ? (
+          <StudioMain style={{ flex: 1 }}>
+            <ConfigEditor
+              aria-label="Project YAML"
+              className="studio-code"
+              onGenerate={preview.generate}
+            />
+          </StudioMain>
+        ) : stage === 'case' && !parsed.error ? (
+          <CaseWizard
+            presentation="embedded"
+            session={{
+              preview,
+              analysis,
+              onExport: () => changeStage('export'),
+            }}
+            onClose={() => changeStage('design')}
+          />
+        ) : stage === 'export' ? (
+          <StudioExport
+            source={source}
+            injections={context.injectionInput}
+            assets={assets}
+            result={analysis.result}
+            stale={boardStale}
+            blockers={blockers}
+            preview={preview}
+            analysis={analysis}
+            review={() => {
+              const assemblies = Object.values(data.designs?.assemblies || {});
+              if (
+                !assemblies.length ||
+                assemblies.some(
+                  (spec) =>
+                    (spec as { preset?: string })?.preset === 'enclosure'
+                )
+              ) {
+                changeStage('case');
+                return;
+              }
+              changeStage('design');
+              setView('sketch');
+            }}
+          />
+        ) : (
+          <>
+            {(view === 'sketch' || stage === 'pcb') && (
+              <StudioBar className={'studio-stage-tools'}>
+                {stage === 'pcb' && (
+                  <>
+                    <button
+                      aria-pressed={pcbView === 'outline'}
+                      onClick={() => setPcbView('outline')}
                     >
-                      {Object.entries({
-                        columns: 'Key matrix',
-                        arc: 'Thumb arc',
-                        free: 'Free cluster',
-                        mirror: 'Linked mirror',
-                        key: 'Key',
-                        component: 'Component',
-                        layer: 'Mounting layer',
-                        constraint: 'Constraint',
-                      }).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </StudioField>
-                  {newKind === 'columns' && (
+                      Outline
+                    </button>
+                    <button
+                      aria-pressed={pcbView === 'pcb'}
+                      onClick={() => setPcbView('pcb')}
+                    >
+                      KiCad PCB
+                    </button>
+                  </>
+                )}
+              </StudioBar>
+            )}
+            <StudioBody data-sheet={sheet || undefined}>
+              <StudioPane
+                ref={inspectorPane}
+                id="studio-inspector"
+                data-pane={paneTab}
+                data-setup={setupOpen || undefined}
+                $open={sheet === 'inspector'}
+                aria-label="Design inspector"
+              >
+                <div className="pane-header">
+                  <button className="close-pane" onClick={closeSheet}>
+                    <X size={18} /> Close inspector
+                  </button>
+                  <div
+                    className="pane-tabs"
+                    role="group"
+                    aria-label="Inspector view"
+                  >
+                    <button
+                      aria-pressed={paneTab === 'objects'}
+                      onClick={() => setPaneTab('objects')}
+                    >
+                      Browse objects
+                    </button>
+                    <button
+                      aria-pressed={paneTab === 'properties'}
+                      onClick={() => setPaneTab('properties')}
+                    >
+                      Edit properties
+                    </button>
+                  </div>
+                  <p
+                    className="selection-summary"
+                    aria-label="Current selection"
+                  >
+                    {targets(selection).length > 1
+                      ? `${targets(selection).length} selected`
+                      : selection.id
+                        ? `Selected: ${selection.id}`
+                        : 'Select an object on the canvas'}
+                  </p>
+                </div>
+                <StudioBrowser className="studio-browser">
+                  <details open={!!sections.objects}>
+                    <summary
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setSections((before) => ({
+                          ...before,
+                          objects: !before.objects,
+                        }));
+                      }}
+                    >
+                      Objects
+                    </summary>
                     <StudioActions>
-                      {(['columns', 'rows'] as const).map((name) => (
-                        <StudioField key={name}>
-                          <span>{name === 'columns' ? 'Columns' : 'Rows'}</span>
+                      <button
+                        onClick={() => {
+                          setAdding(!adding);
+                          setNewKind('columns');
+                        }}
+                      >
+                        <Plus size={16} />
+                        Add
+                      </button>
+                    </StudioActions>
+                    {adding && (
+                      <form
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          add();
+                        }}
+                      >
+                        <StudioField>
+                          <span>Kind</span>
+                          <select
+                            aria-label="New item kind"
+                            value={newKind}
+                            onChange={(event) => setNewKind(event.target.value)}
+                          >
+                            {Object.entries({
+                              columns: 'Key matrix',
+                              arc: 'Thumb arc',
+                              free: 'Free cluster',
+                              mirror: 'Linked mirror',
+                              key: 'Key',
+                              component: 'Component',
+                              layer: 'Mounting layer',
+                              constraint: 'Constraint',
+                            }).map(([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                        </StudioField>
+                        {newKind === 'component' && (
+                          <>
+                            <StudioField>
+                              <span>Component</span>
+                              <select
+                                aria-label="Component catalogue"
+                                value={componentChoice}
+                                onChange={(event) =>
+                                  setComponentChoice(event.target.value)
+                                }
+                              >
+                                {COMPONENT_CHOICES.map((item) => (
+                                  <option key={item.id} value={item.id}>
+                                    {item.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </StudioField>
+                            {Object.keys(data.pcbs || {}).length > 1 && (
+                              <StudioField>
+                                <span>Board</span>
+                                <select
+                                  aria-label="Component board"
+                                  value={
+                                    componentBoard ||
+                                    Object.keys(data.pcbs || {})[0]
+                                  }
+                                  onChange={(event) =>
+                                    setComponentBoard(event.target.value)
+                                  }
+                                >
+                                  {Object.keys(data.pcbs || {}).map((id) => (
+                                    <option key={id}>{id}</option>
+                                  ))}
+                                </select>
+                              </StudioField>
+                            )}
+                            {componentChoice === 'battery' &&
+                              ['Width', 'Depth', 'Height'].map(
+                                (label, axis) => (
+                                  <StudioField key={label}>
+                                    <span>{label} · mm</span>
+                                    <input
+                                      aria-label={`Battery ${label.toLowerCase()}`}
+                                      type="number"
+                                      min="0"
+                                      step="0.1"
+                                      value={batterySize[axis] || ''}
+                                      onChange={(event) =>
+                                        setBatterySize((values) =>
+                                          values.map((v, i) =>
+                                            i === axis
+                                              ? Number(event.target.value)
+                                              : v
+                                          )
+                                        )
+                                      }
+                                    />
+                                  </StudioField>
+                                )
+                              )}
+                          </>
+                        )}
+                        {newKind === 'columns' && (
+                          <StudioActions>
+                            {(['columns', 'rows'] as const).map((name) => (
+                              <StudioField key={name}>
+                                <span>
+                                  {name === 'columns' ? 'Columns' : 'Rows'}
+                                </span>
+                                <input
+                                  aria-label={`New matrix ${name}`}
+                                  type="number"
+                                  min="1"
+                                  max="100"
+                                  value={matrixSize[name]}
+                                  onChange={(event) =>
+                                    setMatrixSize({
+                                      ...matrixSize,
+                                      [name]: Number(event.target.value),
+                                    })
+                                  }
+                                />
+                              </StudioField>
+                            ))}
+                          </StudioActions>
+                        )}
+                        <StudioField>
+                          <span>Name</span>
                           <input
-                            aria-label={`New matrix ${name}`}
-                            type="number"
-                            min="1"
-                            max="100"
-                            value={matrixSize[name]}
-                            onChange={(event) =>
-                              setMatrixSize({
-                                ...matrixSize,
-                                [name]: Number(event.target.value),
-                              })
-                            }
+                            aria-label="New item name"
+                            value={newName}
+                            pattern="[A-Za-z_][A-Za-z_0-9-]*"
+                            onChange={(event) => setNewName(event.target.value)}
                           />
                         </StudioField>
-                      ))}
-                    </StudioActions>
-                  )}
-                  <StudioField>
-                    <span>Name</span>
-                    <input
-                      aria-label="New item name"
-                      value={newName}
-                      pattern="[A-Za-z_][A-Za-z_0-9-]*"
-                      onChange={(event) => setNewName(event.target.value)}
+                        <StudioActions>
+                          <button
+                            type="submit"
+                            disabled={
+                              addingBusy ||
+                              (Object.keys(data.layout.objects || {}).length >
+                                0 &&
+                                !Object.keys(report?.objects || {}).length)
+                            }
+                          >
+                            Create
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAdding(false)}
+                          >
+                            Cancel
+                          </button>
+                        </StudioActions>
+                      </form>
+                    )}
+                    <LayoutDefaults source={source} edit={edit} />
+                    <ClusterTree
+                      data={data}
+                      report={report}
+                      selection={selection}
+                      choose={(value, mode, order) => {
+                        choose(value, 'keep', mode, order);
+                      }}
                     />
-                  </StudioField>
-                  <StudioActions>
-                    <button
-                      type="submit"
-                      disabled={
-                        Object.keys(data.layout.objects || {}).length > 0 &&
-                        !Object.keys(report?.objects || {}).length
-                      }
+                    <details>
+                      <summary>Components and free objects</summary>
+                      {Object.entries(data.layout.objects || {})
+                        .filter(([, item]) => !item.cluster)
+                        .map(([id, item]) => (
+                          <TreeButton
+                            key={id}
+                            aria-pressed={includesObject(selection, { id })}
+                            onClick={(event) => {
+                              choose(
+                                { section: 'objects', id },
+                                'keep',
+                                selectionMode(event),
+                                Object.entries(data.layout.objects || {})
+                                  .filter(([, item]) => !item.cluster)
+                                  .map(([id]) => ({ section: 'objects', id }))
+                              );
+                            }}
+                          >
+                            <Component size={18} />
+                            <span>
+                              {item.label || id}
+                              <small>{item.kind}</small>
+                            </span>
+                          </TreeButton>
+                        ))}
+                    </details>
+                  </details>
+                  <details open={!!sections.design}>
+                    <summary
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setSections((before) => ({
+                          ...before,
+                          design: !before.design,
+                        }));
+                      }}
                     >
-                      Create
-                    </button>
-                    <button type="button" onClick={() => setAdding(false)}>
-                      Cancel
-                    </button>
-                  </StudioActions>
-                </form>
-              )}
-              <LayoutDefaults source={source} edit={edit} />
-              <ClusterTree
-                data={data}
-                report={report}
-                selection={selection}
-                choose={choose}
-              />
-              <details open={stage === 'components'}>
-                <summary>Components and free objects</summary>
-                {Object.entries(data.layout.objects || {})
-                  .filter(([, item]) => !item.cluster)
-                  .map(([id, item]) => (
+                      Design
+                    </summary>
                     <TreeButton
-                      key={id}
-                      aria-pressed={
-                        selection.section === 'objects' && selection.id === id
-                      }
-                      onClick={() => choose({ section: 'objects', id })}
+                      aria-pressed={selection.section === 'parameters'}
+                      onClick={() => choose({ section: 'parameters', id: '' })}
                     >
-                      <Component size={18} />
-                      <span>
-                        {item.label || id}
-                        <small>{item.kind}</small>
-                      </span>
+                      <Variable size={18} />
+                      Parameters
                     </TreeButton>
-                  ))}
-              </details>
-              <h3>Design</h3>
-              <TreeButton
-                aria-pressed={selection.section === 'parameters'}
-                onClick={() => choose({ section: 'parameters', id: '' })}
-              >
-                <Variable size={18} />
-                Parameters
-              </TreeButton>
-              <TreeButton
-                aria-pressed={selection.section === 'constraints'}
-                onClick={() =>
-                  choose({
-                    section: 'constraints',
-                    id: Object.keys(data.layout.constraints || {})[0] || '',
-                  })
-                }
-              >
-                <GitBranch size={18} />
-                Constraints
-              </TreeButton>
-              {Object.entries(data.layout.constraints || {}).map(
-                ([id, item]) => (
-                  <TreeButton
-                    key={id}
-                    aria-pressed={
-                      selection.section === 'constraints' && selection.id === id
-                    }
-                    onClick={() => choose({ section: 'constraints', id })}
+                    <TreeButton
+                      aria-pressed={selection.section === 'constraints'}
+                      onClick={() =>
+                        choose({
+                          section: 'constraints',
+                          id:
+                            Object.keys(data.layout.constraints || {})[0] || '',
+                        })
+                      }
+                    >
+                      <GitBranch size={18} />
+                      Constraints
+                    </TreeButton>
+                    {Object.entries(data.layout.constraints || {}).map(
+                      ([id, item]) => (
+                        <TreeButton
+                          key={id}
+                          aria-pressed={
+                            selection.section === 'constraints' &&
+                            selection.id === id
+                          }
+                          onClick={() => choose({ section: 'constraints', id })}
+                        >
+                          {item.label || id}
+                        </TreeButton>
+                      )
+                    )}
+                    <details>
+                      <summary>Mounting layers</summary>
+                      {Object.keys(data.layout.layers || {}).map((id) => (
+                        <TreeButton
+                          key={id}
+                          aria-pressed={
+                            selection.section === 'layers' &&
+                            selection.id === id
+                          }
+                          onClick={() => choose({ section: 'layers', id })}
+                        >
+                          {id}
+                          <small>Layer</small>
+                        </TreeButton>
+                      ))}
+                    </details>
+                    {Object.keys(data.designs?.profiles || {}).map((id) => (
+                      <TreeButton
+                        key={id}
+                        aria-pressed={
+                          selection.section === 'outline' && selection.id === id
+                        }
+                        onClick={() => choose({ section: 'outline', id })}
+                      >
+                        {id}
+                        <small>Outline</small>
+                      </TreeButton>
+                    ))}
+                    <button
+                      onClick={() =>
+                        edit((before) =>
+                          addOutline(
+                            before,
+                            Object.keys(data.pcbs || {})[0] || 'main',
+                            report,
+                            'replace'
+                          )
+                        )
+                      }
+                    >
+                      Rebuild board outline
+                    </button>
+                    <StudioActions>
+                      <button
+                        onClick={() => {
+                          setView(view === 'sketch' ? 'canvas' : 'sketch');
+                          setSheet('');
+                        }}
+                      >
+                        Sketches
+                      </button>
+                    </StudioActions>
+                  </details>
+                </StudioBrowser>
+                <StudioProperties className="studio-properties">
+                  {setupOpen && !assemblyKeys.length && (
+                    <DesignSetupPanel
+                      source={source}
+                      currentSource={() =>
+                        context.getRealtimeConfigInput() || source
+                      }
+                      injections={context.injectionInput}
+                      onClose={() => setSetupOpen(false)}
+                      onApply={(next, newAssets) => {
+                        edit(
+                          () => next,
+                          (after) => {
+                            context.commitProject(
+                              { source: after },
+                              { assets: newAssets }
+                            );
+                            setSetupOpen(false);
+                          }
+                        );
+                      }}
+                    />
+                  )}
+                  {setupOpen && assemblyKeys.length > 0 && (
+                    <NewDesignWorkspace
+                      embedded
+                      initial={
+                        (assemblyKeys.length
+                          ? keySetup(source, assemblyKeys[0])
+                          : savedSetup) || defaultSetup()
+                      }
+                      mode={assemblyKeys.length ? 'assembly' : 'design'}
+                      onCancel={() => setSetupOpen(false)}
+                      onCreate={(next, newAssets, injections) => {
+                        const setup = getValue(next, [
+                          'meta',
+                          'studio',
+                          'setup',
+                        ]) as DesignSetup;
+                        edit(
+                          (before) =>
+                            assemblyKeys.length
+                              ? applyAssembly(
+                                  before,
+                                  assemblyKeys,
+                                  setup,
+                                  'preserve',
+                                  selection?.section === 'clusters'
+                                    ? 'cluster'
+                                    : selection?.section === 'columns'
+                                      ? 'column'
+                                      : 'keys'
+                                )
+                              : updateSetup(before, setup),
+                          (after) => {
+                            context.commitProject(
+                              { source: after },
+                              { assets: newAssets, injections }
+                            );
+                            setSetupOpen(false);
+                          }
+                        );
+                      }}
+                    />
+                  )}
+                  {!setupOpen && (
+                    <>
+                      {report && (
+                        <RelationshipPanel
+                          source={source}
+                          selection={selection}
+                          report={report}
+                          edit={edit}
+                          onPick={(id, axis) => setPicking({ id, axis })}
+                          onPropose={(next) =>
+                            setRelation({ before: source, source: next })
+                          }
+                        />
+                      )}
+                      {picking && (
+                        <p role="status">
+                          Click a center guide on the canvas.{' '}
+                          <button onClick={() => setPicking(null)}>
+                            Cancel alignment
+                          </button>
+                        </p>
+                      )}
+
+                      <details open={!!sections.selection}>
+                        <summary
+                          onClick={(event) => {
+                            event.preventDefault();
+                            setSections((before) => ({
+                              ...before,
+                              selection: !before.selection,
+                            }));
+                          }}
+                        >
+                          Selection
+                        </summary>
+                        {['objects', 'columns', 'clusters'].includes(
+                          selection.section
+                        ) && (
+                          <>
+                            <StudioInspector
+                              source={source}
+                              data={data}
+                              selection={selection}
+                              report={report}
+                              edit={edit}
+                              select={choose}
+                            />
+                          </>
+                        )}
+                      </details>
+                      {!['objects', 'columns', 'clusters'].includes(
+                        selection.section
+                      ) && (
+                        <StudioInspector
+                          source={source}
+                          data={data}
+                          selection={selection}
+                          report={report}
+                          edit={edit}
+                          select={choose}
+                        />
+                      )}
+                    </>
+                  )}
+                </StudioProperties>
+              </StudioPane>
+              <StudioMain>
+                {stage === 'design' &&
+                  view === 'canvas' &&
+                  !Object.keys(data.layout.objects || {}).length && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: theme.studio.emptyTop,
+                        left: `calc(${theme.studio.touchSize} + ${theme.spacing.lg})`,
+                        right: theme.spacing.md,
+                        zIndex: 1,
+                        textAlign: 'center',
+                      }}
+                    >
+                      <h2>Build your layout</h2>
+                      <p>Place keys and hardware using the design’s spacing.</p>
+                      <StudioActions style={{ justifyContent: 'center' }}>
+                        {['matrix', 'column', 'key', 'component'].map(
+                          (kind) => (
+                            <button
+                              key={kind}
+                              onClick={() => {
+                                setNewKind(
+                                  kind === 'matrix' || kind === 'column'
+                                    ? 'columns'
+                                    : kind
+                                );
+                                setMatrixSize(
+                                  kind === 'column'
+                                    ? { columns: 1, rows: 3 }
+                                    : { columns: 5, rows: 4 }
+                                );
+                                setAdding(true);
+                                setSetupOpen(false);
+                                setSheet('inspector');
+                                setPaneTab('objects');
+                              }}
+                            >
+                              Add {kind}
+                            </button>
+                          )
+                        )}
+                      </StudioActions>
+                    </div>
+                  )}
+
+                {stale && (
+                  <StudioStatus
+                    role="status"
+                    style={{ position: 'relative', zIndex: 2 }}
                   >
-                    {item.label || id}
-                  </TreeButton>
-                )
-              )}
-              <details>
-                <summary>Mounting layers</summary>
-                {Object.keys(data.layout.layers || {}).map((id) => (
-                  <TreeButton
-                    key={id}
-                    aria-pressed={
-                      selection.section === 'layers' && selection.id === id
-                    }
-                    onClick={() => choose({ section: 'layers', id })}
-                  >
-                    {id}
-                    <small>Layer</small>
-                  </TreeButton>
-                ))}
-              </details>
-              {Object.keys(data.designs?.profiles || {}).map((id) => (
-                <TreeButton
-                  key={id}
-                  aria-pressed={
-                    selection.section === 'outline' && selection.id === id
-                  }
-                  onClick={() => choose({ section: 'outline', id })}
-                >
-                  {id}
-                  <small>Outline</small>
-                </TreeButton>
-              ))}
+                    {layout.pending
+                      ? 'Updating layout…'
+                      : 'Showing the last valid geometry.'}
+                    {layout.error && (
+                      <button onClick={layout.generate}>Retry analysis</button>
+                    )}
+                  </StudioStatus>
+                )}
+                {view === 'sketch' ? (
+                  <Suspense fallback={<p>Opening sketches…</p>}>
+                    <DesignView session={{ analysis, preview }} />
+                  </Suspense>
+                ) : stage === 'pcb' && pcbView === 'pcb' ? (
+                  pcb ? (
+                    <FilePreview
+                      previewKey={`pcbs.${pcb[0]}`}
+                      previewExtension="kicad_pcb"
+                      previewContent={pcb[1]}
+                    />
+                  ) : (
+                    <p>Generate a PCB profile to inspect its footprints.</p>
+                  )
+                ) : (
+                  <>
+                    <StudioCanvas
+                      report={report}
+                      injections={context.injectionInput}
+                      source={source}
+                      stale={stale}
+                      selection={selection}
+                      onSelect={choose}
+                      onMove={move}
+                      onDelete={deleteSelected}
+                      model={model}
+                      side={side}
+                      onSide={setSide}
+                      onPickTarget={
+                        picking
+                          ? (target) => {
+                              if (report) {
+                                try {
+                                  setRelation({
+                                    before: source,
+                                    source: alignObject(
+                                      source,
+                                      picking.id,
+                                      target,
+                                      picking.axis,
+                                      report
+                                    ),
+                                  });
+                                  setPicking(null);
+                                } catch (reason) {
+                                  setError(String(reason));
+                                }
+                              }
+                            }
+                          : undefined
+                      }
+                      onAlign={(id, target, axis) => {
+                        if (report) {
+                          try {
+                            setRelation({
+                              before: source,
+                              source: alignObject(
+                                source,
+                                id,
+                                target,
+                                axis,
+                                report
+                              ),
+                            });
+                          } catch (reason) {
+                            setError(String(reason));
+                          }
+                        }
+                      }}
+                      rules={data.layout.constraints || {}}
+                    />
+                  </>
+                )}
+              </StudioMain>
+            </StudioBody>
+          </>
+        )}
+        {review && (
+          <StudioStatus
+            role="region"
+            aria-label="Project findings"
+            style={{ maxHeight: '35vh', overflow: 'auto', alignItems: 'start' }}
+          >
+            {(layout.error || analysis.error) && (
+              <p role="alert">{layout.error || analysis.error}</p>
+            )}
+            {!uniqueFindings.length && <p>No current layout findings.</p>}
+            {uniqueFindings.map((issue, index) => (
               <button
+                key={index}
                 onClick={() =>
-                  edit((before) =>
-                    addOutline(
-                      before,
-                      Object.keys(data.pcbs || {})[0] || 'main',
-                      report,
-                      'replace'
-                    )
+                  navigateFinding(
+                    ('sourcePath' in issue && issue.sourcePath) || issue.feature
                   )
                 }
               >
-                Rebuild board outline
+                {issue.severity}: {issue.message}
               </button>
-              <StudioActions>
-                <button
-                  onClick={() => {
-                    setSketch(!sketch);
-                    setSheet('');
-                  }}
-                >
-                  Sketches
-                </button>
-                <button onClick={() => setLibrary(true)}>Part library</button>
-              </StudioActions>
-            </StudioPane>
-            <StudioMain>
-              {!stale && analysis.error && (
-                <StudioStatus role="status">
-                  Layout is editable. Board outline needs attention:{' '}
-                  {analysis.error}
-                </StudioStatus>
-              )}
-              {stale && (
-                <StudioStatus role="status">
-                  {layout.pending
-                    ? 'Updating layout…'
-                    : 'Showing the last valid geometry.'}
-                  {layout.error && (
-                    <button onClick={layout.generate}>Retry analysis</button>
-                  )}
-                </StudioStatus>
-              )}
-              {sketch ? (
-                <Suspense fallback={<p>Opening sketches…</p>}>
-                  <DesignView />
-                </Suspense>
-              ) : stage === 'pcb' && pcbView === 'pcb' ? (
-                pcb ? (
-                  <FilePreview
-                    previewKey={`pcbs.${pcb[0]}`}
-                    previewExtension="kicad_pcb"
-                    previewContent={pcb[1]}
-                  />
-                ) : (
-                  <p>Generate a PCB profile to inspect its footprints.</p>
-                )
-              ) : (
-                <>
-                  <SelectionPopover
-                    source={source}
-                    selection={selection}
-                    report={report}
-                    edit={edit}
-                    request={quickRequest}
-                  />
-                  <StudioCanvas
-                    report={report}
-                    injections={context.injectionInput}
-                    source={source}
-                    stale={stale}
-                    selection={selection}
-                    onSelect={choose}
-                    onQuickEdit={(value) => {
-                      choose(value, 'keep');
-                      setQuickRequest((current) => current + 1);
-                    }}
-                    onMove={move}
-                    model={model}
-                    side={side}
-                    onSide={setSide}
-                    rules={data.layout.constraints || {}}
-                  />
-                </>
-              )}
-            </StudioMain>
-            <StudioPane
-              ref={inspectorPane}
-              $side="right"
-              $open={sheet === 'inspector'}
-              aria-label="Design inspector"
-            >
-              <button className="close-pane" onClick={closeSheet}>
-                <X size={18} />
-                Close inspector
-              </button>
-              <StudioInspector
-                source={source}
-                data={data}
-                selection={selection}
-                report={report}
-                edit={edit}
-                select={choose}
-              />
-            </StudioPane>
-          </StudioBody>
-        </>
-      )}
-      {review && (
-        <StudioStatus
-          role="region"
-          aria-label="Project findings"
-          style={{ maxHeight: '35vh', overflow: 'auto', alignItems: 'start' }}
-        >
-          {(layout.error || analysis.error) && (
-            <p role="alert">{layout.error || analysis.error}</p>
-          )}
-          {!uniqueFindings.length && <p>No current layout findings.</p>}
-          {uniqueFindings.map((issue, index) => (
-            <button
-              key={index}
-              onClick={() =>
-                navigateFinding(
-                  ('sourcePath' in issue && issue.sourcePath) || issue.feature
-                )
-              }
-            >
-              {issue.severity}: {issue.message}
+            ))}
+            <button onClick={() => setReview(false)}>Close findings</button>
+          </StudioStatus>
+        )}
+        {!(stage === 'case' && view === 'canvas' && !parsed.error) && (
+          <StudioStatus role="status">
+            <small>
+              {stage !== 'design'
+                ? preview.pending
+                  ? 'Generating geometry…'
+                  : preview.stale
+                    ? '3D needs generation'
+                    : 'Current 3D geometry'
+                : stale
+                  ? 'Layout needs analysis'
+                  : solver
+                    ? `Layout ${solver.status === 'solved' ? 'solved' : `solved · ${solver.dof} free movements`}`
+                    : 'Layout resolved'}{' '}
+              ·{' '}
+              {
+                Object.values(report?.objects || {}).filter(
+                  (item) => item.kind === 'key'
+                ).length
+              }{' '}
+              keys
+            </small>
+            <button onClick={() => setReview(!review)}>
+              {blockers
+                ? `${blockers} blockers`
+                : analysis.error
+                  ? 'Analysis needs attention'
+                  : `${uniqueFindings.length} checks`}
             </button>
-          ))}
-          <button onClick={() => setReview(false)}>Close findings</button>
-        </StudioStatus>
-      )}
-      <StudioStatus role="status">
-        <small>
-          {stale
-            ? 'Layout needs analysis'
-            : solver
-              ? `Layout ${solver.status === 'solved' ? 'solved' : `solved · ${solver.dof} free movements`}`
-              : 'Layout resolved'}{' '}
-          ·{' '}
-          {
-            Object.values(report?.objects || {}).filter(
-              (item) => item.kind === 'key'
-            ).length
-          }{' '}
-          keys
-        </small>
-        <button onClick={() => setReview(!review)}>
-          {blockers
-            ? `${blockers} blockers`
-            : analysis.error
-              ? 'Analysis needs attention'
-              : `${uniqueFindings.length} checks`}
-        </button>
-      </StudioStatus>
-    </StudioShell>
+          </StudioStatus>
+        )}
+      </StudioShell>
+    </SnapProvider>
   );
 }

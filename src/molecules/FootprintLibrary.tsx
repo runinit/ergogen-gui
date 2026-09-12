@@ -1,3 +1,4 @@
+import { Undo2 } from 'lucide-react';
 import { footprintUses, linkFootprint } from '../utils/footprintLinks';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
@@ -37,7 +38,8 @@ const Layout = styled.div`
       .inspectorWidth};
   flex: 1;
   min-height: 0;
-  @media (max-width: ${theme.caseWizard.smallScreen}) {
+  overflow: hidden;
+  @media (max-width: ${theme.studio.breakpoint}) {
     grid-template-columns: 1fr;
     overflow: auto;
   }
@@ -46,22 +48,33 @@ const Panel = styled.aside<{
   $drawer?: 'catalog' | 'inspector';
   $open?: boolean;
 }>`
-  @media (max-width: ${theme.caseWizard.smallScreen}) {
+  @media (max-width: ${theme.studio.breakpoint}) {
     ${({ $drawer, $open }) =>
       $drawer
         ? `display:${$open ? 'block' : 'none'}; position:absolute; top:0; bottom:0; ${$drawer === 'catalog' ? 'left' : 'right'}:0; width:min(86vw,${theme.cad.inspectorWidth}); z-index:${theme.cad.drawerLayer}; background:${theme.colors.background}; box-sizing:border-box;`
         : ''}
   }
 
+  @media (max-width: ${theme.workbench.phoneBreakpoint}) {
+    ${({ $drawer }) => ($drawer ? 'width:100%; border-inline:0;' : '')}
+  }
+
   padding: ${theme.spacing.md};
+  min-width: 0;
+  background: ${theme.colors.backgroundLight};
   overflow: auto;
+  scrollbar-gutter: stable;
   border-right: 1px solid ${theme.colors.border};
-  border-left: 1px solid ${theme.colors.border};
+  &[aria-label='Footprint inspector'] {
+    border-right: 0;
+    border-left: 1px solid ${theme.colors.border};
+  }
   h2 {
     overflow-wrap: anywhere;
   }
   label {
-    display: block;
+    display: grid;
+    gap: ${theme.spacing.xs};
     margin-bottom: ${theme.spacing.md};
   }
   input,
@@ -69,11 +82,31 @@ const Panel = styled.aside<{
   textarea {
     width: 100%;
     box-sizing: border-box;
+    background: ${theme.workbench.fieldSurface};
+  }
+  h2 {
+    font-size: ${theme.workbench.titleSize};
+  }
+  h3 {
+    font-size: ${theme.fontSizes.bodySmall};
+    font-weight: 500;
+    color: ${theme.colors.textDarker};
+  }
+  input[type='checkbox'] {
+    width: 18px;
+  }
+  .import-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: ${theme.spacing.sm};
+    margin: ${theme.spacing.sm} 0;
   }
   fieldset {
     margin: ${theme.spacing.md} 0;
-    padding: ${theme.spacing.sm};
-    border: 1px solid ${theme.colors.border};
+    padding: ${theme.spacing.sm} 0;
+    min-width: 0;
+    border: 0;
+    border-top: 1px solid ${theme.colors.border};
   }
   table {
     width: 100%;
@@ -93,22 +126,74 @@ const Panel = styled.aside<{
   }
 `;
 const MobileAction = styled.button`
-  display: none;
-  @media (max-width: ${theme.caseWizard.smallScreen}) {
-    display: inline-flex;
+  /* Keep the shell's generic button rule from exposing drawer controls. */
+  && {
+    display: none;
+    @media (max-width: ${theme.studio.breakpoint}) {
+      display: inline-flex;
+    }
   }
 `;
 const Catalog = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${theme.spacing.xs};
-  margin: ${theme.spacing.md} 0;
-  button {
+  margin: ${theme.spacing.sm} 0 ${theme.spacing.lg};
+  && button {
+    justify-content: flex-start;
     text-align: left;
-    word-break: break-word;
+    min-width: 0;
+    padding: ${theme.spacing.sm};
+    background: transparent;
+    border-color: transparent;
+    > span {
+      min-width: 0;
+      display: grid;
+      gap: ${theme.spacing.xs};
+    }
+    span span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    small {
+      display: block;
+      font-size: ${theme.fontSizes.bodySmall};
+    }
   }
-  button[aria-pressed='true'] {
-    background: ${theme.colors.accentDarker};
+  && button:hover {
+    background: ${theme.colors.buttonHover};
+  }
+  && button[aria-pressed='true'] {
+    background: ${theme.studio.selected};
+    border-color: ${theme.colors.accent};
+  }
+`;
+const EditorHeader = styled.div`
+  position: sticky;
+  top: calc(-1 * ${theme.spacing.md});
+  z-index: 1;
+  margin: calc(-1 * ${theme.spacing.md}) calc(-1 * ${theme.spacing.md})
+    ${theme.spacing.md};
+  padding: ${theme.spacing.md};
+  background: ${theme.colors.backgroundLight};
+  border-bottom: 1px solid ${theme.colors.border};
+  > button {
+    margin-bottom: ${theme.spacing.sm};
+  }
+  h2 {
+    margin: 0 0 ${theme.spacing.xs};
+    font-size: ${theme.fontSizes.base};
+  }
+  p {
+    margin: 0;
+    font-size: ${theme.fontSizes.bodySmall};
+  }
+  .save-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: ${theme.spacing.sm};
+    margin-top: ${theme.spacing.sm};
   }
 `;
 const Center = styled.main`
@@ -116,7 +201,8 @@ const Center = styled.main`
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: ${theme.caseWizard.solidHeight};
+  min-height: 0;
+  overflow: hidden;
   > div[aria-label='Footprint preview'] {
     flex: 1;
   }
@@ -126,7 +212,8 @@ const Toolbar = styled.div`
   flex-wrap: wrap;
   align-items: center;
   gap: ${theme.spacing.sm};
-  padding: ${theme.spacing.md};
+  padding: ${theme.spacing.sm};
+  border-bottom: 1px solid ${theme.colors.border};
   button[aria-pressed='true'] {
     border-color: ${theme.colors.accent};
   }
@@ -137,10 +224,10 @@ const Inset = styled.div`
   left: ${theme.spacing.md};
   width: ${theme.cad.insetWidth};
   height: ${theme.cad.insetHeight};
-  border: 1px solid ${theme.colors.accent};
+  border: 1px solid ${theme.colors.border};
   border-radius: ${theme.caseWizard.radius};
   overflow: hidden;
-  @media (max-width: ${theme.caseWizard.smallScreen}) {
+  @media (max-width: ${theme.studio.breakpoint}) {
     display: none;
   }
 `;
@@ -177,9 +264,7 @@ export default function FootprintLibrary({
     setInspectorOpen(false);
   };
   useEffect(() => {
-    if (
-      !window.matchMedia(`(max-width: ${theme.caseWizard.smallScreen})`).matches
-    ) {
+    if (!window.matchMedia(`(max-width: ${theme.studio.breakpoint})`).matches) {
       return;
     }
     const panel = catalogOpen
@@ -210,6 +295,7 @@ export default function FootprintLibrary({
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
   const [inspecting, setInspecting] = useState(false);
+  const [importsOpen, setImportsOpen] = useState(true);
   const [batch, setBatch] = useState<Batch[]>([]);
   const [bundleFiles, setBundleFiles] = useState<ImportFile[]>([]);
   const [impact, setImpact] = useState<{
@@ -222,6 +308,8 @@ export default function FootprintLibrary({
   const fileInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
   const drafts = useRef(new Map<string, LibraryEntry>());
+  const sourceDrafts = useRef(new Map<string, LibraryEntry>());
+  const histories = useRef(new Map<string, LibraryEntry[]>());
   const history = useRef<LibraryEntry[]>([]);
   const operation = useRef<AbortController>();
   const current = useRef(draft);
@@ -230,12 +318,14 @@ export default function FootprintLibrary({
   const edit = (next: LibraryEntry) => {
     if (draft) {
       history.current.push(draft);
+      histories.current.set(draft.id, history.current);
     }
     drafts.current.set(next.id, next);
     setDraft(next);
     setStatus('Unsaved footprint draft');
   };
   const open = (entry: LibraryEntry) => {
+    setImportsOpen(false);
     setCatalogOpen(false);
     setInspectorOpen(true);
     if (draft) {
@@ -244,10 +334,18 @@ export default function FootprintLibrary({
     setDraft(drafts.current.get(entry.id) || entry);
     setInfo(undefined);
     setError('');
-    setStatus('');
+    history.current = histories.current.get(entry.id) || [];
+    setStatus(history.current.length ? 'Unsaved footprint draft' : '');
     setParams({});
-    history.current = [];
     setActive(0);
+  };
+  // A catalogue item owns one draft, even after browsing another part.
+  const openSource = (name: string, source: string, kind: string) => {
+    const key = `${kind}:${name}`;
+    const entry =
+      sourceDrafts.current.get(key) || createEntry(name, source, 'ergogen');
+    sourceDrafts.current.set(key, entry);
+    open(entry);
   };
   const geometryRevision = JSON.stringify([
     draft?.id,
@@ -364,6 +462,7 @@ export default function FootprintLibrary({
       const sources = await readFootprintFiles(files, controller.signal);
       controller.signal.throwIfAborted();
       setBundleFiles(sources);
+      setImportsOpen(true);
       setBatch(
         sources
           .filter((source) => source.kind !== 'model')
@@ -453,9 +552,10 @@ export default function FootprintLibrary({
         resolved: prepared.resolved,
         mapping: prepared.mapping,
       });
-      drafts.current.delete(saved.id);
+      drafts.current.set(saved.id, saved);
       setDraft(saved);
       history.current = [];
+      histories.current.delete(saved.id);
       const injection = entryInjection(saved);
       context?.setInjectionInput((previous) => [
         ...(previous || []).filter((row) => row[1] !== saved.alias),
@@ -504,8 +604,7 @@ export default function FootprintLibrary({
       onKeyDown={(event) => {
         if (
           !(catalogOpen || inspectorOpen) ||
-          !window.matchMedia(`(max-width: ${theme.caseWizard.smallScreen})`)
-            .matches
+          !window.matchMedia(`(max-width: ${theme.studio.breakpoint})`).matches
         ) {
           return;
         }
@@ -552,12 +651,17 @@ export default function FootprintLibrary({
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
-        <button onClick={() => fileInput.current?.click()}>
-          Import KiCad footprint
-        </button>{' '}
-        <button onClick={() => folderInput.current?.click()}>
-          Import folder
-        </button>
+        <details>
+          <summary>Import footprints</summary>
+          <div className="import-actions">
+            <button onClick={() => fileInput.current?.click()}>
+              Import KiCad footprint
+            </button>{' '}
+            <button onClick={() => folderInput.current?.click()}>
+              Import folder
+            </button>
+          </div>
+        </details>
         <input
           hidden
           ref={fileInput}
@@ -583,8 +687,15 @@ export default function FootprintLibrary({
           }}
         />
         {!!batch.length && (
-          <section>
-            <h3>Import selection</h3>
+          <details open={importsOpen}>
+            <summary
+              onClick={(event) => {
+                event.preventDefault();
+                setImportsOpen(!importsOpen);
+              }}
+            >
+              Import selection ({batch.length})
+            </summary>
             {batch.map((item) => (
               <div key={item.name}>
                 <label>
@@ -617,7 +728,7 @@ export default function FootprintLibrary({
             >
               Prepare selected
             </button>
-          </section>
+          </details>
         )}
         <h3>Your footprints ({entries.length})</h3>
         <Catalog>
@@ -628,11 +739,14 @@ export default function FootprintLibrary({
             .map((entry) => (
               <button
                 key={entry.id}
+                title={entry.name}
                 aria-pressed={draft?.id === entry.id}
                 onClick={() => open(entry)}
               >
-                {entry.name}
-                <small> · r{entry.revision}</small>
+                <span>
+                  <span>{entry.name}</span>
+                  <small>Custom · revision {entry.revision}</small>
+                </span>
               </button>
             ))}
         </Catalog>
@@ -641,12 +755,22 @@ export default function FootprintLibrary({
           {filtered.map((entry) => (
             <button
               key={`${entry.kind}:${entry.name}`}
-              onClick={() =>
-                open(createEntry(entry.name, entry.source, 'ergogen'))
+              aria-label={`${entry.name} · ${entry.kind}`}
+              title={entry.name}
+              aria-pressed={
+                !!draft &&
+                draft.id ===
+                  sourceDrafts.current.get(`${entry.kind}:${entry.name}`)?.id
               }
+              onClick={() => openSource(entry.name, entry.source, entry.kind)}
             >
-              {entry.name}
-              <small> · {entry.kind}</small>
+              <span>
+                <span>{entry.name.split('/').at(-1)}</span>
+                <small>
+                  {entry.kind} ·{' '}
+                  {entry.name.split('/').slice(0, -1).join('/') || 'Ergogen'}
+                </small>
+              </span>
             </button>
           ))}
         </Catalog>
@@ -683,6 +807,7 @@ export default function FootprintLibrary({
           {(['translate', 'rotate', 'scale'] as const).map((value) => (
             <button
               key={value}
+              disabled={!draft?.models[active] || view === '2d'}
               aria-pressed={mode === value}
               onClick={() => setMode(value)}
             >
@@ -720,7 +845,15 @@ export default function FootprintLibrary({
             side={side}
           />
         ) : (
-          <Panel as="div">
+          <Panel
+            as="div"
+            style={{
+              margin: 'auto',
+              maxWidth: '32rem',
+              border: 0,
+              background: 'transparent',
+            }}
+          >
             <h2>Prepare a reusable footprint</h2>
             <p>
               Choose a bundled footprint to customize, or import a KiCad
@@ -750,19 +883,56 @@ export default function FootprintLibrary({
         $open={inspectorOpen}
         aria-label="Footprint inspector"
       >
-        <MobileAction onClick={closeDrawer}>Close inspector</MobileAction>
+        {!draft && (
+          <MobileAction onClick={closeDrawer}>Close inspector</MobileAction>
+        )}
         {draft && (
           <>
-            <h2>{draft.name}</h2>
-            <p>
-              {draft.revision
-                ? `Library footprint · revision ${draft.revision}`
-                : 'New user footprint · unsaved'}
-            </p>
+            <EditorHeader>
+              <MobileAction onClick={closeDrawer}>Close inspector</MobileAction>
+              <h2>{draft.name}</h2>
+              <p>
+                {history.current.length || !draft.revision
+                  ? 'Unsaved changes'
+                  : `Library footprint · revision ${draft.revision}`}
+              </p>
+              <div className="save-actions">
+                <button
+                  data-primary="true"
+                  onClick={() => void save()}
+                  disabled={
+                    busy ||
+                    modelBusy === 'busy' ||
+                    !info ||
+                    (info.targets.length > 1 &&
+                      draft.modelMode === 'replace' &&
+                      !draft.target)
+                  }
+                >
+                  Save footprint
+                </button>
+                <button
+                  aria-label="Undo footprint edit"
+                  disabled={!history.current.length}
+                  onClick={() => {
+                    const previous = history.current.pop();
+                    if (previous) {
+                      drafts.current.set(previous.id, previous);
+                      setDraft(previous);
+                    }
+                  }}
+                >
+                  <Undo2 size={16} /> Undo
+                </button>
+              </div>
+            </EditorHeader>
             <Toolbar>
               <button
                 aria-pressed={tab === 'model'}
-                onClick={() => setTab('model')}
+                onClick={() => {
+                  setTab('model');
+                  setView('3d');
+                }}
               >
                 3D models
               </button>
@@ -947,30 +1117,6 @@ export default function FootprintLibrary({
                 ? `${impact.placements} linked placements · ${impact.projects} projects${impact.unchecked ? ` · ${impact.unchecked} project counts unavailable` : ''}`
                 : `${uses.declarations} linked declarations · ${uses.projects} projects · counting placements…`}
             </p>
-            <button
-              onClick={() => void save()}
-              disabled={
-                busy ||
-                modelBusy === 'busy' ||
-                !info ||
-                (info.targets.length > 1 &&
-                  draft.modelMode === 'replace' &&
-                  !draft.target)
-              }
-            >
-              Save footprint
-            </button>{' '}
-            <button
-              disabled={!history.current.length}
-              onClick={() => {
-                const previous = history.current.pop();
-                if (previous) {
-                  setDraft(previous);
-                }
-              }}
-            >
-              Undo footprint edit
-            </button>
             {draft.revision > 0 && (
               <>
                 <fieldset>

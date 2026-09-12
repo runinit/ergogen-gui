@@ -13,9 +13,9 @@ it('adjusts a column relative to its existing splay, stagger and offsets', () =>
     )
   );
   expect(result.layout.clusters.fingers.arrangement).toMatchObject({
-    offsets: { c1: [4, 2, 0] },
+    offsets: { c1: [4, 3, 0] },
     splay: { c1: 15 },
-    stagger: { c1: 7 },
+    stagger: { c1: 6 },
   });
 });
 it('resizes only selected column members', () => {

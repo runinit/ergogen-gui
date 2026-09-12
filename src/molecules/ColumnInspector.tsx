@@ -1,4 +1,5 @@
-import { StudioActions, StudioField } from './StudioStyles';
+import { useSnapOptions } from '../hooks/useSnapOptions';
+import { StudioActions } from './StudioStyles';
 import {
   addCell,
   matrixNames,
@@ -8,6 +9,12 @@ import {
   StudioDoc,
 } from '../utils/studioSource';
 import { setLayout } from '../utils/layoutSource';
+import DimensionField from './DimensionField';
+import {
+  ensurePitchUnits,
+  pitchUnits,
+  type Dimension,
+} from '../utils/designUnits';
 import type { StudioSelection } from './StudioCanvas';
 
 export default function ColumnInspector({
@@ -23,6 +30,7 @@ export default function ColumnInspector({
   edit: (change: (source: string) => string) => void;
   select: (value: StudioSelection) => void;
 }) {
+  const [snap] = useSnapOptions();
   const cluster = selection.cluster || '',
     column = selection.id;
   const spec = data.layout.clusters?.[cluster],
@@ -32,8 +40,15 @@ export default function ColumnInspector({
   }
   const patch = (path: (string | number)[], value: unknown) =>
     edit((before) =>
-      setLayout(before, 'clusters', cluster, ['arrangement', ...path], value)
+      setLayout(
+        ensurePitchUnits(before),
+        'clusters',
+        cluster,
+        ['arrangement', ...path],
+        value
+      )
     );
+  const units = pitchUnits(source);
   const dimension = (
     label: string,
     path: (string | number)[],
@@ -48,37 +63,37 @@ export default function ColumnInspector({
         ...path,
       ]) ?? fallback;
     return (
-      <StudioField key={`${cluster}-${column}-${label}-${value}`}>
-        <span>{label}</span>
-        <input
-          aria-label={label}
-          disabled={spec.locked}
-          defaultValue={String(value)}
-          onBlur={(event) => {
-            const text = event.target.value.trim();
-            if (!text || text === String(value)) {
-              return;
-            }
-            const next = Number.isFinite(Number(text)) ? Number(text) : text;
-            if (path[0] === 'offsets') {
-              const offsets = (getValue(source, [
-                'layout',
-                'clusters',
-                cluster,
-                'arrangement',
-                'offsets',
-                column,
-              ]) || [0, 0, 0]) as (number | string)[];
-              patch(
-                ['offsets', column],
-                offsets.map((v, i) => (i === path[2] ? next : v))
-              );
-            } else {
-              patch(path, next);
-            }
-          }}
-        />
-      </StudioField>
+      <DimensionField
+        key={`${cluster}-${column}-${label}`}
+        label={label}
+        value={value as Dimension}
+        units={units}
+        disabled={spec.locked}
+        suffix={path[0] === 'splay' ? '°' : 'mm'}
+        step={
+          path[0] === 'stagger'
+            ? snap.millimetres || `${snap.step}v`
+            : undefined
+        }
+        onCommit={(next) => {
+          if (path[0] === 'offsets') {
+            const offsets = (getValue(source, [
+              'layout',
+              'clusters',
+              cluster,
+              'arrangement',
+              'offsets',
+              column,
+            ]) || [0, 0, 0]) as (number | string)[];
+            patch(
+              ['offsets', column],
+              offsets.map((v, i) => (i === path[2] ? next : v))
+            );
+          } else {
+            patch(path, next);
+          }
+        }}
+      />
     );
   };
   return (
@@ -87,11 +102,26 @@ export default function ColumnInspector({
       <p>
         {cluster} · {column}. Changes affect every key in this column.
       </p>
-      {dimension('Column splay', ['splay', column], 0)}
       {dimension('Column stagger', ['stagger', column], 0)}
-      {['X', 'Y', 'Z'].map((label, index) =>
-        dimension(`Column offset ${label}`, ['offsets', column, index], 0)
-      )}
+      <StudioActions aria-label="Stagger presets">
+        {['0', '0.25v', '0.5v', 'v'].map((value) => (
+          <button
+            key={value}
+            disabled={spec.locked}
+            onClick={() => patch(['stagger', column], value)}
+          >
+            {value === 'v' ? '1' : value.replace('v', '')}{' '}
+            {units.u === units.v ? 'u' : 'v'}
+          </button>
+        ))}
+      </StudioActions>
+      {dimension('Column splay', ['splay', column], 0)}
+      <details>
+        <summary>Additional offsets</summary>
+        {['X', 'Y', 'Z'].map((label, index) =>
+          dimension(`Column offset ${label}`, ['offsets', column, index], 0)
+        )}
+      </details>
       <p>
         Splay rotates the column about its first row. Individual key edits stay
         relative to the column.

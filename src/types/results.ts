@@ -1,3 +1,4 @@
+import type { StackupReport } from './stackup';
 /**
  * Shared result structures and case output definitions.
  */
@@ -30,6 +31,7 @@ export interface SolidOutput {
 }
 
 export interface Results {
+  stackups?: Record<string, StackupReport>;
   layout?: import('ergogen/src/native').LayoutReport;
   solids?: Record<string, SolidOutput>;
   designs?: import('./design').DesignReport;

@@ -1,3 +1,4 @@
+import { stackForBoard, setStackDimension } from './stackDimensions';
 import {
   isAlias,
   isMap,
@@ -47,6 +48,7 @@ export function createCase(source: string, name: string): string {
   }
   const boardId = Object.keys(data.pcbs || {})[0];
   const boardProfile = data.pcbs?.[boardId]?.profile;
+  const stackup = stackForBoard(source, boardId);
   for (const path of [
     ['designs', 'assemblies', name],
     ['designs', 'profiles', `${name}_board`],
@@ -74,6 +76,7 @@ export function createCase(source: string, name: string): string {
       ['assemblies', name],
       {
         preset: 'enclosure',
+        ...(stackup ? { stackup } : {}),
         profile: boardProfile || `profiles.${name}_board`,
         mounting: '',
         construction: 'cover',
@@ -125,6 +128,33 @@ export function editCase(
   path: SourcePath,
   value: unknown
 ): string {
+  const assembly = parseDocument(source).toJS()?.designs?.assemblies?.[name];
+  if (assembly?.stackup && path.length === 1) {
+    const stackPath = ['designs', 'stackups', assembly.stackup];
+    if (path[0] === 'plate') {
+      return setStackDimension(
+        source,
+        [...stackPath, 'plate', 'thickness'],
+        value
+      );
+    }
+    if (path[0] === 'pcb_thickness') {
+      return setStackDimension(
+        source,
+        ['pcbs', assembly.board.name, 'thickness'],
+        value
+      );
+    }
+    if (path[0] === 'plate_z') {
+      const thickness =
+        parseDocument(source).toJS().pcbs[assembly.board.name].thickness ?? 1.6;
+      return setStackDimension(
+        source,
+        [...stackPath, 'plate', 'gap'],
+        `(${value}) - (${assembly.pcb_z ?? 6}) - (${thickness})`
+      );
+    }
+  }
   const full = ['designs', 'assemblies', name, ...path];
   const node = parseDocument(source).getIn(full, true);
   // Materialize only the edited alias; its shared anchor remains unchanged.

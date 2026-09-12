@@ -162,6 +162,7 @@ it('clears a previous generation error when the source changes', () => {
   expect(session.error).toBeNull();
 });
 it('releases the generate control when edits supersede a running request', async () => {
+  const source = 'points: {}\n';
   mount();
   act(() => {
     session.createNewConfig(source, 'Generation');

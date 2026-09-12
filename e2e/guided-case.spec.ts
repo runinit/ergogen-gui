@@ -1,4 +1,4 @@
-import { studio, openCase } from './utils/studio';
+import { studio, openCase, openExport } from './utils/studio';
 import { test, expect, Page } from '@playwright/test';
 import source from './fixtures/native-grid';
 const open = async (page: Page) => {
@@ -64,17 +64,19 @@ test('plans gasket mounting before solids and only generates explicitly', async 
   await dialog.getByLabel('Wall thickness (mm)', { exact: true }).press('Tab');
   await expect(dialog.getByLabel('3D assembly preview')).toHaveCount(0);
   await expect(
-    dialog.getByRole('button', { name: 'Generate', exact: true })
+    page.getByRole('button', { name: 'Generate project', exact: true })
   ).toBeEnabled();
   await page.mouse.move(5, 5);
   await page.screenshot({
     path: 'test-results/guided-plan.png',
     fullPage: true,
   });
-  await dialog.getByRole('button', { name: 'Generate', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Generate project', exact: true })
+    .click();
   await expect(
-    dialog.getByRole('button', { name: 'Generating…', exact: true })
-  ).not.toBeVisible({ timeout: 90000 });
+    dialog.getByRole('status').filter({ hasText: /Current geometry/ })
+  ).toBeVisible({ timeout: 90000 });
   await expect(dialog.getByRole('alert')).toHaveCount(0);
   await dialog.getByRole('button', { name: 'assembled', exact: true }).click();
   await expect(dialog.getByLabel('3D assembly preview')).toHaveAttribute(
@@ -87,9 +89,12 @@ test('plans gasket mounting before solids and only generates explicitly', async 
     fullPage: true,
   });
   await dialog.getByRole('button', { name: 'Review', exact: true }).click();
-  await dialog.getByRole('checkbox').check();
+  const exportView = await openExport(page);
+  await exportView
+    .getByRole('checkbox', { name: /I reviewed dimensions/ })
+    .check();
   await expect(
-    dialog.getByRole('button', { name: 'Download ZIP', exact: true })
+    exportView.getByRole('button', { name: 'Download case ZIP', exact: true })
   ).toBeEnabled();
   expect(errors).toEqual([]);
 });
@@ -161,11 +166,13 @@ test('exports a middle frame and rejects an outdated result', async ({
     dialog.getByRole('button', { name: /^gasket gasket_/ }).first()
   ).toBeVisible();
   await expect(
-    dialog.getByRole('button', { name: 'Generate', exact: true })
+    page.getByRole('button', { name: 'Generate project', exact: true })
   ).toBeEnabled();
-  await dialog.getByRole('button', { name: 'Generate', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Generate project', exact: true })
+    .click();
   await expect(
-    dialog.getByText('Generated current draft', { exact: true })
+    dialog.getByRole('status').filter({ hasText: /Current geometry/ })
   ).toBeVisible({ timeout: 90000 });
   await dialog.getByRole('button', { name: 'exploded', exact: true }).click();
   await expect(dialog.getByLabel('3D assembly preview')).toHaveAttribute(
@@ -181,13 +188,16 @@ test('exports a middle frame and rejects an outdated result', async ({
   await dialog.getByLabel('Wall thickness (mm)', { exact: true }).fill('3.1');
   await dialog.getByLabel('Wall thickness (mm)', { exact: true }).press('Tab');
   await expect(
-    dialog.getByText('Changes not generated', { exact: true })
+    dialog.getByRole('status').filter({ hasText: /Case needs regeneration/ })
   ).toBeVisible();
   await expect(dialog.getByLabel('3D assembly preview')).toBeVisible();
   await dialog.getByRole('button', { name: 'Review', exact: true }).click();
-  await dialog.getByRole('checkbox').check();
+  const exportView = await openExport(page);
   await expect(
-    dialog.getByRole('button', { name: 'Download ZIP', exact: true })
+    exportView.getByRole('checkbox', { name: /I reviewed dimensions/ })
+  ).toBeDisabled();
+  await expect(
+    exportView.getByRole('button', { name: 'Download case ZIP', exact: true })
   ).toBeDisabled();
 });
 
@@ -227,24 +237,29 @@ test('imports an STL for a PCB component and packages its KiCad model associatio
     timeout: 30000,
   });
   await expect(
-    dialog.getByRole('button', { name: 'Generate', exact: true })
+    page.getByRole('button', { name: 'Generate project', exact: true })
   ).toBeEnabled();
-  await dialog.getByRole('button', { name: 'Generate', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Generate project', exact: true })
+    .click();
   await expect(
-    dialog.getByRole('button', { name: 'Generating…', exact: true })
-  ).not.toBeVisible({ timeout: 90000 });
+    dialog.getByRole('status').filter({ hasText: /Current geometry/ })
+  ).toBeVisible({ timeout: 90000 });
   if (await dialog.getByRole('alert').count()) {
     await dialog.getByRole('button', { name: 'Review', exact: true }).click();
     console.log(await dialog.getByLabel('Grouped findings').innerText());
   }
   await expect(dialog.getByRole('alert')).toHaveCount(0);
   await expect(
-    dialog.getByText('Generated current draft', { exact: true })
+    dialog.getByRole('status').filter({ hasText: /Current geometry/ })
   ).toBeVisible({ timeout: 90000 });
   await dialog.getByRole('button', { name: 'Review', exact: true }).click();
-  await dialog.getByRole('checkbox').check();
+  const exportView = await openExport(page);
+  await exportView
+    .getByRole('checkbox', { name: /I reviewed dimensions/ })
+    .check();
   const downloadPromise = page.waitForEvent('download');
-  await dialog.getByRole('button', { name: 'Download ZIP' }).click();
+  await exportView.getByRole('button', { name: 'Download case ZIP' }).click();
   const download = await downloadPromise;
   await download.saveAs('test-results/guided-model-project.zip');
   const { readFileSync } = await import('node:fs');
@@ -259,7 +274,7 @@ test('imports an STL for a PCB component and packages its KiCad model associatio
   expect(zip.file('outputs/pcbs/models/controller.wrl')).not.toBeNull();
   await page
     .getByRole('navigation', { name: 'Design workflow' })
-    .getByRole('button', { name: 'Layout', exact: true })
+    .getByRole('button', { name: 'Design', exact: true })
     .click();
   await expect(dialog).not.toBeVisible();
   await page.reload();
@@ -369,12 +384,14 @@ test('generates with optional missing component envelopes and groups review', as
     .click();
   await expect(dialog.getByText('Diode:Unknown · 2 placements')).toBeVisible();
   await expect(
-    dialog.getByRole('button', { name: 'Generate', exact: true })
+    page.getByRole('button', { name: 'Generate project', exact: true })
   ).toBeEnabled();
-  await dialog.getByRole('button', { name: 'Generate', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Generate project', exact: true })
+    .click();
   await expect(
-    dialog.getByRole('button', { name: 'Generating…', exact: true })
-  ).not.toBeVisible({ timeout: 90000 });
+    dialog.getByRole('status').filter({ hasText: /Current geometry/ })
+  ).toBeVisible({ timeout: 90000 });
   if (await dialog.getByRole('alert').count()) {
     await dialog.getByRole('button', { name: 'Review', exact: true }).click();
     console.log(await dialog.getByLabel('Grouped findings').innerText());
@@ -382,7 +399,7 @@ test('generates with optional missing component envelopes and groups review', as
   expect(await dialog.getByRole('alert').allTextContents()).toEqual([]);
   await page.screenshot({ path: 'test-results/optional-component-setup.png' });
   await expect(
-    dialog.getByRole('status').filter({ hasText: 'Generated current draft' })
+    dialog.getByRole('status').filter({ hasText: /Current geometry/ })
   ).toBeVisible({ timeout: 90000 });
   await expect(dialog.getByRole('alert')).toHaveCount(0);
 });

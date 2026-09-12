@@ -1,4 +1,10 @@
-import { studio, openCode, readSource } from './utils/studio';
+import {
+  studio,
+  openCode,
+  openExport,
+  readSource,
+  openInspector,
+} from './utils/studio';
 import grid from './fixtures/native-grid';
 import { test as base, expect, Page, Browser } from '@playwright/test';
 
@@ -98,6 +104,7 @@ test.beforeEach(async ({ page, baseURL }) => {
   await page.goto(baseURL || '/', { waitUntil: 'domcontentloaded' });
   await expect(studio(page)).toBeVisible();
   await generate(page);
+  await openInspector(page);
   await page.getByRole('button', { name: 'Sketches', exact: true }).click();
   await expect(
     page
@@ -141,9 +148,7 @@ test('edits YAML through undo/redo and retains the preview on a broken reference
     page.getByRole('status').filter({ hasText: 'Preview stale —' })
   ).toBeVisible();
   await expect(
-    page
-      .getByRole('status')
-      .filter({ hasText: 'Board outline needs attention' })
+    studio(page).getByRole('alert').filter({ hasText: 'regions.missing' })
   ).toContainText('regions.missing');
   await page.getByLabel('Design feature').selectOption('boundaries.body');
   await expect(
@@ -198,4 +203,15 @@ test('renders assembled and exploded STL parts', async ({ page }) => {
   await page.getByLabel('Part', { exact: true }).selectOption('tray_lid');
   await expect(canvas).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('assembly.png') });
+  const outputs = await openExport(page);
+  await outputs
+    .getByRole('checkbox', { name: /I reviewed dimensions/ })
+    .check();
+  await expect(
+    outputs.getByRole('button', { name: 'Download case ZIP' })
+  ).toBeEnabled();
+  await outputs
+    .getByRole('button', { name: 'Review case and manufacturing' })
+    .click();
+  await expect(page.getByRole('region', { name: 'Design view' })).toBeVisible();
 });

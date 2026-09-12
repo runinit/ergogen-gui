@@ -1,4 +1,4 @@
-import { CONTROLLERS, setupNets, type DesignSetup } from './designSetup';
+import { CONTROLLERS } from './designSetup';
 import {
   getValue,
   readStudio,
@@ -38,13 +38,6 @@ export function keyNets(source: string, id: string) {
 
 // Existing assignments reserve their pins. Only missing nets use unassigned GPIOs.
 export function syncControllerNets(source: string): string {
-  const setup = getValue(source, ['meta', 'studio', 'setup']) as
-    | DesignSetup
-    | undefined;
-  const controller = CONTROLLERS.find((item) => item.id === setup?.controller);
-  if (!controller) {
-    return source;
-  }
   const data = readStudio(source);
   let result = source;
   const messages: string[] = [];
@@ -52,7 +45,10 @@ export function syncControllerNets(source: string): string {
     const binding = item.footprints?.main as
       | { what?: string; params?: Record<string, unknown> }
       | undefined;
-    if (binding?.what !== controller.provider) {
+    const controller = CONTROLLERS.find(
+      (item) => item.provider === binding?.what
+    );
+    if (!binding || !controller) {
       continue;
     }
     const objects = Object.values(data.layout.objects || {}).filter(
@@ -91,11 +87,32 @@ export function syncControllerNets(source: string): string {
         return [];
       })
     );
-    const prefix = item.pcb === 'main' ? '' : `${item.pcb}_`;
-    for (const net of setupNets(setup!, prefix).filter(
-      (net) => net.includes('ENC_') || net.endsWith('SPLIT_DATA')
-    )) {
-      nets.add(net);
+    for (const object of objects) {
+      const required = object.properties?.required_nets;
+      if (Array.isArray(required)) {
+        for (const net of required) {
+          if (typeof net === 'string') {
+            nets.add(net);
+          }
+        }
+      }
+      // Older projects retain accessory nets from their actual footprint bindings.
+      for (const binding of Object.values(object.footprints || {}) as {
+        what?: string;
+        params?: Record<string, unknown>;
+      }[]) {
+        if (
+          !binding.what?.includes('encoder') &&
+          !binding.what?.includes('trrs')
+        ) {
+          continue;
+        }
+        for (const net of Object.values(binding.params || {})) {
+          if (typeof net === 'string' && /ENC_|SPLIT_DATA/.test(net)) {
+            nets.add(net);
+          }
+        }
+      }
     }
     const missing = Array.from(nets).filter(
       (net) => !Object.values(params).includes(net)

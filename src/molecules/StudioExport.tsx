@@ -1,10 +1,13 @@
 import { saveAs } from 'file-saver';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { GeometryJob } from '../hooks/useCasePreview';
+import { caseReadiness } from '../utils/caseReadiness';
 import { Results } from '../types/results';
 import { createZip } from '../utils/zip';
 import { CaseAssets } from '../utils/caseAssets';
 import ShareDialog from './ShareDialog';
 import { StudioActions, StudioMain, StudioStatus } from './StudioStyles';
+import { formatDimension } from '../utils/designUnits';
 import { theme } from '../theme/theme';
 
 export default function StudioExport({
@@ -15,6 +18,8 @@ export default function StudioExport({
   stale,
   blockers,
   review,
+  preview,
+  analysis,
 }: {
   source: string;
   injections?: string[][];
@@ -23,16 +28,47 @@ export default function StudioExport({
   stale: boolean;
   blockers: number;
   review: () => void;
+  preview: GeometryJob;
+  analysis: GeometryJob;
 }) {
   const [error, setError] = useState('');
   const [sharing, setSharing] = useState(false);
-  const ready = !!result && !stale && blockers === 0;
+  const hasOutputs =
+    Object.keys(result?.pcbs || {}).length > 0 ||
+    Object.values(result?.outlines || {}).some(
+      (files) => files.svg || files.dxf
+    );
+  const sheets = Object.entries(result?.stackups || {}).flatMap(
+    ([stack, report]) =>
+      Object.entries(report.layers).map(([id, layer]) => ({
+        stack,
+        id,
+        ...layer,
+      }))
+  );
+  const sheetNames = new Set(sheets.map((layer) => layer.output));
+  const ready = hasOutputs && !stale && blockers === 0;
+  const caseError = caseReadiness(source, preview, analysis);
+  const [reviewed, setReviewed] = useState<Results | null>(null);
+  const confirmed =
+    !caseError && reviewed !== null && reviewed === preview.result;
+  useEffect(() => {
+    if (caseError) {
+      setReviewed(null);
+    }
+  }, [caseError]);
   const download = (name: string, content: string) =>
     saveAs(new Blob([content]), name);
-  const archive = (outputs: Results) => {
-    void createZip(outputs, source, injections, false, false, assets).catch(
-      (error) => setError(String(error))
-    );
+  const archive = (outputs: Results, kind: 'board' | 'case' = 'board') => {
+    setError('');
+    void createZip(
+      outputs,
+      source,
+      injections,
+      false,
+      kind === 'case',
+      assets
+    ).catch((error) => setError(String(error)));
   };
   return (
     <StudioMain style={{ padding: theme.spacing.lg, flex: 1 }}>
@@ -42,7 +78,9 @@ export default function StudioExport({
           ? 'Geometry needs updating. Your source is always available.'
           : blockers
             ? `${blockers} blockers need review before geometry export.`
-            : 'PCB and outline files match the current project.'}
+            : hasOutputs
+              ? 'PCB and outline files match the current project.'
+              : 'This project has no PCB or outline outputs yet.'}
       </p>
       {error && <StudioStatus role="alert">{error}</StudioStatus>}
       <h3>Editable project</h3>
@@ -62,7 +100,11 @@ export default function StudioExport({
         <button
           disabled={!ready}
           onClick={() =>
-            archive({ pcbs: result?.pcbs, outlines: result?.outlines })
+            archive({
+              pcbs: result?.pcbs,
+              outlines: result?.outlines,
+              stackups: result?.stackups,
+            })
           }
         >
           Download PCB and outlines ZIP
@@ -84,7 +126,7 @@ export default function StudioExport({
         </StudioActions>
       ))}
       {Object.entries(result?.outlines || {})
-        .filter(([name]) => !name.startsWith('_'))
+        .filter(([name]) => !name.startsWith('_') && !sheetNames.has(name))
         .map(([name, files]) => (
           <StudioActions key={name}>
             {(['dxf', 'svg'] as const).map(
@@ -101,12 +143,76 @@ export default function StudioExport({
             )}
           </StudioActions>
         ))}
+      {!!sheets.length && (
+        <section aria-label="Material layer exports">
+          <h3>Material layers</h3>
+          <p>
+            Nominal contours in millimetres. Each layer has its own fit and
+            outline checks.
+          </p>
+          {sheets.map((layer) => {
+            const files = result?.outlines?.[layer.output || ''];
+            const enabled = !stale && layer.status === 'ready' && !!files?.dxf;
+            return (
+              <div key={`${layer.stack}-${layer.id}`}>
+                <h4>
+                  {layer.label || layer.id} · {layer.material}
+                </h4>
+                <p>
+                  {layer.stock !== undefined
+                    ? `${formatDimension(layer.stock)} mm stock · ${formatDimension(layer.installed!)} mm installed · `
+                    : ''}
+                  {layer.message ||
+                    (layer.remaining !== undefined
+                      ? `${formatDimension(layer.remaining)} mm ${layer.remaining < 0 ? 'interference' : 'remaining'}`
+                      : layer.status)}
+                </p>
+                {files?.svg && !stale && (
+                  <img
+                    alt={`${layer.label || layer.id} cutting outline`}
+                    src={`data:image/svg+xml,${encodeURIComponent(files.svg)}`}
+                    style={{
+                      maxWidth: theme.caseWizard.previewHeight,
+                      width: '100%',
+                    }}
+                  />
+                )}
+                <StudioActions>
+                  <button
+                    disabled={!enabled}
+                    onClick={() => download(`${layer.output}.dxf`, files!.dxf!)}
+                  >
+                    Download {layer.label || layer.id} DXF
+                  </button>
+                </StudioActions>
+              </div>
+            );
+          })}
+        </section>
+      )}
       <h3>Case parts</h3>
-      <p>
-        Generate the case, review clearances and process checks, then download
-        its STEP, STL and manufacturing package.
-      </p>
+      <p>{caseError || 'Generated case files match the current project.'}</p>
       <button onClick={review}>Review case and manufacturing</button>
+      <label>
+        <input
+          type="checkbox"
+          checked={confirmed}
+          disabled={!!caseError}
+          onChange={(event) =>
+            setReviewed(event.target.checked ? preview.result : null)
+          }
+        />{' '}
+        I reviewed dimensions, hardware and manufacturing findings.
+      </label>
+      <StudioActions>
+        <button
+          disabled={!confirmed}
+          onClick={() => preview.result && archive(preview.result, 'case')}
+        >
+          Download case ZIP
+        </button>
+      </StudioActions>
+      <p>Physical fit requires a fabricated prototype.</p>
       {sharing && (
         <ShareDialog
           config={source}

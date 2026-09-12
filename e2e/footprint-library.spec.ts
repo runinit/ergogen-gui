@@ -1,4 +1,4 @@
-import { studio, openCase, openLibrary } from './utils/studio';
+import { studio, openCase, openExport, openLibrary } from './utils/studio';
 import { CONFIG_LOCAL_STORAGE_KEY } from '../src/context/constants';
 import { test, expect, Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
@@ -138,11 +138,13 @@ test('imports a KiCad bundle, aligns models, links placements, and exports a por
   await expect(
     dialog.getByLabel('Mounting system', { exact: true })
   ).toHaveValue('gasket');
-  await dialog.getByRole('button', { name: 'Generate', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Generate project', exact: true })
+    .click();
   await expect(
     dialog.getByText(
-      /Generated current draft|Generation needs attention. Open Review for grouped findings./,
-      { exact: true }
+      /Current geometry|Generation needs attention. Open Review for grouped findings./,
+      {}
     )
   ).toBeVisible({ timeout: 90000 });
   if (await dialog.getByRole('alert').count()) {
@@ -152,7 +154,7 @@ test('imports a KiCad bundle, aligns models, links placements, and exports a por
     );
   }
   await expect(
-    dialog.getByText('Generated current draft', { exact: true })
+    dialog.getByRole('status').filter({ hasText: /Current geometry/ })
   ).toBeVisible({ timeout: 90000 });
   await dialog.getByRole('button', { name: 'assembled', exact: true }).click();
   await expect(dialog.getByLabel('3D assembly preview')).toHaveAttribute(
@@ -160,13 +162,16 @@ test('imports a KiCad bundle, aligns models, links placements, and exports a por
     'true'
   );
   await dialog.getByRole('button', { name: 'Review', exact: true }).click();
-  await dialog.getByRole('checkbox', { name: /I reviewed dimensions/ }).check();
+  const exportView = await openExport(page);
+  await exportView
+    .getByRole('checkbox', { name: /I reviewed dimensions/ })
+    .check();
   await expect(
-    dialog.getByRole('button', { name: 'Download ZIP', exact: true })
+    exportView.getByRole('button', { name: 'Download case ZIP', exact: true })
   ).toBeEnabled();
   const downloading = page.waitForEvent('download');
-  await dialog
-    .getByRole('button', { name: 'Download ZIP', exact: true })
+  await exportView
+    .getByRole('button', { name: 'Download case ZIP', exact: true })
     .click();
   const download = await downloading;
   await download.saveAs('test-results/cad-portable-project.zip');
@@ -205,16 +210,16 @@ test('imports a KiCad bundle, aligns models, links placements, and exports a por
     await expect(studio(offlinePage)).toBeVisible();
     await openCase(offlinePage);
     const reopened = offlinePage.getByRole('region', { name: 'Case designer' });
-    await reopened
-      .getByRole('button', { name: 'Generate', exact: true })
+    await offlinePage
+      .getByRole('button', { name: 'Generate project', exact: true })
       .click();
     await expect(
-      reopened.getByText('Generated current draft', { exact: true })
+      reopened.getByRole('status').filter({ hasText: /Current geometry/ })
     ).toBeVisible({ timeout: 90000 });
     await openLibrary(offlinePage);
     await studio(offlinePage)
       .getByRole('button', {
-        name: `${manifest.entries[0].name} · r1`,
+        name: `${manifest.entries[0].name} Custom · revision 1`,
         exact: true,
       })
       .click();
@@ -267,9 +272,11 @@ test('assigns a model to a native BHK controller and exports the object binding'
   await dialog
     .getByRole('treeitem', { name: 'controller (1)', exact: true })
     .click();
-  await dialog.getByRole('button', { name: 'Generate', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Generate project', exact: true })
+    .click();
   await expect(
-    dialog.getByText('Generated current draft', { exact: true })
+    dialog.getByRole('status').filter({ hasText: /Current geometry/ })
   ).toBeVisible({ timeout: 90000 });
   await dialog.getByRole('button', { name: 'exploded', exact: true }).click();
   await expect(dialog.getByLabel('3D assembly preview')).toHaveAttribute(
@@ -288,10 +295,13 @@ test('assigns a model to a native BHK controller and exports the object binding'
   await page.screenshot({ path: 'test-results/cad-bhk-narrow.png' });
   await page.setViewportSize({ width: 1487, height: 1058 });
   await dialog.getByRole('button', { name: 'Review', exact: true }).click();
-  await dialog.getByRole('checkbox', { name: /I reviewed dimensions/ }).check();
+  const exportView = await openExport(page);
+  await exportView
+    .getByRole('checkbox', { name: /I reviewed dimensions/ })
+    .check();
   const download = page.waitForEvent('download');
-  await dialog
-    .getByRole('button', { name: 'Download ZIP', exact: true })
+  await exportView
+    .getByRole('button', { name: 'Download case ZIP', exact: true })
     .click();
   await (await download).saveAs('test-results/cad-bhk-project.zip');
   const zip = await JSZip.loadAsync(

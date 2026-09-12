@@ -1,40 +1,49 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Hand, MousePointer2, Move, Maximize, Minus, Plus } from 'lucide-react';
+import { useSnapOptions } from '../hooks/useSnapOptions';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { LayoutReport } from 'ergogen/src/native';
 import type { IModel } from 'makerjs';
 import { layoutPolygon } from '../utils/layoutDrawing';
 import { Drawing } from './CasePlanPreview';
 import { theme } from '../theme/theme';
-import { StudioBar } from './StudioStyles';
+import CanvasTools from './CanvasTools';
+import SnapControls from './SnapControls';
+import { snapLayout, type LayoutSnap } from '../utils/layoutSnapping';
+import { pitchUnits } from '../utils/designUnits';
+import { layoutSpacing, hasSpacing } from '../utils/snapSpacing';
 import { useLayoutAnalysis } from '../hooks/useCasePreview';
-import { moveLayout } from '../utils/layoutSource';
-import { moveColumn } from '../utils/studioSource';
+import {
+  moveTargets,
+  movingIds,
+  attachObject,
+  attachmentReason,
+} from '../utils/studioMove';
+import {
+  includesObject,
+  targets,
+  sameTarget,
+  selectTargets,
+  selectionMode,
+  type StudioSelection,
+} from '../utils/studioTargets';
+export type { StudioSelection } from '../utils/studioTargets';
 import type { StudioRule } from '../utils/studioSource';
 
-export interface StudioSelection {
-  section:
-    | 'objects'
-    | 'columns'
-    | 'clusters'
-    | 'parameters'
-    | 'constraints'
-    | 'outline'
-    | 'layers';
-  id: string;
-  cluster?: string;
-}
 type Box = { x: number; y: number; w: number; h: number };
-const PAD = 14,
+const DRAG_THRESHOLD = 4,
+  SNAP_PIXELS = 8,
+  PAD = 14,
   MIN_SIZE = 40,
   ZOOM_STEP = 1.25,
   MIN_SCALE = 0.1,
-  MAX_SCALE = 5;
+  MAX_SCALE = 5,
+  MOVE_TOLERANCE = 0.01;
 export default function StudioCanvas({
   report,
+  inspector,
   selection,
   onSelect,
-  onQuickEdit,
   onMove,
+  onDelete,
   stale,
   source,
   model,
@@ -42,13 +51,23 @@ export default function StudioCanvas({
   onSide,
   rules,
   injections,
+  onAlign,
+  onPickTarget,
 }: {
+  onPickTarget?: (ref: string) => void;
+  onAlign?: (id: string, target: string, axis: 'x' | 'y') => void;
   report?: LayoutReport;
+  inspector?: ReactNode;
   injections?: string[][];
   selection: StudioSelection;
   onSelect: (value: StudioSelection, panel?: 'inspect' | 'keep') => void;
-  onQuickEdit?: (value: StudioSelection) => void;
-  onMove: (selection: StudioSelection, delta: number[], source: string) => void;
+  onMove: (
+    selection: StudioSelection,
+    delta: number[],
+    source: string,
+    candidate?: string
+  ) => boolean | void;
+  onDelete?: () => void;
   stale: boolean;
   source: string;
   model?: IModel;
@@ -58,7 +77,40 @@ export default function StudioCanvas({
 }) {
   const svg = useRef<SVGSVGElement>(null);
   const [tool, setTool] = useState('select');
-  const [scope, setScope] = useState('keys');
+  // Selection changes must not replace the tool chosen for the next click.
+  const [scope, setScope] = useState(() =>
+    ['columns', 'clusters'].includes(selection.section)
+      ? selection.section
+      : 'keys'
+  );
+  const [snapping, setSnapping] = useState(true);
+  const [snapOptions, setSnapOptions] = useSnapOptions();
+  const [lastSnap, setLastSnap] = useState<LayoutSnap | null>(null);
+  const pitchValues = useMemo(() => {
+    try {
+      return pitchUnits(source);
+    } catch {
+      return { u: 19, v: 19 };
+    }
+  }, [source]);
+  const [gap, setGap] = useState(2);
+  const [relative, setRelative] = useState(false);
+  const [committed, setCommitted] = useState<{
+    source: string;
+    report: LayoutReport;
+  } | null>(null);
+  const spacing = useMemo(() => {
+    try {
+      return report ? layoutSpacing(source, report) : {};
+    } catch {
+      return {};
+    }
+  }, [source, report]);
+  useEffect(() => {
+    if (committed && (source !== committed.source || !stale)) {
+      setCommitted(null);
+    }
+  }, [source, stale, committed]);
   const items = Object.values(report?.objects || {}).filter(
     (item) => item.kind !== 'anchor'
   );
@@ -90,8 +142,8 @@ export default function StudioCanvas({
     .sort()
     .join('|');
   useEffect(() => {
-    setCamera(null);
-  }, [objectIds]);
+    setCamera(fitRef.current);
+  }, [objectIds, side]);
   const box = camera || fit;
   const liveBox = useRef(box);
   liveBox.current = box;
@@ -105,75 +157,136 @@ export default function StudioCanvas({
   const [drag, setDrag] = useState<{
     selection: StudioSelection;
     start: number[];
+    screen: number[];
+    snap?: LayoutSnap;
+    attach?: string;
     delta: number[];
     source: string;
     phase: 'moving' | 'released';
+    checkSpacing?: boolean;
   } | null>(null);
   const [moveError, setMoveError] = useState('');
-  const candidate = useMemo(() => {
+  const proposal = useMemo(() => {
     if (
       !drag ||
+      drag.phase !== 'released' ||
       drag.source !== source ||
-      !['objects', 'clusters', 'columns'].includes(drag.selection.section)
+      !report
     ) {
-      return '';
-    }
-    if (drag.selection.section === 'columns') {
-      const cluster = drag.selection.cluster || '',
-        frame = report?.clusters[cluster];
-      if (!frame || frame.locked) {
-        return '';
-      }
-      try {
-        return moveColumn(
-          source,
-          cluster,
-          drag.selection.id,
-          drag.delta,
-          frame.matrix
-        );
-      } catch {
-        return '';
-      }
-    }
-    const section = drag.selection.section as 'objects' | 'clusters';
-    const frame = report?.[section]?.[drag.selection.id];
-    if (!frame || frame.locked) {
-      return '';
+      return { source: '', error: '' };
     }
     try {
-      return moveLayout(
-        source,
-        section,
-        drag.selection.id,
-        drag.delta,
-        frame.editMatrix
-      );
-    } catch {
-      return '';
+      if (
+        drag.checkSpacing &&
+        !hasSpacing(
+          report,
+          movingIds(source, drag.selection, report),
+          drag.delta,
+          gap,
+          spacing
+        )
+      ) {
+        throw new Error(
+          'Not enough room for the configured spacing. Move farther away or turn off snapping.'
+        );
+      }
+      return {
+        source: drag.attach
+          ? attachObject(
+              source,
+              drag.selection.id,
+              drag.attach,
+              drag.delta,
+              report
+            )
+          : moveTargets(source, drag.selection, drag.delta, report),
+        error: '',
+      };
+    } catch (error) {
+      return { source: '', error: String(error) };
     }
-  }, [drag, source, report]);
+  }, [drag, source, report, gap, spacing]);
+  const candidate = proposal.source;
   const preview = useLayoutAnalysis(candidate, injections, !!candidate);
   const previewReady =
     !!candidate && !preview.stale && !preview.pending && !preview.error;
-  const visible = previewReady ? preview.result?.layout || report : report;
+  const visible = previewReady
+    ? preview.result?.layout || report
+    : committed?.report || report;
   const drawn = Object.values(visible?.objects || {}).filter(
     (item) => item.kind !== 'anchor'
   );
+  const dragSource = drag?.source,
+    dragSelection = drag?.selection;
+  const draggedIds = useMemo(() => {
+    if (!dragSource || !dragSelection || !report) {
+      return [];
+    }
+    try {
+      return movingIds(dragSource, dragSelection, report);
+    } catch {
+      return Object.values(report.objects)
+        .filter((item) => includesObject(dragSelection, item))
+        .map((item) => item.id);
+    }
+  }, [dragSource, dragSelection, report]);
   useEffect(() => {
     if (!drag || drag.phase !== 'released') {
       return;
     }
     if (drag.source !== source || !candidate || preview.error) {
-      setMoveError(preview.error || 'The project changed. Retry the move.');
+      setMoveError(
+        proposal.error ||
+          preview.error ||
+          'The project changed. Retry the move.'
+      );
       setDrag(null);
       return;
     }
     if (previewReady) {
-      onMove(drag.selection, drag.delta, drag.source);
+      const checked = preview.result?.layout;
+      const blocked = draggedIds.find((id) => {
+        const before = report?.objects[id],
+          after = checked?.objects[id];
+        return (
+          before &&
+          (!after ||
+            before.position.some(
+              (value, axis) =>
+                Math.abs(value + drag.delta[axis] - after.position[axis]) >
+                MOVE_TOLERANCE
+            ))
+        );
+      });
+      if (!checked || blocked) {
+        setMoveError(
+          blocked
+            ? `Placement constraints hold ${blocked}. Adjust its constraints before moving it.`
+            : 'The moved layout could not be validated.'
+        );
+      } else if (
+        onMove(drag.selection, drag.delta, drag.source, candidate) === false
+      ) {
+        setMoveError('The project changed during this move. Retry.');
+      } else {
+        // Keep the accepted pose visible until the main analysis catches up.
+        setCommitted({ source: candidate, report: checked });
+        setLastSnap(drag.snap?.kind === 'center' ? drag.snap : null);
+      }
       setDrag(null);
     }
-  }, [drag, candidate, previewReady, preview.error, onMove, source]);
+  }, [
+    drag,
+    candidate,
+    previewReady,
+    preview.error,
+    proposal.error,
+    preview.result,
+    draggedIds,
+    report,
+    onMove,
+    source,
+  ]);
   const convert = (x: number, y: number) => {
     const matrix = svg.current?.getScreenCTM();
     if (!matrix) {
@@ -239,7 +352,7 @@ export default function StudioCanvas({
     return next;
   };
   const reset = () => {
-    setCamera(null);
+    setCamera(fitRef.current);
     gesture.current = null;
     setDrag(null);
   };
@@ -268,94 +381,106 @@ export default function StudioCanvas({
   };
   return (
     <>
-      <StudioBar aria-label="Canvas tools" style={{ flexWrap: 'wrap' }}>
-        {[
-          [MousePointer2, 'select', 'Select'],
-          [Move, 'move', 'Move'],
-          [Hand, 'pan', 'Pan'],
-        ].map(([Icon, id, label]) => {
-          const Glyph = Icon as typeof Hand;
-          return (
+      <SnapControls
+        options={{ ...snapOptions, gap }}
+        enabled={snapping}
+        onChange={setSnapOptions}
+        units={pitchValues}
+      />
+      {lastSnap?.axis &&
+        selection.section === 'objects' &&
+        onAlign &&
+        lastSnap.moving === selection.id && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: theme.studio.dragStatusBottom,
+              left: theme.spacing.md,
+              zIndex: 1,
+            }}
+          >
             <button
-              key={String(id)}
-              aria-label={String(label)}
-              aria-pressed={tool === id}
-              onClick={() => setTool(String(id))}
+              onClick={() => {
+                onAlign(lastSnap.moving, lastSnap.target, lastSnap.axis!);
+                setLastSnap(null);
+              }}
             >
-              <Glyph size={18} />
+              Keep aligned · {lastSnap.label.replace('Centered on ', '')}
             </button>
-          );
-        })}
-        <select
-          aria-label="Selection mode"
-          value={scope}
-          onChange={(event) => {
-            setScope(event.target.value);
-            setTool('select');
-          }}
-        >
-          <option value="keys">Keys</option>
-          <option value="columns">Columns</option>
-          <option value="clusters">Clusters</option>
-        </select>
-        <button
-          aria-pressed={side === 'top'}
-          onClick={() => {
-            onSide('top');
-            reset();
-          }}
-        >
-          2D
-        </button>
-        <button
-          aria-pressed={side === 'side'}
-          onClick={() => {
-            onSide('side');
-            reset();
-          }}
-        >
-          Side
-        </button>
-        <span className="grow" />
-        <button aria-label="Fit layout" onClick={reset}>
-          <Maximize size={18} />
-        </button>
-        <button aria-label="Zoom out" onClick={() => zoom(ZOOM_STEP)}>
-          <Minus size={18} />
-        </button>
-        <small className="desktop">{Math.round((fit.w / box.w) * 100)}%</small>
-        <button aria-label="Zoom in" onClick={() => zoom(1 / ZOOM_STEP)}>
-          <Plus size={18} />
-        </button>
-      </StudioBar>
+            <button
+              aria-label="Dismiss alignment"
+              onClick={() => setLastSnap(null)}
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+      <CanvasTools
+        tool={tool}
+        setTool={setTool}
+        scope={scope}
+        setScope={setScope}
+        side={side}
+        setSide={onSide}
+        reset={reset}
+        zoom={(direction) =>
+          zoom(direction === 'in' ? 1 / ZOOM_STEP : ZOOM_STEP)
+        }
+        scale={Math.round((fit.w / box.w) * 100)}
+        snapping={snapping}
+        setSnapping={setSnapping}
+        gap={gap}
+        setGap={setGap}
+        relative={relative}
+        setRelative={setRelative}
+        relativeReason={attachmentReason(source, selection)}
+        inspector={inspector}
+        onDelete={selection.id && !stale ? onDelete : undefined}
+      />
       {(drag || moveError) && (
         <div
           role="status"
           style={{
             position: 'absolute',
-            bottom: theme.spacing.sm,
+            bottom: theme.studio.dragStatusBottom,
             left: theme.spacing.sm,
             padding: theme.spacing.sm,
             background: theme.colors.background,
             pointerEvents: 'none',
           }}
         >
-          {moveError || (preview.pending ? 'Solving move…' : 'Previewing move')}
+          {moveError ||
+            (drag?.phase === 'released'
+              ? 'Checking placement…'
+              : drag?.snap
+                ? `${drag.snap.label}${drag.attach ? ' · keep relative' : ''}`
+                : 'Drag to move · Alt bypasses snap · Esc cancels')}
         </div>
       )}
       <svg
         ref={svg}
         aria-label="Interactive board layout"
         role="group"
+        tabIndex={0}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.stopPropagation();
+            setDrag(null);
+            setMoveError('');
+          }
+        }}
         viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`}
         style={{
           width: '100%',
           minHeight: 0,
           flex: 1,
           touchAction: 'none',
-          cursor: tool === 'pan' ? 'grab' : 'default',
+          cursor: tool === 'pan' ? 'grab' : drag ? 'grabbing' : 'default',
         }}
         onPointerDown={(event) => {
+          if (event.button > 1 || drag?.phase === 'released') {
+            return;
+          }
           pointers.current.set(event.pointerId, {
             x: event.clientX,
             y: event.clientY,
@@ -370,23 +495,43 @@ export default function StudioCanvas({
             .closest('[data-object]')
             ?.getAttribute('data-object');
           const item = id ? report?.objects[id] : undefined;
-          if (item && tool !== 'pan') {
-            const next = pick(item);
-            onSelect(next, tool === 'move' ? 'keep' : 'inspect');
-            if (tool === 'select') {
+          if (item && tool !== 'pan' && event.button !== 1) {
+            const picked = pick(item);
+            const mode = selectionMode(event);
+            const order = Array.from(
+              new Map(
+                items.map((value) => {
+                  const target = pick(value);
+                  return [JSON.stringify(target), target];
+                })
+              ).values()
+            );
+            const next =
+              mode === 'replace' &&
+              targets(selection).some((target) => sameTarget(target, picked))
+                ? selection
+                : selectTargets(selection, picked, mode, order);
+            onSelect(next, 'keep');
+            svg.current?.focus();
+            if (mode !== 'replace') {
               return;
             }
-            if (tool === 'move' && !stale && !item.locked) {
+            if (!stale && !item.locked) {
+              setCamera({ ...liveBox.current });
               setDrag({
                 selection: next,
                 start: convert(event.clientX, event.clientY),
+                screen: [event.clientX, event.clientY],
                 delta: [0, 0, 0],
                 source,
                 phase: 'moving',
               });
               setMoveError('');
-              return;
             }
+            return;
+          }
+          if (tool === 'select' && event.button !== 1) {
+            onSelect({ section: 'objects', id: '' }, 'keep');
           }
           startGesture();
         }}
@@ -399,8 +544,54 @@ export default function StudioCanvas({
             y: event.clientY,
           });
           if (drag?.phase === 'moving' && pointers.current.size === 1) {
+            if (
+              Math.hypot(
+                event.clientX - drag.screen[0],
+                event.clientY - drag.screen[1]
+              ) < DRAG_THRESHOLD &&
+              !drag.delta.some(Boolean)
+            ) {
+              return;
+            }
             const next = convert(event.clientX, event.clientY);
-            setDrag({ ...drag, delta: next.map((v, i) => v - drag.start[i]) });
+            const delta = next.map((v, i) => v - drag.start[i]);
+            const matrix = svg.current?.getScreenCTM();
+            const tolerance =
+              SNAP_PIXELS /
+              Math.max(0.01, Math.hypot(matrix?.a || 1, matrix?.b || 0));
+            const snap =
+              snapping && !event.altKey && side === 'top' && report
+                ? snapLayout(
+                    report,
+                    draggedIds,
+                    delta,
+                    { ...snapOptions, gap },
+                    pitchValues,
+                    tolerance,
+                    spacing,
+                    report.clusters[
+                      drag.selection.cluster ||
+                        (drag.selection.section === 'clusters'
+                          ? drag.selection.id
+                          : report.objects[drag.selection.id]?.cluster) ||
+                        ''
+                    ]?.matrix,
+                    drag.snap
+                  )
+                : undefined;
+            const attach =
+              relative &&
+              snap?.kind === 'edge' &&
+              !attachmentReason(source, drag.selection)
+                ? snap.target
+                : undefined;
+            setDrag({
+              ...drag,
+              delta: snap?.delta || delta,
+              snap,
+              attach,
+              checkSpacing: snapping && !event.altKey && side === 'top',
+            });
             return;
           }
           const start = gesture.current,
@@ -476,14 +667,11 @@ export default function StudioCanvas({
           </g>
         )}
         {drawn.map((item) => {
-          const active =
-            selection.section === 'columns'
-              ? item.cluster === selection.cluster &&
-                item.cell?.[0] === selection.id
-              : selection.section === 'clusters'
-                ? item.cluster === selection.id
-                : selection.section === 'objects' && item.id === selection.id;
-          const delta = [0, 0, 0];
+          const active = includesObject(selection, item);
+          const delta =
+            drag && !previewReady && draggedIds.includes(item.id)
+              ? drag.delta
+              : [0, 0, 0];
           return (
             <g
               key={item.id}
@@ -495,20 +683,19 @@ export default function StudioCanvas({
                 item.cell ? `studio-${item.id}-cell` : undefined
               }
               aria-pressed={active}
-              onContextMenu={(event) => {
-                event.preventDefault();
-                onQuickEdit?.(pick(item));
-              }}
-              onDoubleClick={() => onQuickEdit?.(pick(item))}
               transform={`translate(${delta[0]},${-delta[axis]})`}
               onKeyDown={(event) => {
-                if (event.key === 'F10' && event.shiftKey) {
-                  event.preventDefault();
-                  onQuickEdit?.(pick(item));
-                }
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
-                  onSelect(pick(item));
+                  const next = pick(item);
+                  const order = items.map(pick);
+                  const selected = selectTargets(
+                    selection,
+                    next,
+                    selectionMode(event),
+                    order
+                  );
+                  onSelect(selected, 'keep');
                 }
                 if (
                   !active ||
@@ -529,8 +716,24 @@ export default function StudioCanvas({
                 ] =
                   (event.key === 'ArrowLeft' || event.key === 'ArrowDown'
                     ? -1
-                    : 1) * (event.shiftKey ? 5 : 1);
-                onMove(selection, delta, source);
+                    : 1) *
+                  (event.shiftKey ? 4 : 1) *
+                  (snapOptions.millimetres ||
+                    snapOptions.step *
+                      pitchValues[
+                        event.key === 'ArrowLeft' || event.key === 'ArrowRight'
+                          ? 'u'
+                          : 'v'
+                      ]);
+                setCamera({ ...liveBox.current });
+                setDrag({
+                  selection,
+                  start: [0, 0, 0],
+                  screen: [0, 0],
+                  delta,
+                  source,
+                  phase: 'released',
+                });
               }}
             >
               {item.cell && (
@@ -562,6 +765,82 @@ export default function StudioCanvas({
             </g>
           );
         })}
+        {drag?.snap &&
+          drag.snap.guides.map((guide, index) => (
+            <line
+              key={`snap-${index}`}
+              x1={guide.a[0]}
+              y1={-guide.a[1]}
+              x2={guide.b[0]}
+              y2={-guide.b[1]}
+              stroke={theme.colors.accent}
+              strokeWidth=".4"
+              strokeDasharray="1 1"
+              pointerEvents="none"
+            />
+          ))}
+        {side === 'top' &&
+          Object.values(visible?.guides || {})
+            .filter((guide) => guide.id.endsWith('.center'))
+            .map((guide) => (
+              <path
+                key={`center-${guide.id}`}
+                d={`M${guide.position[0] - 0.8} ${-guide.position[1]}h1.6m-0.8 -0.8v1.6`}
+                stroke={theme.studio.key}
+                strokeWidth=".12"
+                fill="none"
+                opacity=".6"
+                pointerEvents="none"
+              />
+            ))}
+        {onPickTarget &&
+          Object.values(visible?.guides || {}).map((guide) => (
+            <g
+              key={`pick-${guide.id}`}
+              role="button"
+              tabIndex={0}
+              aria-label={`Align to ${guide.label}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onPickTarget(guide.id);
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  onPickTarget(guide.id);
+                }
+              }}
+            >
+              <circle
+                cx={guide.position[0]}
+                cy={-guide.position[1]}
+                r="1.4"
+                stroke={theme.colors.accent}
+                fill={theme.colors.background}
+              />
+              {!guide.id.endsWith('.center') && (
+                <>
+                  <rect
+                    x={guide.position[0] + 1}
+                    y={-guide.position[1] - 6}
+                    width={guide.label.split(' · ')[0].length * 1.5 + 3}
+                    height="5"
+                    rx=".5"
+                    fill={theme.colors.backgroundLight}
+                  />
+                  <text
+                    x={guide.position[0] + 2}
+                    y={-guide.position[1] - 2.5}
+                    fontSize="2.5"
+                    fill={theme.colors.text}
+                  >
+                    {guide.label.split(' · ')[0]}
+                  </text>
+                </>
+              )}
+              <title>{guide.label}</title>
+            </g>
+          ))}
         {side === 'top' &&
           Object.entries(rules)
             .filter(([id, rule]) =>
@@ -570,23 +849,37 @@ export default function StudioCanvas({
                 : rule.refs.some(
                     (ref) =>
                       ref === selection.id ||
-                      ref === `${selection.section}.${selection.id}`
+                      ref === `${selection.section}.${selection.id}` ||
+                      ref === `${selection.id}.center`
                   )
             )
             .map(([id, rule]) => {
-              const refs = rule.refs.map((ref) =>
-                ref.startsWith('clusters.')
-                  ? visible?.clusters[ref.slice(9)]
-                  : visible?.objects[
-                      ref.replace(/^objects\./, '').replace(/\.origin$/, '')
-                    ]
+              const refs = rule.refs.map(
+                (ref) =>
+                  visible?.guides?.[ref] ||
+                  (ref.startsWith('clusters.')
+                    ? visible?.clusters[ref.slice(9)]
+                    : visible?.objects[
+                        ref.replace(/^objects\./, '').replace(/\.origin$/, '')
+                      ])
               );
               if (!refs[0] || !refs[1]) {
                 return null;
               }
               const [a, b] = refs as NonNullable<(typeof refs)[number]>[];
               return (
-                <g key={id} pointerEvents="none">
+                <g
+                  key={id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Edit relationship ${rule.label || id}`}
+                  onClick={() => onSelect({ section: 'constraints', id })}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      onSelect({ section: 'constraints', id });
+                    }
+                  }}
+                >
                   <line
                     x1={a.position[0]}
                     y1={-a.position[1]}

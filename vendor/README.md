@@ -55,3 +55,20 @@ sub-tolerance offset repair during solid conversion.
 The source is committed; this is not an npm release.
 
 SHA-256: `7f774f2566c399d658ffc2662937b2190c8eb0f00bd200339848c3ffe3ba8f39`
+
+## Corner relief repair
+
+Previous dependency: `ergogen-studio-b3293ff8a4fe.tgz`. Source matches engine commit
+`44bbc26` plus the local `src/designs/finishing.js` repair for newly enclosed
+voids during corner relief. This is an uncommitted local snapshot.
+
+SHA-256: `b3293ff8a4feac421449e12a65546723b8890db533fdeddf3233012fa2574491`
+
+## Layout units and mechanical layers
+
+Selected dependency: `ergogen-layout-944c5d0dff46.tgz`. Includes native center guides,
+frame-based alignment constraints, mechanical stack references, and independent
+material DXFs with reference solids. Engine source: `2a0754a`, including the
+outline repair in `41184ef`. This is a local snapshot, not an npm release.
+
+SHA-256: `944c5d0dff46c99013d77a225115f3f602292a34211ae6df416767238ed642ea`

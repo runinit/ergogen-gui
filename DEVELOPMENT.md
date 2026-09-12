@@ -16,10 +16,62 @@ This document serves as a knowledge base and architectural guide for the project
 
 ## Board Studio and document session
 
-`BoardStudio` is the native workspace: Layout → Components → PCB → Case → Export.
+### Pitch, relationships and setup
+
+`DimensionField` retains expressions such as `0.5u` and shows resolved millimetres.
+`u` is horizontal pitch; `v` is vertical pitch, defaulting to `u` on square layouts.
+`SnapProvider` shares quarter-unit defaults and 1, 1/2, 1/4, 1/8 increments between
+canvas nudges, drag snapping and column stagger controls. Vertical column moves
+edit stagger while preserving authored offsets. Alt temporarily bypasses snapping.
+
+`layoutSnapping` consumes native physical center and row/column guides. Temporary
+snaps can become labelled native constraints through **Keep aligned**. The
+Inspector also supports mouse-picked center alignment, distance and equal spacing.
+`layoutRelations` validates candidates before committing, tracks owned freedoms,
+and bakes the solved pose when unlinking the final managed relationship.
+
+`DesignSetupPanel` stages Basics, Key assembly and Stackup in the workspace.
+`setupDraft` merges changed settings against current source and rejects conflicts;
+layout edits made while setup is open survive. Existing keys inherit assembly
+changes unless customized or locked. Rows, columns, MCUs and encoders are added in
+Layout. The assembly editor generates a separate two-key KiCad sample using real
+footprints and assets. `componentPlacement` inserts catalogue electronics on the
+chosen PCB; battery envelopes require measured dimensions.
+
+### Mechanical material layers
+
+`designs.stackups` defines PCB/plate dimensions and named foam, silicone or gasket
+layers between existing physical surfaces. Named parameters also drive linked
+case assemblies and inherited per-key electronics. Stock thickness and compression
+produce installed thickness; sheets sharing a gap accumulate in order. Interference
+and missing surfaces belong to the affected layer and do not move the stack.
+
+Native stackup compilation derives flat contours from the selected PCB/profile,
+subtracts intersecting bodies, mounts and explicit cutouts, then validates closed
+geometry. Gasket defaults require named contacts or an explicit profile. Each ready
+layer has its own millimetre DXF and nominal reference solid. ZIP exports include
+`outputs/material-layers.json`. Gap fit in setup is distinct from cutting-outline
+readiness in Export; reference solids do not model elastic deformation.
+
+`BoardStudio` is the native workspace: Design → PCB → Case → Export.
 Its tree and inspector surround a shared physical-layout canvas. Phone panels
 replace the docked columns without removing editing controls. Legacy documents
 retain the existing workspace while native projects use Studio.
+
+Design combines layout and component placement, with one part-library entry.
+Settings opens a modal inside the workspace and restores focus when closed;
+selection, camera and the active stage remain mounted. Advanced library source
+appears only after selecting an entry. Schema routing parses YAML, retains the
+active editor during syntax errors and resets when switching projects.
+
+Board Studio owns native analysis and explicit generation across Case, Code,
+library, sketches and Export. Analysis updates sketch editing; full generation
+supplies assembly meshes and converts JSCAD tray parts before publishing success.
+The legacy context never generates native documents, including
+initial imports and migrated thumbnails. Visiting Case does not modify the source;
+**Create case** is an explicit undoable edit. Export groups portable source, PCB,
+outlines and case files. Manufacturing review belongs to the current generated
+result and resets after edits; case failures do not block valid PCB outputs.
 
 `ConfigContext` owns the source, realtime source reference, project assets,
 custom injections and bounded undo/redo history. Code typing coalesces for 750 ms;
@@ -35,10 +87,13 @@ Duplicate keys receive new explicit net names and generated footprint references
 Resizing an arrangement retains the IDs of existing cells. Deletion refuses
 referenced objects instead of leaving broken attachments.
 
-New projects start from numeric matrix dimensions (5 columns × 4 rows by default).
-Their keys mount on the PCB top surface; new thumb clusters and loose keys reuse
-that layer. Case-height changes therefore move the electronics with the PCB.
-Selection scope—Keys, Columns or Clusters—is separate from Select, Move and Pan.
+New projects start with an empty canvas and docked Design setup.
+`boardDefaults` creates explicit `u`/`v` pitch and mechanical parameters;
+`boardTopology` links mirrored clusters. Adding physical content initializes a
+missing PCB outline without replacing existing profiles. Keys mount on the PCB
+top surface; new thumb clusters and loose keys reuse that layer. Case-height changes therefore move the electronics with the PCB.
+The floating canvas pill exposes Objects, Columns and Matrices directly, alongside
+Pan and snapping. Selecting a tree item also updates the canvas selection scope.
 `ColumnInspector` edits a whole column's splay, stagger and offsets, and exposes
 its occupied and empty cells. Resizing preserves deleted holes; Add key restores
 a chosen cell. The engine assigns shared column/row nets; individual overrides
@@ -46,12 +101,36 @@ remain available under Wiring. This interaction draws inspiration from the
 [Cosmos editor](https://ryanis.cool/cosmos/beta), using our existing theme,
 native YAML and physical geometry.
 
-`StudioCanvas` renders resolved engine envelopes. A move has an ephemeral source
-candidate, resolved through the layout worker before it is committed to history.
-Cancelled pointers and failed solutions discard that candidate. Dimensions and
-arrangement formulas remain authored expressions; movement changes local overrides.
-Camera state is independent of source history. Fit, wheel zoom, pan and pinch
-operate on the drawing; drag feedback is an absolute overlay that never resizes the canvas.
+`StudioCanvas` renders resolved engine envelopes. Pointer motion translates SVG
+objects immediately; only a released drag creates a YAML candidate and invokes the
+layout worker. The accepted pose stays visible until normal analysis catches up.
+The camera freezes at drag start; Fit alone reframes the changed geometry. Cancelled
+pointers, changed source and rejected solutions leave source history unchanged.
+A solved constraint that prevents the requested motion produces a visible error.
+
+`studioTargets` owns Ctrl/Cmd toggling, Shift ranges and containment-aware selection.
+`studioMove` applies world deltas through local edit frames. Selected descendants
+move once with their ancestor, including owned electronics and mirrored members.
+`studioDelete` assembles a single undoable edit, removes owned components, and
+preserves lock and external-reference checks. Delete in text fields or dialogs
+keeps its normal editing behavior.
+
+`snapSpacing` resolves pitch expressions through the native unit evaluator and
+caches scoped defaults. Keys retain their pitch-derived edge gaps, including
+oversized caps and unequal row/column pitch. Independent components use the gap
+chosen in Canvas options. Snapping compares actual rotated envelope edges and
+rejects candidates that crowd another object on the same PCB and mounting layer.
+Owned key electronics retain their intentionally overlapping assembly placements.
+Alt or the Snap toggle explicitly bypasses these placement rules. A same-layer
+component can keep its snapped target and relative offset; stacked, solved and
+key-owned placements keep their existing relationships.
+
+The Inspector opens explicitly and remembers its state. Desktop properties
+remain beside the canvas; phones use a scrollable drawer. Panels respect reduced
+motion. Objects show relative translation and rotation, keys add
+size/alignment, columns add splay/stagger, and matrices add row/column spacing.
+The compact tree groups owned electronics beneath keys. Pan, pinch, wheel zoom,
+arrow nudges and explicit Fit remain available.
 
 `StudioInspector` edits parameters, arrangements, placement, solver freedoms,
 constraints, layers, physical envelopes and outline finishing. For a profile that
@@ -712,9 +791,10 @@ editors. Documents and values are cloned before exposure; aliases, source ranges
 and independent edits remain covered by regression tests. A different source
 replaces the snapshot, bounding retained configuration data.
 
-While Case is active, Board Studio suspends its layout and board workers; the
-case designer owns draft analysis. Returning to Layout resumes analysis. Explicit
-3D builds reuse a successfully completed worker when injections are unchanged,
+While Case is active, Board Studio suspends its lightweight layout worker and
+keeps board analysis and full generation at workspace level. Standalone legacy
+case drafts retain their own jobs. Explicit 3D builds reuse a successfully
+completed worker when injections are unchanged,
 retaining the initialized CAD runtime. Busy, failed or changed-injection workers
 are replaced. Source, asset and request revisions still reject stale results;
 each build regenerates solids without reducing mesh precision or validation.
@@ -737,15 +817,12 @@ editable. Presets change the selected keycap envelope, preserving switch holes,
 footprint bindings and other keys.
 
 `keyResize` stores explicit horizontal/vertical alignment in
-`properties.key_alignment`. Auto keeps the leftmost column's left edge and the
-rightmost column's right edge fixed. Left/centre/right and top/centre/bottom are
+`properties.key_alignment`. Auto grows outside columns outward, keeping their inward edges fixed. Left/centre/right and top/centre/bottom are
 available for manual control. Compensation uses the key's rotated axes and
 preserves manual offsets and expressions. Undo restores size and position together.
 
-`SelectionControls` shares batch sizing and relative adjustments between the
-inspector and `SelectionPopover`. Double-click, context menu, Shift+F10 or Quick
-edit opens the non-modal editor. Outside pointer input dismisses it before a
-canvas drag. `studioSelection` applies a whole selection in one source transaction;
+`SelectionControls` provides batch sizing and relative adjustments inside the
+manually opened Inspector. Selection changes leave its visibility unchanged. `studioSelection` applies a whole selection in one source transaction;
 locked members reject the edit rather than partially updating it.
 
 `keyOptions` expands editor recipes into native object envelopes and footprint
@@ -853,3 +930,31 @@ Embedded case initialization renders the new case definition before adopting it
 into the project. Key position controls edit local placement overrides. Editing
 a source invalidates pending generation and releases the busy state; late worker
 responses cannot replace the current project.
+
+### Shared inspector and resize clearance
+
+Board Studio owns the Inspector toggle and session section state. Desktop sessions
+start with the object browser and properties docked around the canvas. Narrow
+screens start with the inspector closed and use a drawer with separate
+Browse objects and Edit properties views. Selection updates properties without
+opening a closed drawer. At phone widths, drawers fill the workspace; a sticky
+selection summary keeps the active object visible while scrolling properties.
+Escape restores focus to Inspector.
+
+The part library uses the same pane widths and control tokens. Save and undo
+remain in its sticky identity header; selecting a prepared import collapses the
+batch list. Each catalogue source retains one editable draft and undo history.
+Board Studio keeps the library mounted while changing views within a project.
+Model number fields hold temporary text locally and commit on blur or Enter;
+Escape restores the last committed value. Native model transforms therefore
+produce one edit per completed field change.
+
+`sizeSelection` is the shared key, column and matrix size command. It resolves the
+current native draft without the solver, applies all sizes, then computes polygon
+clearance using pitch-derived gaps. `resizeSpacing` changes only downstream
+columns and rows in affected matrices. Native placement and arrangement fields
+hold the result; `meta.studio.resizeAnchors` and `meta.studio.resizeSpacing` track
+ownership so unchanged generated adjustments can be removed on shrink. Authored
+expressions remain expressions. Locks and constraints prevent automatic movement;
+unresolved resize clearance is surfaced as an export blocker. The source is
+committed once through project history and the existing background outline pipeline.

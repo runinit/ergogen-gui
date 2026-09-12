@@ -1,0 +1,53 @@
+[
+  {
+    "device": "desktop",
+    "scene": "board",
+    "overflow": false
+  },
+  {
+    "device": "desktop",
+    "scene": "parts",
+    "overflow": false,
+    "save": {
+      "x": 1137,
+      "y": 224.375,
+      "width": 122,
+      "height": 38.296875
+    },
+    "errors": []
+  },
+  {
+    "device": "mobile",
+    "scene": "board",
+    "overflow": false
+  },
+  {
+    "device": "mobile",
+    "scene": "parts",
+    "overflow": false,
+    "save": {
+      "x": 17,
+      "y": 358.234375,
+      "width": 122,
+      "height": 44
+    },
+    "errors": []
+  },
+  {
+    "device": "narrow",
+    "scene": "board",
+    "overflow": false
+  },
+  {
+    "device": "narrow",
+    "scene": "parts",
+    "overflow": false,
+    "save": {
+      "x": 17,
+      "y": 358.234375,
+      "width": 122,
+      "height": 44
+    },
+    "errors": []
+  }
+]

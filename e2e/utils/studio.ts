@@ -42,18 +42,30 @@ export async function openCase(page: Page) {
     .click();
   const designer = page.getByRole('region', { name: 'Case designer' });
   await expect(designer).toBeVisible();
+  const create = designer.getByRole('button', {
+    name: 'Create case',
+    exact: true,
+  });
+  if (await create.count()) {
+    await create.click();
+  }
   return designer;
+}
+
+export async function openExport(page: Page) {
+  await studio(page)
+    .getByRole('navigation', { name: 'Design workflow' })
+    .getByRole('button', { name: 'Export', exact: true })
+    .click();
+  return studio(page).getByRole('main');
 }
 
 export async function openLibrary(page: Page) {
   await studio(page)
     .getByRole('navigation', { name: 'Design workflow' })
-    .getByRole('button', { name: 'Components', exact: true })
+    .getByRole('button', { name: 'Design', exact: true })
     .click();
-  await page
-    .getByRole('button', { name: 'Part library', exact: true })
-    .last()
-    .click();
+  await page.getByRole('button', { name: 'Part library', exact: true }).click();
   await expect(page.getByLabel('Import footprint files')).toBeAttached();
   return studio(page);
 }
@@ -62,6 +74,32 @@ export async function createDraft(page: Page) {
   await page
     .getByRole('button', { name: 'New native design', exact: true })
     .click();
-  await page.getByRole('button', { name: 'Create draft', exact: true }).click();
+  await page.getByRole('button', { name: 'Apply setup', exact: true }).click();
   await expect(studio(page)).toBeVisible();
+}
+
+export async function openInspector(page: Page) {
+  const trigger = page.getByRole('button', { name: 'Inspector', exact: true });
+  if ((await trigger.getAttribute('aria-expanded')) !== 'true') {
+    await trigger.click();
+  }
+  const panel = page.getByRole('complementary', { name: 'Design inspector' });
+  const browse = panel.getByRole('button', {
+    name: 'Browse objects',
+    exact: true,
+  });
+  if (await browse.isVisible()) {
+    await browse.click();
+  }
+  for (const name of ['Objects', 'Selection', 'Design']) {
+    const heading = panel.getByText(name, { selector: 'summary', exact: true });
+    if (
+      !(await heading.evaluate(
+        (node) => (node.parentElement as HTMLDetailsElement).open
+      ))
+    ) {
+      await heading.click();
+    }
+  }
+  return panel;
 }

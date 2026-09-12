@@ -47,6 +47,7 @@ export function assemblyParts(setup: DesignSetup) {
   return parts;
 }
 type KeyContext = {
+  pcbThickness?: number | string;
   pcb?: string;
   cluster?: string;
   cell?: string[];
@@ -67,6 +68,11 @@ export function compileKey(
   const isMx = setup.family === 'mx';
   const reversible = setup.topology === 'reversible';
   const { columnNet, rowNet } = context;
+  const thickness = context.pcbThickness ?? PCB_THICKNESS;
+  const below = (height: number) =>
+    typeof thickness === 'number'
+      ? -thickness - height
+      : `-(${thickness}) - ${height}`;
   const sw = setup.template.switch;
   const params = {
     from: columnNet,
@@ -145,7 +151,7 @@ export function compileKey(
         body: {
           height:
             offset.side === 'B'
-              ? [-PCB_THICKNESS - BODY_HEIGHT[kind], -PCB_THICKNESS]
+              ? [below(BODY_HEIGHT[kind]), below(0)]
               : [0, BODY_HEIGHT[kind]],
         },
       },

@@ -1,5 +1,10 @@
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import { theme } from '../theme/theme';
+
+const paneEntry = keyframes`
+  from { transform: translateX(8px); }
+  to { transform: translateX(0); }
+`;
 
 export const StudioShell = styled.section`
   flex: 1;
@@ -10,6 +15,26 @@ export const StudioShell = styled.section`
   color: ${theme.colors.text};
   background: ${theme.colors.background};
   font-family: ${theme.fonts.body};
+  font-size: ${theme.workbench.textSize};
+  line-height: 1.45;
+  overflow: hidden;
+  color-scheme: dark;
+  scrollbar-color: ${theme.colors.border} ${theme.colors.background};
+  scrollbar-width: thin;
+  ::selection {
+    background: ${theme.studio.selected};
+    color: ${theme.colors.text};
+  }
+  input,
+  textarea {
+    caret-color: ${theme.colors.accent};
+  }
+  input[type='number'] {
+    font-variant-numeric: tabular-nums;
+  }
+  a {
+    text-underline-offset: 3px;
+  }
   button,
   input,
   select,
@@ -22,13 +47,20 @@ export const StudioShell = styled.section`
     box-sizing: border-box;
   }
   button {
-    min-height: ${theme.studio.touchSize};
+    min-height: ${theme.workbench.controlHeight};
     padding: ${theme.spacing.sm} ${theme.spacing.md};
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: ${theme.spacing.sm};
     cursor: pointer;
+    transition:
+      background-color ${theme.workbench.stateMotion},
+      border-color ${theme.workbench.stateMotion};
+  }
+  button:hover:not(:disabled) {
+    background: ${theme.colors.buttonHover};
+    border-color: ${theme.workbench.borderHover};
   }
   button:disabled {
     opacity: 0.45;
@@ -41,8 +73,12 @@ export const StudioShell = styled.section`
     background: ${theme.studio.selected};
   }
   button[data-primary='true'] {
-    background: ${theme.colors.accent};
-    border-color: ${theme.colors.accent};
+    background: ${theme.workbench.primary};
+    border-color: ${theme.workbench.primary};
+    color: ${theme.colors.white};
+  }
+  button[data-primary='true']:hover:not(:disabled) {
+    background: ${theme.workbench.primaryHover};
   }
   button:focus-visible,
   input:focus-visible,
@@ -51,28 +87,52 @@ export const StudioShell = styled.section`
     outline: 2px solid ${theme.colors.accent};
     outline-offset: 2px;
   }
+  [data-object]:focus {
+    outline: none;
+  }
+  [data-object]:focus-visible polygon {
+    stroke: ${theme.colors.accent};
+    stroke-width: 2px;
+    stroke-dasharray: 4px 2px;
+    vector-effect: non-scaling-stroke;
+  }
   input,
   select,
   textarea {
     min-width: 0;
     max-width: 100%;
     padding: ${theme.spacing.sm};
-    min-height: ${theme.studio.touchSize};
+    min-height: ${theme.workbench.controlHeight};
   }
   input[type='checkbox'] {
     min-height: auto;
     width: 18px;
     height: 18px;
   }
-  color-scheme: dark;
   summary {
     cursor: pointer;
-    padding: ${theme.spacing.md} 0;
+    padding: ${theme.spacing.sm} 0;
+    font-weight: 500;
   }
   @media (min-width: ${theme.studio.breakpoint}) {
     .studio-mobile-tools,
     .mobile-only {
       display: none;
+    }
+  }
+  @media (max-width: ${theme.studio.breakpoint}) {
+    button,
+    input,
+    select {
+      min-height: ${theme.studio.touchSize};
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation: none !important;
+      transition: none !important;
     }
   }
   .studio-code {
@@ -81,7 +141,7 @@ export const StudioShell = styled.section`
     height: 100%;
   }
   h2 {
-    font-size: ${theme.fontSizes.lg};
+    font-size: ${theme.workbench.titleSize};
     margin: 0 0 ${theme.spacing.md};
   }
   h3 {
@@ -105,7 +165,7 @@ export const StudioBar = styled.div`
   border-bottom: 1px solid ${theme.colors.border};
   flex-shrink: 0;
   h1 {
-    font-size: ${theme.fontSizes.h3};
+    font-size: ${theme.workbench.titleSize};
     margin: 0;
     white-space: nowrap;
     overflow: hidden;
@@ -128,16 +188,38 @@ export const StageNav = styled.nav`
   border-bottom: 1px solid ${theme.colors.border};
   button {
     border: 0;
-    border-bottom: 3px solid transparent;
+    border-bottom: 2px solid transparent;
     border-radius: 0;
     background: transparent;
-    padding: ${theme.spacing.md} ${theme.spacing.lg};
+    padding: ${theme.spacing.sm} ${theme.spacing.lg};
+  }
+  .workspace-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: ${theme.spacing.xs};
+    padding: ${theme.spacing.xs} ${theme.spacing.sm};
+    button {
+      border-radius: ${theme.cad.fieldRadius};
+      padding: ${theme.spacing.sm};
+    }
   }
   button[aria-current='step'] {
     border-bottom-color: ${theme.colors.accent};
     color: ${theme.colors.accent};
   }
   @media (max-width: ${theme.studio.breakpoint}) {
+    flex-wrap: wrap;
+    .workspace-actions {
+      width: 100%;
+      border-top: 1px solid ${theme.colors.border};
+      justify-content: flex-end;
+      button {
+        flex-direction: row;
+        flex: initial;
+        font-size: ${theme.workbench.textSize};
+      }
+    }
     button {
       flex: 1;
       flex-direction: column;
@@ -164,12 +246,14 @@ export const StudioHeader = styled(StudioBar)`
     .project-actions {
       order: 1;
       width: 100%;
+      min-width: 0;
+      flex-wrap: wrap;
+      button {
+        padding: ${theme.spacing.sm};
+      }
     }
     .project-actions button[data-primary] {
       margin-left: auto;
-    }
-    .project-actions .desktop {
-      display: inline;
     }
   }
 `;
@@ -177,28 +261,125 @@ export const StudioBody = styled.div`
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: ${theme.studio.treeWidth} minmax(0, 1fr) ${theme.studio
-      .inspectorWidth};
+  grid-template-columns: minmax(0, 1fr);
   position: relative;
   overflow: hidden;
+  &[data-sheet='inspector'] {
+    grid-template-columns: ${theme.studio.treeWidth} minmax(0, 1fr) ${theme
+        .studio.inspectorWidth};
+    > main {
+      grid-column: 2;
+    }
+  }
   @media (max-width: ${theme.studio.breakpoint}) {
-    grid-template-columns: minmax(0, 1fr);
-    &[data-sheet] {
-      grid-template-rows: minmax(220px, 1fr) minmax(0, 1fr);
+    &[data-sheet='inspector'] {
+      grid-template-columns: minmax(0, 1fr);
+      > main {
+        grid-column: 1;
+      }
     }
   }
 `;
-export const StudioPane = styled.aside<{
-  $side: 'left' | 'right';
-  $open: boolean;
-}>`
-  min-height: 0; overflow: auto; padding: ${theme.spacing.md}; border-${(p) => (p.$side === 'left' ? 'right' : 'left')}: 1px solid ${theme.colors.border}; background: ${theme.colors.backgroundLight};
-  grid-column: ${(p) => (p.$side === 'left' ? 1 : 3)}; grid-row: 1;
-  .close-pane { display: none; }
-  @media(max-width: ${theme.studio.breakpoint}) { display: ${(p) => (p.$open ? 'block' : 'none')}; position: relative; grid-row: 2; border-top: 1px solid ${theme.colors.border}; z-index: ${theme.studio.panelLayer}; grid-column: 1; .close-pane { display: inline-flex; margin-bottom: ${theme.spacing.md}; } }
+export const StudioPane = styled.aside<{ $open: boolean }>`
+  display: ${(p) => (p.$open ? 'contents' : 'none')};
+  .pane-header {
+    display: none;
+  }
+  @media (max-width: ${theme.studio.breakpoint}) {
+    display: ${(p) => (p.$open ? 'block' : 'none')};
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: min(90%, ${theme.studio.inspectorWidth});
+    overflow: auto;
+    background: ${theme.colors.backgroundLight};
+    border-left: 1px solid ${theme.colors.border};
+    z-index: ${theme.studio.popoverLayer};
+    animation: ${paneEntry} ${theme.workbench.paneMotion};
+    .pane-header {
+      display: block;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: ${theme.colors.backgroundLight};
+    }
+    .selection-summary {
+      margin: 0;
+      padding: 0 ${theme.spacing.sm} ${theme.spacing.sm};
+      color: ${theme.colors.textDarker};
+      overflow-wrap: anywhere;
+      font-size: ${theme.fontSizes.bodySmall};
+    }
+    &[data-setup] .pane-tabs,
+    &[data-setup] .selection-summary {
+      display: none;
+    }
+    .pane-tabs {
+      display: flex;
+      gap: ${theme.spacing.xs};
+      padding: ${theme.spacing.sm};
+      border-bottom: 1px solid ${theme.colors.border};
+    }
+    .pane-tabs button {
+      flex: 1;
+      font-size: ${theme.fontSizes.bodySmall};
+      padding: ${theme.spacing.sm};
+    }
+    &[data-pane='properties'] .studio-browser,
+    &[data-pane='objects'] .studio-properties {
+      display: none;
+    }
+    .close-pane {
+      display: flex;
+      margin: ${theme.spacing.sm};
+    }
+  }
+  @media (max-width: ${theme.workbench.phoneBreakpoint}) {
+    width: 100%;
+    border-left: 0;
+  }
+`;
+export const StudioBrowser = styled.div`
+  grid-column: 1;
+  grid-row: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: ${theme.spacing.md};
+  background: ${theme.colors.backgroundLight};
+  border-right: 1px solid ${theme.colors.border};
+  > details + details {
+    margin-top: ${theme.spacing.md};
+    border-top: 1px solid ${theme.colors.border};
+  }
+  @media (max-width: ${theme.studio.breakpoint}) {
+    border-right: 0;
+  }
+`;
+export const StudioProperties = styled.div`
+  grid-column: 3;
+  grid-row: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: ${theme.spacing.md};
+  background: ${theme.colors.backgroundLight};
+  border-left: 1px solid ${theme.colors.border};
+  h2 {
+    overflow-wrap: anywhere;
+  }
+  fieldset {
+    min-width: 0;
+  }
+  input,
+  select,
+  textarea {
+    background: ${theme.workbench.fieldSurface};
+  }
+  @media (max-width: ${theme.studio.breakpoint}) {
+    border-left: 0;
+    border-top: 1px solid ${theme.colors.border};
+  }
 `;
 export const StudioMain = styled.main`
-  grid-column: 2;
+  grid-column: 1;
   grid-row: 1;
   min-width: 0;
   min-height: 0;
@@ -209,6 +390,11 @@ export const StudioMain = styled.main`
   @media (max-width: ${theme.studio.breakpoint}) {
     grid-column: 1;
   }
+`;
+
+// Keep editor drafts mounted while another project view is active.
+export const StudioLibrary = styled.div<{ $active: boolean }>`
+  display: ${({ $active }) => ($active ? 'contents' : 'none')};
 `;
 export const StudioField = styled.label`
   display: grid;
@@ -233,7 +419,7 @@ export const TreeButton = styled.button`
   &[aria-pressed='true'],
   &[aria-selected='true'] {
     background: ${theme.studio.selected} !important;
-    border-left: 3px solid ${theme.colors.accent} !important;
+    color: ${theme.colors.accent};
   }
   justify-content: flex-start !important;
   text-align: left;
@@ -253,6 +439,7 @@ export const StudioStatus = styled.div`
   flex-wrap: wrap;
   gap: ${theme.spacing.sm};
   flex-shrink: 0;
+  font-size: ${theme.fontSizes.bodySmall};
   button {
     margin-left: auto;
   }
